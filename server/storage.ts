@@ -3,6 +3,8 @@ import {
   referrals,
   emailQueue,
   refundSurveys,
+  pageVisits,
+  supportQueries,
   type User,
   type UpsertUser,
   type Referral,
@@ -11,9 +13,13 @@ import {
   type InsertEmailQueue,
   type RefundSurvey,
   type InsertRefundSurvey,
+  type PageVisit,
+  type InsertPageVisit,
+  type SupportQuery,
+  type InsertSupportQuery,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, lte, and, isNull } from "drizzle-orm";
+import { eq, lte, and, isNull, gte, sql, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -48,6 +54,19 @@ export interface IStorage {
   // Admin operations
   getAllUsers(): Promise<User[]>;
   getAllReferrals(): Promise<Referral[]>;
+
+  // Visit tracking operations
+  trackVisit(visit: InsertPageVisit): Promise<PageVisit>;
+  getVisitCount(startDate?: Date, endDate?: Date): Promise<number>;
+
+  // Support query tracking operations
+  trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery>;
+  getSupportQueryStats(startDate?: Date, endDate?: Date): Promise<{
+    totalQueries: number;
+    totalCost: number;
+    queriesByEmail: Array<{ email: string; count: number; totalCost: number }>;
+  }>;
+  getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -317,6 +336,106 @@ export class DatabaseStorage implements IStorage {
 
   async getAllReferrals(): Promise<Referral[]> {
     return db.select().from(referrals);
+  }
+
+  async trackVisit(visit: InsertPageVisit): Promise<PageVisit> {
+    const [newVisit] = await db
+      .insert(pageVisits)
+      .values(visit)
+      .returning();
+    return newVisit;
+  }
+
+  async getVisitCount(startDate?: Date, endDate?: Date): Promise<number> {
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(pageVisits.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(pageVisits.createdAt, endDate));
+    }
+
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(pageVisits)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return result[0]?.count || 0;
+  }
+
+  async trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery> {
+    const [newQuery] = await db
+      .insert(supportQueries)
+      .values(query)
+      .returning();
+    return newQuery;
+  }
+
+  async getSupportQueryStats(startDate?: Date, endDate?: Date): Promise<{
+    totalQueries: number;
+    totalCost: number;
+    queriesByEmail: Array<{ email: string; count: number; totalCost: number }>;
+  }> {
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(supportQueries.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(supportQueries.createdAt, endDate));
+    }
+
+    // Get total queries and cost
+    const totals = await db
+      .select({
+        totalQueries: sql<number>`count(*)::int`,
+        totalCost: sql<number>`COALESCE(sum(${supportQueries.cost}::numeric), 0)::numeric`,
+      })
+      .from(supportQueries)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    // Get queries grouped by email
+    const byEmail = await db
+      .select({
+        email: supportQueries.userEmail,
+        count: sql<number>`count(*)::int`,
+        totalCost: sql<number>`COALESCE(sum(${supportQueries.cost}::numeric), 0)::numeric`,
+      })
+      .from(supportQueries)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .groupBy(supportQueries.userEmail)
+      .orderBy(desc(sql`count(*)`));
+
+    return {
+      totalQueries: totals[0]?.totalQueries || 0,
+      totalCost: Number(totals[0]?.totalCost || 0),
+      queriesByEmail: byEmail.map(row => ({
+        email: row.email || 'Anonymous',
+        count: row.count,
+        totalCost: Number(row.totalCost),
+      })),
+    };
+  }
+
+  async getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const results = await db
+      .select({
+        date: sql<string>`DATE(${supportQueries.createdAt})::text`,
+        count: sql<number>`count(*)::int`,
+        avgCost: sql<number>`COALESCE(avg(${supportQueries.cost}::numeric), 0)::numeric`,
+      })
+      .from(supportQueries)
+      .where(gte(supportQueries.createdAt, startDate))
+      .groupBy(sql`DATE(${supportQueries.createdAt})`)
+      .orderBy(sql`DATE(${supportQueries.createdAt})`);
+
+    return results.map(row => ({
+      date: row.date,
+      count: row.count,
+      avgCost: Number(row.avgCost),
+    }));
   }
 }
 

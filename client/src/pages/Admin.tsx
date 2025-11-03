@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail } from "lucide-react";
+import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Analytics {
   totalUsers: number;
@@ -15,17 +16,40 @@ interface Analytics {
   totalReferrers: number;
   totalReferralsSent: number;
   totalReferralsCompleted: number;
+  totalVisits: number;
   trialConversionRate: number;
   signupToTrialRate: number;
+  visitToSignupRate: number;
+  visitToCheckoutRate: number;
+}
+
+interface SupportAnalytics {
+  totalQueries: number;
+  totalCost: number;
+  queriesByEmail: Array<{
+    email: string;
+    count: number;
+    totalCost: number;
+  }>;
+  overTime: Array<{
+    date: string;
+    count: number;
+    avgCost: number;
+  }>;
 }
 
 export default function Admin() {
   const { toast } = useToast();
   const [testEmail, setTestEmail] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [timerange, setTimerange] = useState("all");
 
   const { data: analytics, isLoading } = useQuery<Analytics>({
-    queryKey: ['/api/admin/analytics'],
+    queryKey: ['/api/admin/analytics', { timerange }],
+  });
+
+  const { data: supportAnalytics, isLoading: isLoadingSupportAnalytics } = useQuery<SupportAnalytics>({
+    queryKey: ['/api/admin/support-analytics', { timerange, days: 30 }],
   });
 
   const sendTestEmailMutation = useMutation({
@@ -82,32 +106,62 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold mb-2" data-testid="heading-admin">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Platform analytics and email template testing</p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2" data-testid="heading-admin">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Platform analytics and email template testing</p>
+          </div>
+
+          <div className="w-full md:w-48">
+            <Select value={timerange} onValueChange={setTimerange}>
+              <SelectTrigger data-testid="select-timerange">
+                <SelectValue placeholder="Select timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="24h">Last 24 Hours</SelectItem>
+                <SelectItem value="7d">Last 7 Days</SelectItem>
+                <SelectItem value="30d">Last 30 Days</SelectItem>
+                <SelectItem value="90d">Last 90 Days</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card data-testid="card-total-visits">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Visits</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-visits">{analytics?.totalVisits || 0}</div>
+              <p className="text-xs text-muted-foreground">Page views tracked</p>
+            </CardContent>
+          </Card>
+
           <Card data-testid="card-total-users">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Signups</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-users">{analytics?.totalUsers || 0}</div>
-              <p className="text-xs text-muted-foreground">All signups</p>
+              <p className="text-xs text-muted-foreground">
+                {analytics?.visitToSignupRate || 0}% conversion from visits
+              </p>
             </CardContent>
           </Card>
 
           <Card data-testid="card-trial-users">
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Trial Users</CardTitle>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Checkouts</CardTitle>
+              <MousePointerClick className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-trial-users">{analytics?.usersWithTrial || 0}</div>
               <p className="text-xs text-muted-foreground">
-                {analytics?.signupToTrialRate || 0}% conversion from signup
+                {analytics?.visitToCheckoutRate || 0}% conversion from visits
               </p>
             </CardContent>
           </Card>
@@ -166,6 +220,119 @@ export default function Admin() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Support Analytics Section */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card data-testid="card-support-queries">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Support Queries</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-queries">{supportAnalytics?.totalQueries || 0}</div>
+              <p className="text-xs text-muted-foreground">Total chat messages</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-support-cost">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Support Cost</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-cost">${supportAnalytics?.totalCost.toFixed(4) || '0.0000'}</div>
+              <p className="text-xs text-muted-foreground">Total OpenAI API cost</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card data-testid="card-support-leaderboard">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Support Query Leaderboard
+            </CardTitle>
+            <CardDescription>Most active users ranked by query count</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSupportAnalytics ? (
+              <p className="text-muted-foreground">Loading support data...</p>
+            ) : supportAnalytics?.queriesByEmail && supportAnalytics.queriesByEmail.length > 0 ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
+                  <div>Email</div>
+                  <div className="text-right">Queries</div>
+                  <div className="text-right">Cost</div>
+                </div>
+                {supportAnalytics.queriesByEmail.map((row, idx) => (
+                  <div key={idx} className="grid grid-cols-3 gap-4 py-2 border-b last:border-0" data-testid={`leaderboard-row-${idx}`}>
+                    <div className="truncate" title={row.email}>{row.email}</div>
+                    <div className="text-right font-medium">{row.count}</div>
+                    <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No support queries yet</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-support-chart">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Support Queries Over Time
+            </CardTitle>
+            <CardDescription>Daily query volume and average cost per query</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSupportAnalytics ? (
+              <p className="text-muted-foreground">Loading chart data...</p>
+            ) : supportAnalytics?.overTime && supportAnalytics.overTime.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={supportAnalytics.overTime}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => {
+                      const date = new Date(value);
+                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                    }}
+                  />
+                  <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'avgCost') return [`$${value.toFixed(6)}`, 'Avg Cost'];
+                      return [value, 'Queries'];
+                    }}
+                  />
+                  <Line
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    name="queries"
+                  />
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="avgCost"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    name="avgCost"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-muted-foreground">No data available for chart</p>
+            )}
           </CardContent>
         </Card>
 

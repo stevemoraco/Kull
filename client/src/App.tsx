@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Checkout from "@/pages/Checkout";
+import Dashboard from "@/pages/Dashboard";
 import Admin from "@/pages/Admin";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
@@ -23,6 +24,8 @@ function Router() {
     <Switch>
       {/* Public pages accessible to all */}
       <Route path="/landing" component={Landing} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/account" component={Dashboard} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/refunds" component={Refunds} />

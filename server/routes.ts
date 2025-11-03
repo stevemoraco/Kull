@@ -442,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/chat/message', async (req: any, res) => {
     try {
       const { message, history } = req.body;
-      
+
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
       }
@@ -450,7 +450,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getChatResponse } = await import('./chatService');
       const response = await getChatResponse(message, history || []);
 
-      res.json({ message: response });
+      // Track support query in database
+      const userEmail = req.user?.claims?.email;
+      const userId = req.user?.claims?.sub;
+
+      await storage.trackSupportQuery({
+        userEmail,
+        userId,
+        userMessage: message,
+        aiResponse: response.message,
+        tokensIn: response.tokensIn,
+        tokensOut: response.tokensOut,
+        cost: response.cost.toString(),
+        model: 'gpt-4o-mini',
+      });
+
+      res.json({ message: response.message });
     } catch (error: any) {
       console.error("Error processing chat message:", error);
       res.status(500).json({ message: "Failed to process message" });
@@ -584,6 +599,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Visit tracking endpoint (public)
+  app.post('/api/track/visit', async (req: any, res) => {
+    try {
+      const { page, sessionId, referrer, userAgent } = req.body;
+      const userId = req.user?.claims?.sub; // Optional, only if logged in
+
+      await storage.trackVisit({
+        page: page || 'home',
+        sessionId,
+        userId,
+        referrer,
+        userAgent,
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error tracking visit:", error);
+      res.status(500).json({ message: "Failed to track visit: " + error.message });
+    }
+  });
+
   // Admin endpoints (restricted to steve@lander.media)
   const isAdmin = (req: any, res: Response, next: NextFunction) => {
     if (!req.user || req.user.claims.email !== 'steve@lander.media') {
@@ -594,20 +630,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/analytics', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
+      const { timerange = 'all' } = req.query;
+
+      // Calculate date range based on timerange parameter
+      let startDate: Date | undefined;
+      const endDate = new Date();
+
+      switch (timerange) {
+        case '24h':
+          startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '90d':
+          startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'all':
+        default:
+          startDate = undefined;
+          break;
+      }
+
       const allUsers = await storage.getAllUsers();
       const allReferrals = await storage.getAllReferrals();
-      
-      const totalUsers = allUsers.length;
-      const usersWithTrial = allUsers.filter(u => u.trialStartedAt).length;
-      const usersWithSubscription = allUsers.filter(u => u.stripeSubscriptionId).length;
-      
+
+      // Filter users by date range if specified
+      const filteredUsers = startDate
+        ? allUsers.filter(u => u.createdAt && new Date(u.createdAt) >= startDate!)
+        : allUsers;
+
+      const totalUsers = filteredUsers.length;
+      const usersWithTrial = filteredUsers.filter(u => {
+        if (!u.trialStartedAt) return false;
+        return !startDate || new Date(u.trialStartedAt) >= startDate;
+      }).length;
+      const usersWithSubscription = filteredUsers.filter(u => {
+        if (!u.stripeSubscriptionId) return false;
+        // If user has trialConvertedAt, use that; otherwise use createdAt as fallback
+        const conversionDate = u.trialConvertedAt || u.createdAt;
+        return !startDate || (conversionDate && new Date(conversionDate) >= startDate);
+      }).length;
+
       const totalReferrers = new Set(allReferrals.map(r => r.referrerId)).size;
       const totalReferralsSent = allReferrals.length;
       const totalReferralsCompleted = allReferrals.filter(r => r.status === 'completed').length;
-      
+
+      // Get visit count for the timerange
+      const totalVisits = await storage.getVisitCount(startDate, endDate);
+
+      // Calculate conversion rates
       const trialConversionRate = usersWithTrial > 0 ? (usersWithSubscription / usersWithTrial * 100) : 0;
       const signupToTrialRate = totalUsers > 0 ? (usersWithTrial / totalUsers * 100) : 0;
-      
+      const visitToSignupRate = totalVisits > 0 ? (totalUsers / totalVisits * 100) : 0;
+      const visitToCheckoutRate = totalVisits > 0 ? (usersWithTrial / totalVisits * 100) : 0;
+
       res.json({
         totalUsers,
         usersWithTrial,
@@ -615,12 +695,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalReferrers,
         totalReferralsSent,
         totalReferralsCompleted,
+        totalVisits,
         trialConversionRate: Math.round(trialConversionRate * 10) / 10,
         signupToTrialRate: Math.round(signupToTrialRate * 10) / 10,
+        visitToSignupRate: Math.round(visitToSignupRate * 10) / 10,
+        visitToCheckoutRate: Math.round(visitToCheckoutRate * 10) / 10,
       });
     } catch (error: any) {
       console.error("Error fetching admin analytics:", error);
       res.status(500).json({ message: "Failed to fetch analytics: " + error.message });
+    }
+  });
+
+  app.get('/api/admin/support-analytics', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { timerange = 'all', days = 30 } = req.query;
+
+      // Calculate date range based on timerange parameter
+      let startDate: Date | undefined;
+      const endDate = new Date();
+
+      switch (timerange) {
+        case '24h':
+          startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '90d':
+          startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case 'all':
+        default:
+          startDate = undefined;
+          break;
+      }
+
+      // Get support query stats
+      const stats = await storage.getSupportQueryStats(startDate, endDate);
+
+      // Get time series data for chart
+      const overTime = await storage.getSupportQueriesOverTime(parseInt(days as string) || 30);
+
+      res.json({
+        totalQueries: stats.totalQueries,
+        totalCost: stats.totalCost,
+        queriesByEmail: stats.queriesByEmail,
+        overTime,
+      });
+    } catch (error: any) {
+      console.error("Error fetching support analytics:", error);
+      res.status(500).json({ message: "Failed to fetch support analytics: " + error.message });
     }
   });
 
