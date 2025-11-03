@@ -66,7 +66,7 @@
   - Bold headline introducing Kull AI
   - Animated product demo mockup (Lightroom interface with AI ratings appearing)
   - Feature grid (2 columns mobile, 4 columns desktop):
-    - "5 AI Models" with icons (Gemini, Grok, Groq, Claude, OpenAI)
+    - "5 AI Models" with icons (Gemini, Grok, Kimi k2, Claude, GPT-5)
     - "Real-Time Rating"
     - "Live Preview"
     - "Instant Sync"

@@ -6,7 +6,7 @@ export function SolutionSection() {
     {
       icon: Zap,
       title: "5 AI Models",
-      description: "Gemini, Grok, Groq, Claude & OpenAI working together"
+      description: "Gemini, Grok, Kimi k2, Claude & GPT-5 you can choose from"
     },
     {
       icon: Target,

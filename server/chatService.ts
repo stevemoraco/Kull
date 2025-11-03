@@ -11,7 +11,7 @@ const KULL_AI_KNOWLEDGE = `
 # Kull AI Documentation
 
 ## Overview
-Kull AI is a powerful Lightroom plugin that uses multiple AI models (Gemini, Grok, Groq, Claude, OpenAI) to automatically rate your photos from 1-5 stars in real-time.
+Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can choose from (Gemini, Grok, Kimi k2, Claude, GPT-5) to automatically rate your photos from 1-5 stars in real-time using low-cost batch APIs when possible.
 
 ## Installation
 
@@ -35,10 +35,10 @@ Kull AI is a powerful Lightroom plugin that uses multiple AI models (Gemini, Gro
 
 ### AI Models
 - **Gemini**: Google's powerful vision model, great for general photography
-- **GPT-4 Vision**: OpenAI's model, excellent for detailed analysis
+- **GPT-5**: OpenAI's latest model, excellent for detailed analysis
 - **Claude**: Anthropic's model, good for artistic photos
-- **Grok**: Fast and efficient for large batches
-- **Groq**: Ultra-fast inference for real-time rating
+- **Grok**: xAI's fast model, efficient for large batches
+- **Kimi k2**: Via Groq, ultra-fast inference for real-time rating
 
 ### Rating System
 - Photos are rated 1-5 stars based on:
@@ -157,14 +157,16 @@ For the Lightroom plugin setup, ask me "How do I install the Lightroom plugin?"`
 
   // AI model questions
   if (lowerMessage.includes('model') || lowerMessage.includes('gemini') || lowerMessage.includes('gpt') || 
-      lowerMessage.includes('claude') || lowerMessage.includes('grok') || lowerMessage.includes('groq')) {
-    return `We support 5 AI models, each with strengths:
+      lowerMessage.includes('claude') || lowerMessage.includes('grok') || lowerMessage.includes('kimi')) {
+    return `We support 5 advanced AI models you can choose from:
 
-🔮 **Gemini**: Best for general photography, balanced ratings
-🧠 **GPT-4 Vision**: Detailed analysis, great for artistic shots
-🎨 **Claude**: Excellent for artistic merit and composition
-⚡ **Grok**: Fast processing, perfect for large batches
-🚀 **Groq**: Ultra-fast, ideal for real-time rating
+🔮 **Gemini** (Google): Best for general photography, balanced ratings
+🧠 **GPT-5** (OpenAI): Detailed analysis, great for artistic shots
+🎨 **Claude** (Anthropic): Excellent for artistic merit and composition
+⚡ **Grok** (xAI): Fast processing, perfect for large batches
+🚀 **Kimi k2** (via Groq): Ultra-fast inference for real-time rating
+
+All models use **low-cost batch APIs** when possible and rate photos based on **context in the photoshoot** for maximum accuracy!
 
 **Recommendation**: Start with Gemini for most photos. Try different models to see which matches your style!
 

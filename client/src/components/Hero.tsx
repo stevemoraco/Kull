@@ -64,7 +64,7 @@ export function Hero() {
         <div className="mt-16 pt-8 border-t border-border/40">
           <p className="text-sm text-muted-foreground mb-6 uppercase tracking-wide font-semibold">Powered by 5 Advanced AI Models</p>
           <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
-            {['Gemini', 'Grok', 'Groq', 'Claude', 'OpenAI'].map((model) => (
+            {['Gemini', 'Grok', 'Kimi k2', 'Claude', 'GPT-5'].map((model) => (
               <div
                 key={model}
                 className="px-4 py-2 bg-card border border-card-border rounded-lg text-sm font-semibold text-card-foreground"

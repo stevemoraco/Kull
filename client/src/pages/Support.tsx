@@ -89,7 +89,7 @@ export default function Support() {
               <div className="bg-card border border-card-border rounded-xl p-6">
                 <h3 className="text-xl font-bold mb-3 text-foreground">Which AI models does Kull AI use?</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  We use 5 advanced models: Gemini (Google), Grok (xAI), Groq, Claude (Anthropic), and OpenAI. All 5 analyze each photo and reach a consensus rating for maximum accuracy.
+                  We use 5 advanced models you can choose from: Gemini (Google), Grok (xAI), Kimi k2 (via Groq), Claude (Anthropic), and GPT-5 (OpenAI). All 5 analyze each photo using their low-cost batch APIs when possible, and rate each based on context in the photoshoot for maximum accuracy.
                 </p>
               </div>
 
