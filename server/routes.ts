@@ -421,10 +421,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Request refund endpoint (7-day money-back guarantee)
+  // Audio transcription endpoint using OpenAI Whisper
+  app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
+    try {
+      const multer = require('multer');
+      const upload = multer({ storage: multer.memoryStorage() });
+      
+      upload.single('audio')(req, res, async (err: any) => {
+        if (err) {
+          return res.status(400).json({ message: "Failed to upload audio file" });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: "No audio file provided" });
+        }
+
+        const formData = new FormData();
+        const audioBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
+        formData.append('file', audioBlob, 'audio.webm');
+        formData.append('model', 'whisper-1');
+
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('OpenAI transcription failed');
+        }
+
+        const data = await response.json();
+        res.json({ text: data.text });
+      });
+    } catch (error: any) {
+      console.error("Error transcribing audio:", error);
+      res.status(500).json({ 
+        message: "Failed to transcribe audio",
+        detail: error.message 
+      });
+    }
+  });
+
+  // Request refund endpoint with survey (7-day money-back guarantee)
   app.post('/api/refund/request', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { primaryReason, wouldRecommend, missingFeature, technicalIssues, additionalFeedback } = req.body;
+      
+      // Validate survey data
+      if (!primaryReason) {
+        return res.status(400).json({ 
+          message: "Survey required",
+          detail: "Please complete the refund survey before processing your refund." 
+        });
+      }
+
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -460,11 +514,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: 1,
       });
 
-      if (invoices.data.length === 0 || !invoices.data[0].charge) {
+      const invoice = invoices.data[0];
+      if (!invoice || !invoice.charge) {
         return res.status(400).json({ message: "No payment found to refund" });
       }
 
-      const charge = invoices.data[0].charge as string;
+      const charge = typeof invoice.charge === 'string' ? invoice.charge : invoice.charge.id;
 
       // Create refund
       const refund = await stripe.refunds.create({
@@ -472,17 +527,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason: 'requested_by_customer',
       });
 
+      // Store survey feedback
+      await storage.createRefundSurvey({
+        userId,
+        primaryReason,
+        wouldRecommend: wouldRecommend === null ? null : wouldRecommend,
+        missingFeature: missingFeature || null,
+        technicalIssues: technicalIssues || null,
+        additionalFeedback: additionalFeedback || null,
+        refundProcessed: true,
+        refundAmount: refund.amount,
+      });
+
       // Cancel subscription
       await stripe.subscriptions.cancel(user.stripeSubscriptionId);
 
       // Update user status
-      await storage.updateSubscription(userId, user.subscriptionTier, 'canceled', user.stripeCustomerId || null);
+      await storage.updateSubscription(userId, user.subscriptionTier || 'professional', 'canceled', user.stripeCustomerId || undefined);
 
       res.json({
         success: true,
         refund: {
           id: refund.id,
-          amount: refund.amount / 100,
+          amount: refund.amount,
           status: refund.status,
         },
         message: "Refund processed successfully. You will see the credit in 5-7 business days."

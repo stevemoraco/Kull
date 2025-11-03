@@ -69,5 +69,32 @@ export const insertReferralSchema = createInsertSchema(referrals).pick({
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Referral = typeof referrals.$inferSelect;
 
+// Refund surveys table to capture feedback before processing refunds
+export const refundSurveys = pgTable("refund_surveys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  // Survey questions and answers
+  primaryReason: varchar("primary_reason").notNull(), // Why they're requesting a refund
+  wouldRecommend: boolean("would_recommend"), // Would they recommend to others
+  missingFeature: varchar("missing_feature"), // What feature was missing
+  technicalIssues: varchar("technical_issues"), // Any technical problems
+  additionalFeedback: varchar("additional_feedback"), // Open-ended feedback
+  // Voice transcription data
+  audioTranscriptUrl: varchar("audio_transcript_url"), // S3/storage URL if they used voice
+  transcriptionText: varchar("transcription_text", { length: 2000 }), // OpenAI Whisper transcription
+  // Metadata
+  refundProcessed: boolean("refund_processed").default(false),
+  refundAmount: integer("refund_amount"), // Amount in cents
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRefundSurveySchema = createInsertSchema(refundSurveys).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRefundSurvey = z.infer<typeof insertRefundSurveySchema>;
+export type RefundSurvey = typeof refundSurveys.$inferSelect;
+
 // Re-export email queue types
 export * from "./emailQueue";

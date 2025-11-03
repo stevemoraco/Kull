@@ -2,12 +2,15 @@ import {
   users,
   referrals,
   emailQueue,
+  refundSurveys,
   type User,
   type UpsertUser,
   type Referral,
   type InsertReferral,
   type EmailQueue,
   type InsertEmailQueue,
+  type RefundSurvey,
+  type InsertRefundSurvey,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, lte, and, isNull } from "drizzle-orm";
@@ -38,6 +41,9 @@ export interface IStorage {
   cancelDripEmails(userId: string): Promise<void>;
   cancelEmail(id: string): Promise<void>;
   incrementEmailRetry(id: string): Promise<void>;
+  
+  // Refund survey operations
+  createRefundSurvey(survey: InsertRefundSurvey): Promise<RefundSurvey>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -291,6 +297,14 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(emailQueue.id, id));
     }
+  }
+
+  async createRefundSurvey(survey: InsertRefundSurvey): Promise<RefundSurvey> {
+    const [created] = await db
+      .insert(refundSurveys)
+      .values(survey)
+      .returning();
+    return created;
   }
 }
 
