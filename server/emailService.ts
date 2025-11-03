@@ -238,12 +238,12 @@ export async function sendEmail(email: {
           to: [{ email: email.to }],
         }],
         from: {
-          email: 'noreply@kullai.com',
-          name: 'Kull AI',
+          email: 'steve@kullai.com',
+          name: 'Steve Moraco',
         },
         reply_to: {
-          email: 'support@kullai.com',
-          name: 'Kull AI Support',
+          email: 'steve@kullai.com',
+          name: 'Steve Moraco',
         },
         subject: email.subject,
         content: [
