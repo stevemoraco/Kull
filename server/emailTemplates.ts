@@ -124,7 +124,7 @@ const getOfferHoursRemaining = (user: User): number => {
 
 // POST-CHECKOUT EMAILS
 export const welcome5minEmail = (user: User) => ({
-  subject: "🎉 Welcome to Kull AI - Your Journey Starts Now!",
+  subject: "Welcome to Kull AI - Your Journey Starts Now!",
   html: `
 <!DOCTYPE html>
 <html>
@@ -132,7 +132,7 @@ export const welcome5minEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to Kull AI! 🚀</h1>
+      <h1>Welcome to Kull AI!</h1>
     </div>
     <div class="content">
       <p>Hi ${user.firstName || 'there'},</p>
@@ -165,14 +165,14 @@ export const welcome5minEmail = (user: User) => ({
       </ul>
 
       <div class="stats-box">
-        <strong>📊 Your Plan:</strong> ${user.subscriptionTier === 'professional' ? 'Professional ($99/mo)' : 'Studio ($499/mo)'}<br>
-        <strong>💳 Trial Ends:</strong> ${new Date(user.trialEndsAt!).toLocaleString()}<br>
-        <strong>✅ Status:</strong> Active & ready to use
+        <strong>Your Plan:</strong> ${user.subscriptionTier === 'professional' ? 'Professional ($99/mo)' : 'Studio ($499/mo)'}<br>
+        <strong>Trial Ends:</strong> ${new Date(user.trialEndsAt!).toLocaleString()}<br>
+        <strong>Status:</strong> Active & ready to use
       </div>
 
       <p><strong>Need Help?</strong> Click the chat icon on any page for instant AI-powered support, or visit our <a href="${baseUrl}/support">Support Center</a>.</p>
 
-      <p>Happy rating! 📸</p>
+      <p>Happy rating!</p>
       <p><strong>Steve Moraco</strong><br>
       Founder, Kull AI</p>
     </div>
@@ -219,7 +219,7 @@ Follow me: https://x.com/steveMoraco
 });
 
 export const installCheck45minEmail = (user: User) => ({
-  subject: "Quick Check: Is Kull AI Rating Your Photos Yet? 📸",
+  subject: "Quick Check: Is Kull AI Rating Your Photos Yet?",
   html: `
 <!DOCTYPE html>
 <html>
@@ -235,7 +235,7 @@ export const installCheck45minEmail = (user: User) => ({
 
       <p>If yes - amazing! You're experiencing the future of photography workflow. If not, here's a quick setup guide:</p>
 
-      <h3>🎯 5-Minute Quick Start:</h3>
+      <h3>5-Minute Quick Start:</h3>
       <ol>
         <li><strong>Open the DMG</strong> file you downloaded</li>
         <li><strong>Drag Kull AI</strong> to Applications folder</li>
@@ -250,7 +250,7 @@ export const installCheck45minEmail = (user: User) => ({
       </center>
 
       <div class="stats-box">
-        <strong>💡 Pro Tip:</strong> Start with Gemini model for balanced ratings, then try GPT-5 for detailed artistic analysis. Each model sees photos differently!
+        <strong>Pro Tip:</strong> Start with Gemini model for balanced ratings, then try GPT-5 for detailed artistic analysis. Each model sees photos differently!
       </div>
 
       <h3>Common Questions:</h3>
@@ -263,7 +263,7 @@ export const installCheck45minEmail = (user: User) => ({
       <p><strong>Running Into Issues?</strong> Our AI chat support can help with any installation questions - just click the chat icon on our website.</p>
 
       <div class="alert">
-        <strong>⏰ Trial Status:</strong> ${Math.ceil((new Date(user.trialEndsAt!).getTime() - Date.now()) / (1000 * 60 * 60))} hours remaining
+        <strong>Trial Status:</strong> ${Math.ceil((new Date(user.trialEndsAt!).getTime() - Date.now()) / (1000 * 60 * 60))} hours remaining
       </div>
 
       <p>Make the most of your trial!</p>
@@ -307,7 +307,7 @@ Follow me: https://x.com/steveMoraco`
 
 // TRIAL ENDING WARNINGS
 export const trialEnding6hrEmail = (user: User) => ({
-  subject: "⏰ Your Kull AI Trial Ends in 6 Hours - What's Next?",
+  subject: "Your Kull AI Trial Ends in 6 Hours - What's Next?",
   html: `
 <!DOCTYPE html>
 <html>
@@ -315,7 +315,7 @@ export const trialEnding6hrEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="alert">
-      <strong>⏰ Trial Ending Soon:</strong> Your free trial ends in <strong>6 hours</strong> at ${new Date(user.trialEndsAt!).toLocaleString()}
+      <strong>Trial Ending Soon:</strong> Your free trial ends in <strong>6 hours</strong> at ${new Date(user.trialEndsAt!).toLocaleString()}
     </div>
     <div class="content">
       <p>Hi ${user.firstName},</p>
@@ -396,7 +396,7 @@ Follow me: https://x.com/steveMoraco`
 });
 
 export const trialEnding1hrEmail = (user: User) => ({
-  subject: "🚨 Final Notice: Your Kull AI Trial Ends in 1 Hour",
+  subject: "Final Notice: Your Kull AI Trial Ends in 1 Hour",
   html: `
 <!DOCTYPE html>
 <html>
@@ -404,7 +404,7 @@ export const trialEnding1hrEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="alert">
-      <strong>🚨 FINAL NOTICE:</strong> Your trial ends in <strong>1 HOUR</strong> at ${new Date(user.trialEndsAt!).toLocaleString()}
+      <strong>FINAL NOTICE:</strong> Your trial ends in <strong>1 HOUR</strong> at ${new Date(user.trialEndsAt!).toLocaleString()}
     </div>
     <div class="content">
       <p>Hi ${user.firstName},</p>
@@ -433,7 +433,7 @@ export const trialEnding1hrEmail = (user: User) => ({
       </ul>
 
       <div class="alert alert-success">
-        <strong>💰 Risk-Free Promise:</strong> Even after billing, you have 7 full days to request an instant refund at <a href="${baseUrl}/refunds">${baseUrl}/refunds</a>
+        <strong>Risk-Free Promise:</strong> Even after billing, you have 7 full days to request an instant refund at <a href="${baseUrl}/refunds">${baseUrl}/refunds</a>
       </div>
 
       <p><strong>Not sure yet?</strong> Cancel now and sign up again later when you're ready!</p>
@@ -480,7 +480,7 @@ Follow me: https://x.com/steveMoraco`
 // NON-CHECKOUT DRIP CAMPAIGN (Every 4-5 hours if no checkout in first 2 hours)
 
 export const drip1_2hrEmail = (user: User) => ({
-  subject: "Still Deciding? Here's Everything Kull AI Can Do For You 🎯",
+  subject: "Still Deciding? Here's Everything Kull AI Can Do For You",
   html: `
 <!DOCTYPE html>
 <html>
@@ -492,17 +492,17 @@ export const drip1_2hrEmail = (user: User) => ({
       
       <p>I noticed you haven't started your free trial yet. No worries! I wanted to share exactly what Kull AI can do for your photography workflow.</p>
 
-      <h2>📸 The Problem Every Photographer Faces:</h2>
+      <h2>The Problem Every Photographer Faces:</h2>
       <p>You spend hours culling through thousands of photos, manually rating each one. It's exhausting, time-consuming, and honestly... boring.</p>
 
       <div class="stats-box">
-        <strong>😰 Average photographer stats:</strong><br>
+        <strong>Average photographer stats:</strong><br>
         • 3-5 hours culling 1,000 photos<br>
         • 75% of time on "obvious" keep/delete decisions<br>
         • Mental fatigue leads to inconsistent ratings
       </div>
 
-      <h2>✨ How Kull AI Changes Everything:</h2>
+      <h2>How Kull AI Changes Everything:</h2>
       <ul class="feature-list">
         <li><strong>Rate 1,000 photos in 10-15 minutes</strong> using AI batch processing</li>
         <li><strong>5 different AI perspectives</strong> - Gemini, GPT-5, Claude, Grok, Kimi k2</li>
@@ -514,7 +514,7 @@ export const drip1_2hrEmail = (user: User) => ({
         <a href="${baseUrl}" class="button">Start Your Free 24-Hour Trial →</a>
       </center>
 
-      <h3>💡 Pro Photographer Workflow:</h3>
+      <h3>Pro Photographer Workflow:</h3>
       <ol>
         <li>Import shoot to Lightroom (as usual)</li>
         <li>Let Kull AI rate everything (10-15 minutes for 1,000 photos)</li>
@@ -523,7 +523,7 @@ export const drip1_2hrEmail = (user: User) => ({
       </ol>
 
       <div class="alert">
-        <strong>⏰ Your Special Offer Countdown:</strong> Expires in ${getOfferHoursRemaining(user)} hours - 3 extra months free on annual plans!
+        <strong>Your Special Offer Countdown:</strong> Expires in ${getOfferHoursRemaining(user)} hours - 3 extra months free on annual plans!
       </div>
 
       <p><strong>Questions?</strong> Chat with us instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
@@ -567,7 +567,7 @@ Follow me: https://x.com/steveMoraco`
 });
 
 export const drip2_6hrEmail = (user: User) => ({
-  subject: "🔍 Which AI Model is Best for Your Photography? (Guide Inside)",
+  subject: "Which AI Model is Best for Your Photography? (Guide Inside)",
   html: `
 <!DOCTYPE html>
 <html>
@@ -581,39 +581,39 @@ export const drip2_6hrEmail = (user: User) => ({
 
       <p>Great news - you get access to ALL 5, and each excels at different photography styles!</p>
 
-      <h2>🤖 Your AI Model Guide:</h2>
+      <h2>Your AI Model Guide:</h2>
 
       <div class="stats-box">
-        <strong>🔮 Gemini (Google)</strong><br>
+        <strong>Gemini (Google)</strong><br>
         Best for: General photography, balanced ratings<br>
         Perfect when: You want consistent, reliable ratings across all photo types
       </div>
 
       <div class="stats-box">
-        <strong>🧠 GPT-5 (OpenAI)</strong><br>
+        <strong>GPT-5 (OpenAI)</strong><br>
         Best for: Artistic & portrait photography<br>
         Perfect when: You need detailed composition and artistic merit analysis
       </div>
 
       <div class="stats-box">
-        <strong>🎨 Claude (Anthropic)</strong><br>
+        <strong>Claude (Anthropic)</strong><br>
         Best for: Fine art & creative work<br>
         Perfect when: Artistic vision and emotional impact matter most
       </div>
 
       <div class="stats-box">
-        <strong>⚡ Grok (xAI)</strong><br>
+        <strong>Grok (xAI)</strong><br>
         Best for: Event photography, large batches<br>
         Perfect when: Speed is critical - weddings, sports, events
       </div>
 
       <div class="stats-box">
-        <strong>🚀 Kimi k2 (via Groq)</strong><br>
+        <strong>Kimi k2 (via Groq)</strong><br>
         Best for: Real-time rating, immediate feedback<br>
         Perfect when: You want instant ratings as you browse
       </div>
 
-      <h3>💡 Pro Tips:</h3>
+      <h3>Pro Tips:</h3>
       <ul class="feature-list">
         <li>Start with Gemini for your first batch</li>
         <li>Try different models on the same photos - see which matches your taste</li>
@@ -626,7 +626,7 @@ export const drip2_6hrEmail = (user: User) => ({
       </center>
 
       <div class="alert">
-        <strong>⏰ Offer Countdown:</strong> ${getOfferHoursRemaining(user)} hours remaining to lock in 3 bonus months!
+        <strong>Offer Countdown:</strong> ${getOfferHoursRemaining(user)} hours remaining to lock in 3 bonus months!
       </div>
 
       <p>Questions about AI models? <a href="${baseUrl}/support">Chat with us →</a></p>
@@ -654,11 +654,11 @@ Hi ${user.firstName},
 
 You get ALL 5 AI models:
 
-🔮 Gemini - General photography, balanced
-🧠 GPT-5 - Artistic & portraits
-🎨 Claude - Fine art & creative
-⚡ Grok - Events, speed
-🚀 Kimi k2 - Real-time rating
+Gemini - General photography, balanced
+GPT-5 - Artistic & portraits
+Claude - Fine art & creative
+Grok - Events, speed
+Kimi k2 - Real-time rating
 
 Pro Tip: Start with Gemini, then try others!
 
@@ -672,7 +672,7 @@ Follow me: https://x.com/steveMoraco`
 });
 
 export const drip3_11hrEmail = (user: User) => ({
-  subject: "💰 Is Kull AI Worth It? Let's Do The Math Together",
+  subject: "Is Kull AI Worth It? Let's Do The Math Together",
   html: `
 <!DOCTYPE html>
 <html>
@@ -684,7 +684,7 @@ export const drip3_11hrEmail = (user: User) => ({
       
       <p>I get it - investing in new software is a big decision. Let's look at the real numbers...</p>
 
-      <h2>📊 Your Time is Valuable:</h2>
+      <h2>Your Time is Valuable:</h2>
 
       <div class="stats-box">
         <strong>Manual culling 4 shoots/month:</strong><br>
@@ -696,7 +696,7 @@ export const drip3_11hrEmail = (user: User) => ({
         <strong>Time Saved:</strong> <span style="color: #10B981; font-weight: bold;">12 hours/month</span>
       </div>
 
-      <h3>💵 What's 12 Hours Worth?</h3>
+      <h3>What's 12 Hours Worth?</h3>
       <ul class="feature-list">
         <li>Book 2-3 additional client shoots ($1,000-$3,000+)</li>
         <li>Focus on editing and creative work</li>
@@ -712,7 +712,7 @@ export const drip3_11hrEmail = (user: User) => ({
         ROI: Perfect for high-volume photographers - pays for itself in one weekend
       </div>
 
-      <h2>✅ What You Get:</h2>
+      <h2>What You Get:</h2>
       <ul class="feature-list">
         <li>Unlimited photo rating (no per-photo fees!)</li>
         <li>All 5 AI models included</li>
@@ -726,7 +726,7 @@ export const drip3_11hrEmail = (user: User) => ({
       </center>
 
       <div class="alert">
-        <strong>⏰ Special Offer:</strong> Only ${getOfferHoursRemaining(user)} hours left to get 3 bonus months free!
+        <strong>Special Offer:</strong> Only ${getOfferHoursRemaining(user)} hours left to get 3 bonus months free!
       </div>
 
       <p><strong>Still have questions?</strong> <a href="${baseUrl}/support">Chat with us</a> or check our <a href="${baseUrl}/refunds">refund policy</a></p>
@@ -775,7 +775,7 @@ Follow me: https://x.com/steveMoraco`
 });
 
 export const drip4_16hrEmail = (user: User) => ({
-  subject: "🎓 Free Tutorial: Master Your Photo Workflow in 10 Minutes",
+  subject: "Free Tutorial: Master Your Photo Workflow in 10 Minutes",
   html: `
 <!DOCTYPE html>
 <html>
@@ -787,7 +787,7 @@ export const drip4_16hrEmail = (user: User) => ({
       
       <p>Whether or not you try Kull AI, I wanted to share our <strong>free guide to optimizing your photo culling workflow</strong>.</p>
 
-      <h2>📚 The Complete Photo Rating Guide:</h2>
+      <h2>The Complete Photo Rating Guide:</h2>
 
       <h3>Step 1: Import Smart</h3>
       <ul class="feature-list">
@@ -823,7 +823,7 @@ export const drip4_16hrEmail = (user: User) => ({
       </ul>
 
       <div class="stats-box">
-        <strong>💡 Pro Tip:</strong> AI isn't replacing your artistic judgment - it's eliminating the boring parts so you can focus on creative decisions!
+        <strong>Pro Tip:</strong> AI isn't replacing your artistic judgment - it's eliminating the boring parts so you can focus on creative decisions!
       </div>
 
       <center>
@@ -831,7 +831,7 @@ export const drip4_16hrEmail = (user: User) => ({
       </center>
 
       <div class="alert">
-        <strong>⏰ Your Bonus Expires Soon:</strong> ${getOfferHoursRemaining(user)} hours to claim 3 free months
+        <strong>Your Bonus Expires Soon:</strong> ${getOfferHoursRemaining(user)} hours to claim 3 free months
       </div>
 
       <p>Questions about workflow? <a href="${baseUrl}/support">Ask our AI chat →</a></p>
@@ -885,7 +885,7 @@ Follow me: https://x.com/steveMoraco`
 });
 
 export const drip5_21hrEmail = (user: User) => ({
-  subject: `⚠️ Last Call: Your Special Offer Expires in ${getOfferHoursRemaining(user)} Hours`,
+  subject: `Last Call: Your Special Offer Expires in ${getOfferHoursRemaining(user)} Hours`,
   html: `
 <!DOCTYPE html>
 <html>
@@ -893,7 +893,7 @@ export const drip5_21hrEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="alert">
-      <strong>⚠️ FINAL HOURS:</strong> Your special offer (3 free months on annual plans) expires in ${getOfferHoursRemaining(user)} hours
+      <strong>FINAL HOURS:</strong> Your special offer (3 free months on annual plans) expires in ${getOfferHoursRemaining(user)} hours
     </div>
     <div class="content">
       <p>Hi ${user.firstName},</p>
@@ -916,7 +916,7 @@ export const drip5_21hrEmail = (user: User) => ({
         Savings: <strong>$1,497</strong>
       </div>
 
-      <h3>🚀 Plus Your Free 24-Hour Trial:</h3>
+      <h3>Plus Your Free 24-Hour Trial:</h3>
       <ul class="feature-list">
         <li>Try everything before you pay anything</li>
         <li>All 5 AI models included</li>
@@ -993,7 +993,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎁 You've Been Invited!</h1>
+      <h1>You've Been Invited!</h1>
     </div>
     <div class="content">
       <p style="font-size: 18px; font-weight: 600; color: #111827;">Hi there!</p>
@@ -1001,7 +1001,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       <p><strong>${referrerName}</strong> (${referrerEmail}) thinks you'd love Kull AI and invited you to try our AI-powered photo rating system for free!</p>
 
       <div class="alert alert-success">
-        <p style="margin: 0; font-weight: 600;">🎉 Special Referral Offer for You</p>
+        <p style="margin: 0; font-weight: 600;">Special Referral Offer for You</p>
         <p style="margin: 8px 0 0 0; font-size: 14px;">Get a FREE 1-day unlimited trial of Kull AI, plus if you become a paid customer, both you and ${referrerName} will receive exclusive bonus rewards!</p>
       </div>
 
@@ -1019,11 +1019,11 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
 
       <div style="text-align: center;">
         <a href="${baseUrl}" class="button" style="display: inline-block;">
-          🚀 Start Your Free Trial Now
+          Start Your Free Trial Now
         </a>
       </div>
 
-      <h3>🎁 Referral Rewards</h3>
+      <h3>Referral Rewards</h3>
       <p>When you sign up as a paid customer:</p>
       
       <div class="stats-box">
@@ -1048,7 +1048,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       5. If you love it, subscribe and we both win!</p>
 
       <div class="alert">
-        <p style="margin: 0; font-weight: 600;">⏰ Limited Time Offer</p>
+        <p style="margin: 0; font-weight: 600;">Limited Time Offer</p>
         <p style="margin: 8px 0 0 0; font-size: 14px;">New signups get 3 FREE MONTHS on annual plans - but this special offer won't last long!</p>
       </div>
 
