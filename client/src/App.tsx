@@ -21,7 +21,8 @@ function Router() {
 
   return (
     <Switch>
-      {/* Public pages */}
+      {/* Public pages accessible to all */}
+      <Route path="/landing" component={Landing} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/refunds" component={Refunds} />

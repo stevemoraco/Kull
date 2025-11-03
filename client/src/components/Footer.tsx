@@ -2,14 +2,14 @@ import { Link } from "wouter";
 
 export function Footer() {
   const productLinks = [
-    { name: "Features", href: "#features" },
-    { name: "Pricing", href: "#pricing" },
-    { name: "Download", href: "#download" },
-    { name: "iOS App", href: "#ios-app" }
+    { name: "Features", href: "/landing#features" },
+    { name: "Pricing", href: "/landing#pricing" },
+    { name: "Download", href: "/landing#download" },
+    { name: "iOS App", href: "/landing#ios-app" }
   ];
 
   const companyLinks = [
-    { name: "About", href: "#about" },
+    { name: "About", href: "/landing#about" },
     { name: "Contact", href: "/contact" },
     { name: "Support", href: "/support" }
   ];
@@ -48,7 +48,7 @@ export function Footer() {
             <ul className="space-y-2">
               {companyLinks.map((link) => (
                 <li key={link.name}>
-                  {link.href.startsWith('#') ? (
+                  {link.href.startsWith('/landing#') || link.href.startsWith('#') ? (
                     <a
                       href={link.href}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"

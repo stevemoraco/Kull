@@ -310,6 +310,7 @@ export function ReferralForm() {
                     1 Month Free
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">3 sent</div>
+                  <div className="text-[10px] text-primary/70 font-medium">$99 value</div>
                 </div>
 
                 {/* Milestone 3: 5 referrals - Priority Support */}
@@ -331,6 +332,7 @@ export function ReferralForm() {
                     Priority Support
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">5 sent</div>
+                  <div className="text-[10px] text-primary/70 font-medium">$499 value</div>
                 </div>
 
                 {/* Milestone 4: 10 referrals - 3 months free */}
@@ -352,6 +354,7 @@ export function ReferralForm() {
                     3 Months Free
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">10 sent</div>
+                  <div className="text-[10px] text-primary/70 font-medium">$297-$1497 value</div>
                 </div>
               </div>
             </div>
