@@ -107,23 +107,35 @@ export function ReferralForm() {
   };
 
   const completedReferrals = referrals.filter(r => r.status === 'completed').length;
-  const bonusUnlocked = completedReferrals >= 10 ? '3 months free' :
-                        completedReferrals >= 5 ? 'Priority support' :
-                        completedReferrals >= 3 ? '1 month free' :
-                        completedReferrals >= 1 ? 'Bonus features' :
+  const totalSent = referrals.length;
+  
+  // Determine unlocked bonuses based on new tier system
+  const bonusUnlocked = (totalSent >= 10 || completedReferrals >= 3) ? '3 months free' :
+                        totalSent >= 5 ? 'Priority support' :
+                        totalSent >= 3 ? '1 month free' :
                         'None yet';
 
-  // Calculate next reward
+  // Calculate next reward based on current status + filled emails
   const getNextReward = () => {
     const filledEmails = emails.filter(email => email && email.includes('@')).length;
-    const potentialCompleted = completedReferrals + filledEmails;
+    const potentialSent = totalSent + filledEmails;
     
-    if (potentialCompleted === 0) return null;
-    if (potentialCompleted < 1) return { count: 1, reward: "Bonus features unlock" };
-    if (potentialCompleted < 3) return { count: 3, reward: "1 month free" };
-    if (potentialCompleted < 5) return { count: 5, reward: "Priority support upgrade" };
-    if (potentialCompleted < 10) return { count: 10, reward: "3 months free (save hundreds!)" };
-    return { count: 10, reward: "Maximum bonuses unlocked!" };
+    // New tier system: 1mo free (3 sent), 3mo free (10 sent OR 3 completed), priority support (5 sent)
+    
+    // If nothing filled yet, show first milestone
+    if (filledEmails === 0) {
+      if (totalSent < 3) return { count: 3 - totalSent, reward: "1 month free", type: "first" };
+      if (totalSent < 5) return { count: 5 - totalSent, reward: "Priority support", type: "first" };
+      if (totalSent < 10 && completedReferrals < 3) return { count: 10 - totalSent, reward: "3 months free", type: "first" };
+      return null;
+    }
+    
+    // With filled emails, calculate next milestone
+    if (potentialSent < 3) return { count: 3 - totalSent, reward: "1 month free", type: "next" };
+    if (potentialSent < 5) return { count: 5 - totalSent, reward: "Priority support", type: "next" };
+    if (potentialSent < 10 && completedReferrals < 3) return { count: 10 - totalSent, reward: "3 months free", type: "next" };
+    
+    return { count: 0, reward: "Maximum bonuses unlocked!", type: "complete" };
   };
 
   const nextReward = getNextReward();
@@ -150,26 +162,6 @@ export function ReferralForm() {
         </div>
       </div>
 
-      {/* Reward reminder */}
-      {nextReward && filledCount > 0 && (
-        <Alert className="bg-primary/10 border-primary/30">
-          <Gift className="h-4 w-4 text-primary" />
-          <AlertDescription className="text-foreground">
-            <strong>{filledCount} photographer{filledCount > 1 ? 's' : ''} ready to invite!</strong>
-            {completedReferrals + filledCount < nextReward.count && (
-              <span className="ml-1">
-                Just {nextReward.count - (completedReferrals + filledCount)} more to unlock: <strong className="text-primary">{nextReward.reward}</strong>
-              </span>
-            )}
-            {completedReferrals + filledCount >= nextReward.count && (
-              <span className="ml-1">
-                On track to unlock: <strong className="text-primary">{nextReward.reward}</strong>
-              </span>
-            )}
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Referral form */}
       {referrals.length < 10 && (
         <form onSubmit={handleSubmit} className="bg-card border border-card-border rounded-xl p-6">
@@ -186,7 +178,7 @@ export function ReferralForm() {
                   placeholder={`Photographer ${index + 1} email`}
                   value={email}
                   onChange={(e) => updateEmail(index, e.target.value)}
-                  className="flex-1"
+                  className={`flex-1 ${index === 0 && !email && nextReward?.type === 'first' ? 'ring-2 ring-primary/50 shadow-[0_0_15px_rgba(168,85,247,0.4)] animate-pulse' : ''}`}
                   data-testid={`input-referral-email-${index}`}
                 />
                 {emails.length > 1 && (
@@ -226,6 +218,37 @@ export function ReferralForm() {
               {createReferralsMutation.isPending ? 'Sending...' : 'Send Invites'}
             </Button>
           </div>
+
+          {/* Reward enticement - positioned below Send button */}
+          {nextReward && (
+            <Alert className="bg-primary/10 border-primary/30 mt-4">
+              <Gift className="h-4 w-4 text-primary" />
+              <AlertDescription className="text-foreground">
+                {nextReward.type === 'first' && filledCount === 0 && (
+                  <>
+                    <strong>Type in your first email to start earning rewards!</strong>
+                    <span className="ml-1">
+                      Just {nextReward.count} referral{nextReward.count > 1 ? 's' : ''} to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+                    </span>
+                  </>
+                )}
+                {filledCount > 0 && nextReward.type !== 'complete' && (
+                  <>
+                    <strong>{filledCount} photographer{filledCount > 1 ? 's' : ''} ready to invite!</strong>
+                    <span className="ml-1">
+                      Just {nextReward.count} more to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+                    </span>
+                  </>
+                )}
+                {nextReward.type === 'complete' && (
+                  <>
+                    <strong>Amazing! You're at maximum rewards!</strong>
+                    <span className="ml-1 text-primary">All bonuses unlocked 🎉</span>
+                  </>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
 
           <p className="text-xs text-muted-foreground mt-3">
             {10 - referrals.length} referral slots remaining. Both you and your friends receive rewards!
