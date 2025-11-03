@@ -584,6 +584,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoints (restricted to steve@lander.media)
+  const isAdmin = (req: any, res: Response, next: NextFunction) => {
+    if (!req.user || req.user.claims.email !== 'steve@lander.media') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  };
+
+  app.get('/api/admin/analytics', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allReferrals = await storage.getAllReferrals();
+      
+      const totalUsers = allUsers.length;
+      const usersWithTrial = allUsers.filter(u => u.trialStartedAt).length;
+      const usersWithSubscription = allUsers.filter(u => u.stripeSubscriptionId).length;
+      
+      const totalReferrers = new Set(allReferrals.map(r => r.referrerId)).size;
+      const totalReferralsSent = allReferrals.length;
+      const totalReferralsCompleted = allReferrals.filter(r => r.status === 'completed').length;
+      
+      const trialConversionRate = usersWithTrial > 0 ? (usersWithSubscription / usersWithTrial * 100) : 0;
+      const signupToTrialRate = totalUsers > 0 ? (usersWithTrial / totalUsers * 100) : 0;
+      
+      res.json({
+        totalUsers,
+        usersWithTrial,
+        usersWithSubscription,
+        totalReferrers,
+        totalReferralsSent,
+        totalReferralsCompleted,
+        trialConversionRate: Math.round(trialConversionRate * 10) / 10,
+        signupToTrialRate: Math.round(signupToTrialRate * 10) / 10,
+      });
+    } catch (error: any) {
+      console.error("Error fetching admin analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics: " + error.message });
+    }
+  });
+
+  app.post('/api/admin/test-email', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { templateName, testEmail } = req.body;
+
+      if (!templateName || !testEmail) {
+        return res.status(400).json({ message: "Template name and test email required" });
+      }
+
+      const { sendEmail } = await import('./emailService');
+      const { emailTemplates } = await import('./emailTemplates');
+
+      // Create a test user object
+      const testUser = {
+        id: 'test-user-id',
+        email: testEmail,
+        firstName: 'Test',
+        lastName: 'User',
+        profileImageUrl: null,
+        offerExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        trialStartedAt: new Date(),
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripeSetupIntentId: null,
+        subscriptionTier: 'professional' as const,
+        subscriptionBilling: 'annual' as const,
+        referralRewardsEarned: [],
+      };
+
+      let emailTemplate: any;
+      
+      switch (templateName) {
+        case 'firstLoginWelcome':
+          emailTemplate = emailTemplates.firstLoginWelcome(testUser);
+          break;
+        case 'welcome5min':
+          emailTemplate = emailTemplates.welcome5min(testUser);
+          break;
+        case 'installCheck45min':
+          emailTemplate = emailTemplates.installCheck45min(testUser);
+          break;
+        case 'trialEnding6hr':
+          emailTemplate = emailTemplates.trialEnding6hr(testUser);
+          break;
+        case 'trialEnding1hr':
+          emailTemplate = emailTemplates.trialEnding1hr(testUser);
+          break;
+        case 'drip1_2hr':
+          emailTemplate = emailTemplates.drip1_2hr(testUser);
+          break;
+        case 'drip2_6hr':
+          emailTemplate = emailTemplates.drip2_6hr(testUser);
+          break;
+        case 'drip3_11hr':
+          emailTemplate = emailTemplates.drip3_11hr(testUser);
+          break;
+        case 'drip4_16hr':
+          emailTemplate = emailTemplates.drip4_16hr(testUser);
+          break;
+        case 'drip5_21hr':
+          emailTemplate = emailTemplates.drip5_21hr(testUser);
+          break;
+        case 'referralInvitation':
+          emailTemplate = emailTemplates.referralInvitation('Test Referrer', 'referrer@example.com', testEmail);
+          break;
+        case 'referralConfirmation':
+          emailTemplate = emailTemplates.referralConfirmation(testUser, ['friend1@example.com', 'friend2@example.com'], ['1 month free'], ['Priority support']);
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid template name" });
+      }
+
+      await sendEmail({
+        to: testEmail,
+        subject: `[TEST] ${emailTemplate.subject}`,
+        html: emailTemplate.html,
+        text: emailTemplate.text,
+      });
+
+      res.json({ success: true, message: `Test email sent to ${testEmail}` });
+    } catch (error: any) {
+      console.error("Error sending test email:", error);
+      res.status(500).json({ message: "Failed to send test email: " + error.message });
+    }
+  });
+
   // Audio transcription endpoint using OpenAI Whisper
   app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
     try {

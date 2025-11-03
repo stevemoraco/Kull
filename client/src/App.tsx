@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Checkout from "@/pages/Checkout";
+import Admin from "@/pages/Admin";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Refunds from "@/pages/Refunds";
@@ -34,6 +35,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/admin" component={Admin} />
         </>
       )}
       <Route component={NotFound} />

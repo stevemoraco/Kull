@@ -44,6 +44,10 @@ export interface IStorage {
   
   // Refund survey operations
   createRefundSurvey(survey: InsertRefundSurvey): Promise<RefundSurvey>;
+  
+  // Admin operations
+  getAllUsers(): Promise<User[]>;
+  getAllReferrals(): Promise<Referral[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -305,6 +309,14 @@ export class DatabaseStorage implements IStorage {
       .values(survey)
       .returning();
     return created;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async getAllReferrals(): Promise<Referral[]> {
+    return db.select().from(referrals);
   }
 }
 
