@@ -46,7 +46,7 @@ export default function Terms() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Service Description</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Kull AI provides AI-powered photo rating services for Adobe Lightroom users. Our service uses multiple AI models (Gemini, Grok, Groq, Claude, and OpenAI) to analyze and rate your photos with a 1-5 star rating system.
+                Kull AI provides a universal Mac/iPhone/iPad app with AI-powered photo rating and organization services. Our service uses multiple AI models (Gemini, Grok, Groq, Claude, and OpenAI) to analyze, rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with a 1-5 star rating system.
               </p>
             </section>
 
@@ -87,7 +87,7 @@ export default function Terms() {
                 <div>
                   <h3 className="font-semibold text-lg text-foreground mb-2">Professional Plan - $99/month ($1,188/year)</h3>
                   <p className="leading-relaxed">
-                    Designed for individual photographers. Includes unlimited photo ratings, 5 AI model consensus, Lightroom integration, iOS app access, and standard support.
+                    Designed for individual photographers. Includes unlimited photo ratings and organization, 5 AI model consensus, universal Mac app (works with any folder), iPhone & iPad apps, auto-sync across all devices, and standard support.
                   </p>
                 </div>
                 <div>
