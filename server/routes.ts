@@ -65,17 +65,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('No user email on file');
       }
 
-      // Create Stripe customer if doesn't exist
+      // Create Stripe customer if doesn't exist or find existing by email
       let customerId = user.stripeCustomerId;
       if (!customerId) {
-        const customer = await stripe.customers.create({
+        // Check if customer already exists with this email
+        const existingCustomers = await stripe.customers.list({
           email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
-          metadata: {
-            userId: user.id,
-          },
+          limit: 1,
         });
-        customerId = customer.id;
+        
+        if (existingCustomers.data.length > 0) {
+          customerId = existingCustomers.data[0].id;
+        } else {
+          const customer = await stripe.customers.create({
+            email: user.email,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+            metadata: {
+              userId: user.id,
+            },
+          });
+          customerId = customer.id;
+        }
       }
 
       // Create SetupIntent to collect payment method
@@ -405,6 +415,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching referrals:", error);
       res.status(500).json({ message: "Failed to fetch referrals: " + error.message });
+    }
+  });
+
+  // Request refund endpoint (7-day money-back guarantee)
+  app.post('/api/refund/request', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.stripeSubscriptionId) {
+        return res.status(400).json({ message: "No active subscription found" });
+      }
+
+      // Get subscription from Stripe
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      
+      if (!subscription) {
+        return res.status(404).json({ message: "Subscription not found" });
+      }
+
+      // Check if subscription is within 7-day refund window
+      const subscriptionStart = new Date(subscription.created * 1000);
+      const now = new Date();
+      const daysSinceSubscription = (now.getTime() - subscriptionStart.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceSubscription > 7) {
+        return res.status(400).json({ 
+          message: "Refund window expired",
+          detail: "Refunds are only available within 7 days of your first payment. You can still cancel your subscription to prevent future charges."
+        });
+      }
+
+      // Get the latest invoice
+      const invoices = await stripe.invoices.list({
+        subscription: user.stripeSubscriptionId,
+        limit: 1,
+      });
+
+      if (invoices.data.length === 0 || !invoices.data[0].charge) {
+        return res.status(400).json({ message: "No payment found to refund" });
+      }
+
+      const charge = invoices.data[0].charge as string;
+
+      // Create refund
+      const refund = await stripe.refunds.create({
+        charge,
+        reason: 'requested_by_customer',
+      });
+
+      // Cancel subscription
+      await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+
+      // Update user status
+      await storage.updateSubscription(userId, user.subscriptionTier, 'canceled', user.stripeCustomerId || null);
+
+      res.json({
+        success: true,
+        refund: {
+          id: refund.id,
+          amount: refund.amount / 100,
+          status: refund.status,
+        },
+        message: "Refund processed successfully. You will see the credit in 5-7 business days."
+      });
+    } catch (error: any) {
+      console.error("Error processing refund:", error);
+      res.status(500).json({ 
+        message: "Failed to process refund",
+        detail: error.message 
+      });
     }
   });
 

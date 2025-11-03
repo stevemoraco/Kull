@@ -1,9 +1,54 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { DollarSign, ArrowLeft, CheckCircle } from "lucide-react";
+import { DollarSign, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Refunds() {
+  const { user, isLoading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [refundResult, setRefundResult] = useState<any>(null);
+
+  const handleRequestRefund = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to request a refund",
+        variant: "destructive",
+      });
+      window.location.href = "/api/login";
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const result = await apiRequest("/api/refund/request", {
+        method: "POST",
+      });
+      setRefundResult(result);
+      toast({
+        title: "Refund Processed",
+        description: "Your refund has been processed successfully. You will see the credit in 5-7 business days.",
+      });
+    } catch (error: any) {
+      const errorMessage = error.detail || error.message || "Failed to process refund";
+      toast({
+        title: "Refund Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setRefundResult({ error: errorMessage });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -34,6 +79,45 @@ export default function Refunds() {
               Last Updated: November 3, 2025
             </p>
           </div>
+
+          {/* Self-Service Refund Section */}
+          {user && (
+            <section className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-8 mb-8">
+              <h2 className="text-2xl font-bold mb-4 text-foreground">Request Instant Refund</h2>
+              {!refundResult ? (
+                <>
+                  <p className="text-muted-foreground leading-relaxed mb-6">
+                    Within 7 days of your first payment, you can request an instant refund with one click. No questions asked.
+                  </p>
+                  <Button
+                    onClick={handleRequestRefund}
+                    disabled={isProcessing}
+                    size="lg"
+                    className="w-full sm:w-auto"
+                    data-testid="button-request-refund"
+                  >
+                    {isProcessing ? 'Processing Refund...' : 'Request Refund Now'}
+                  </Button>
+                </>
+              ) : refundResult.error ? (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{refundResult.error}</AlertDescription>
+                </Alert>
+              ) : (
+                <Alert className="bg-green-500/10 border-green-500/20">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <AlertDescription className="text-green-900 dark:text-green-100">
+                    <div className="space-y-2">
+                      <p className="font-semibold">Refund Processed Successfully!</p>
+                      <p>Amount: ${refundResult.refund.amount}</p>
+                      <p className="text-sm">You will see the credit in your account within 5-7 business days.</p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </section>
+          )}
 
           <div className="prose prose-lg max-w-none space-y-8">
             <section className="bg-card border border-card-border rounded-2xl p-8">
@@ -86,9 +170,9 @@ export default function Refunds() {
                     <span className="text-sm font-bold text-primary">1</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg text-foreground mb-2">Contact Support</h3>
+                    <h3 className="font-semibold text-lg text-foreground mb-2">Sign In</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                      Email us at <a href="mailto:support@kullai.com" className="text-primary hover:underline">support@kullai.com</a> with "Refund Request" in the subject line.
+                      Make sure you're logged into your account.
                     </p>
                   </div>
                 </div>
@@ -97,9 +181,9 @@ export default function Refunds() {
                     <span className="text-sm font-bold text-primary">2</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg text-foreground mb-2">Provide Details</h3>
+                    <h3 className="font-semibold text-lg text-foreground mb-2">Click the Button</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                      Include your account email and reason for the refund (optional but helps us improve).
+                      Click the "Request Refund Now" button above (only available within 7 days of payment).
                     </p>
                   </div>
                 </div>
@@ -110,7 +194,7 @@ export default function Refunds() {
                   <div>
                     <h3 className="font-semibold text-lg text-foreground mb-2">Receive Confirmation</h3>
                     <p className="text-muted-foreground leading-relaxed">
-                      We'll confirm your refund within 24 hours and process it within 5-7 business days.
+                      Your refund will be processed instantly and you'll see the credit in 5-7 business days.
                     </p>
                   </div>
                 </div>
@@ -185,21 +269,21 @@ export default function Refunds() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Chargebacks</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We encourage you to contact us directly before initiating a chargeback with your credit card company. Most issues can be resolved quickly through our support team. Chargebacks may result in immediate account suspension and could affect your ability to use Kull AI in the future.
+                We encourage you to use the self-service refund button above before initiating a chargeback with your credit card company. Our instant refund system makes this easy. Chargebacks may result in immediate account suspension and could affect your ability to use Kull AI in the future.
               </p>
             </section>
 
             <section className="bg-card border border-card-border rounded-2xl p-8">
-              <h2 className="text-2xl font-bold mb-4 text-foreground">Contact Support</h2>
+              <h2 className="text-2xl font-bold mb-4 text-foreground">Need Help?</h2>
               <p className="text-muted-foreground leading-relaxed mb-4">
-                Have questions about our refund policy? We're here to help:
+                Have questions about our refund policy? Use our chat support on any page for instant help.
               </p>
               <div className="p-4 bg-muted/30 rounded-lg">
                 <p className="text-foreground font-semibold">Lander Media</p>
                 <p className="text-muted-foreground">31 N Tejon St</p>
                 <p className="text-muted-foreground">Colorado Springs, CO 80903</p>
                 <p className="text-muted-foreground mt-2">
-                  Email: <a href="mailto:support@kullai.com" className="text-primary hover:underline">support@kullai.com</a>
+                  Founded 2014
                 </p>
               </div>
             </section>
