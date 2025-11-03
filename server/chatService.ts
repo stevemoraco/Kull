@@ -1,8 +1,8 @@
-// Simple chat service for answering Kull AI support questions
-// This can be enhanced with OpenAI or other LLMs, and GitHub docs integration
+// Chat service powered by OpenAI with GitHub repository integration
+// Uses GPT-4o-mini for cost-effective, high-quality responses
 
 interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
@@ -53,7 +53,7 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - Unlimited photo ratings
 - All 5 AI models
 - Lightroom integration
-- Email support
+- Chat support 24/7
 - DMG download for macOS
 
 ### Studio Plan ($499/mo)
@@ -71,12 +71,13 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - Cancel anytime with zero charge
 - Card pre-authorization for annual amount
 - Option to downgrade to monthly if needed
+- Email reminders at 6 hours and 1 hour before trial ends
 
 ## Subscription Management
 - Billed annually by default (save $396-$2,004/year)
 - Monthly billing available
 - Cancel anytime from account settings
-- Pro-rated refunds within 30 days
+- Self-service refund within 7 days of payment
 
 ## Common Issues
 
@@ -121,15 +122,88 @@ Colorado Springs, CO 80903
 Founded 2014
 Chat support available 24/7
 Founder: @stevemoraco on Twitter
+
+## GitHub Repository
+Technical documentation and code: https://github.com/stevemoraco/kull
 `;
+
+// System prompt for the AI assistant
+const SYSTEM_PROMPT = `You are a helpful customer support AI assistant for Kull AI, a Lightroom plugin that uses 5 advanced AI models to rate photos.
+
+Your role:
+- Help users with installation, features, billing, and troubleshooting
+- Be friendly, concise, and professional
+- Use the knowledge base provided to answer questions accurately
+- If asked about technical implementation, reference the GitHub repository at https://github.com/stevemoraco/kull
+- For complex issues beyond your knowledge, suggest contacting founder Steve Moraco on Twitter (@stevemoraco)
+- Encourage self-service refunds within 7 days via the /refund page
+- Never provide email addresses - direct users to chat or Twitter DM only
+
+Knowledge Base:
+${KULL_AI_KNOWLEDGE}
+
+Keep responses concise (2-4 paragraphs max) and friendly. Use emojis sparingly for clarity.`;
 
 export async function getChatResponse(
   userMessage: string,
   history: ChatMessage[]
 ): Promise<string> {
-  // For now, use a simple pattern matching system
-  // This can be upgraded to use OpenAI API or other LLMs
+  const openaiApiKey = process.env.OPENAI_API_KEY;
   
+  if (!openaiApiKey) {
+    console.log('[Chat] OpenAI API key not configured, falling back to pattern matching');
+    return getFallbackResponse(userMessage);
+  }
+
+  try {
+    // Build messages array with system prompt
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
+      ...history.slice(-10), // Keep last 10 messages for context
+      {
+        role: 'user',
+        content: userMessage,
+      },
+    ];
+
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: false, // We'll implement streaming in the next iteration
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Chat] OpenAI API error:', errorText);
+      return getFallbackResponse(userMessage);
+    }
+
+    const data = await response.json();
+    const assistantMessage = data.choices[0]?.message?.content || getFallbackResponse(userMessage);
+    
+    console.log('[Chat] OpenAI response generated successfully');
+    return assistantMessage;
+  } catch (error) {
+    console.error('[Chat] Error calling OpenAI:', error);
+    return getFallbackResponse(userMessage);
+  }
+}
+
+// Fallback pattern matching for when OpenAI is unavailable
+function getFallbackResponse(userMessage: string): string {
   const lowerMessage = userMessage.toLowerCase();
 
   // Installation questions
@@ -170,43 +244,25 @@ For the Lightroom plugin setup, ask me "How do I install the Lightroom plugin?"`
 
 All models use **low-cost batch APIs** when possible and rate photos based on **context in the photoshoot** for maximum accuracy!
 
-**Recommendation**: Start with Gemini for most photos. Try different models to see which matches your style!
-
-Want to know more about a specific model?`;
-  }
-
-  // Rating questions
-  if (lowerMessage.includes('rating') || lowerMessage.includes('star') || lowerMessage.includes('rate')) {
-    return `Our AI rates photos 1-5 stars based on:
-
-⭐ Composition & framing
-⭐ Lighting quality
-⭐ Focus & sharpness
-⭐ Color balance
-⭐ Artistic merit
-⭐ Technical quality
-
-The ratings are suggestions to speed up your culling workflow. You can always adjust them manually in Lightroom!
-
-Pro tip: Different AI models may rate the same photo differently - try multiple to find your preference.`;
+**Recommendation**: Start with Gemini for most photos. Try different models to see which matches your style!`;
   }
 
   // Trial/billing questions
   if (lowerMessage.includes('trial') || lowerMessage.includes('cancel') || lowerMessage.includes('billing') || 
-      lowerMessage.includes('charge') || lowerMessage.includes('subscription')) {
-    if (lowerMessage.includes('cancel')) {
-      return `To cancel your trial or subscription:
+      lowerMessage.includes('charge') || lowerMessage.includes('subscription') || lowerMessage.includes('refund')) {
+    if (lowerMessage.includes('cancel') || lowerMessage.includes('refund')) {
+      return `To cancel your trial or request a refund:
 
-1. Go to your Account Settings
-2. Click "Subscription"
-3. Click "Cancel Subscription"
-4. Confirm cancellation
+**During Trial (before 24 hours):**
+- Cancel anytime with zero charge
+- Go to Account Settings > Subscription > Cancel
 
-✅ During trial (before 24 hours): Zero charge
-✅ After trial starts: Cancel anytime, no refund for current period
-✅ We'll send you emails at 6 hours and 1 hour before your trial ends
+**After Trial (within 7 days of payment):**
+- Use self-service refund button at /refund page
+- Instant processing, money back in 5-7 business days
+- No questions asked!
 
-No tricks, no hassle - just click and you're done!`;
+We'll send you reminder emails at 6 hours and 1 hour before your trial ends.`;
     }
     return `Your 24-hour free trial includes:
 
@@ -221,63 +277,6 @@ We place a pre-authorization hold on your card to verify it can handle the annua
 You'll receive reminder emails at 6 hours and 1 hour before your trial ends!`;
   }
 
-  // Plan/pricing questions
-  if (lowerMessage.includes('plan') || lowerMessage.includes('price') || lowerMessage.includes('cost') || 
-      lowerMessage.includes('professional') || lowerMessage.includes('studio')) {
-    return `We offer two plans:
-
-📸 **Professional - $99/mo** ($1,188/year)
-- Unlimited photo ratings
-- All 5 AI models
-- Lightroom integration
-- Email support
-- Save $396 vs monthly
-
-🎬 **Studio - $499/mo** ($5,988/year)
-- Everything in Professional
-- Priority AI processing
-- Batch up to 10,000 photos
-- Team collaboration
-- Priority support
-- Save $2,004 vs monthly
-
-Both include a 24-hour free trial! Which features are most important to you?`;
-  }
-
-  // Technical issues
-  if (lowerMessage.includes('not working') || lowerMessage.includes('error') || lowerMessage.includes('problem') || 
-      lowerMessage.includes('issue') || lowerMessage.includes('broken')) {
-    return `I'm here to help! Let's troubleshoot:
-
-**Common fixes:**
-1. Restart Lightroom
-2. Check internet connection
-3. Re-enable plugin in Lightroom's Plug-in Manager
-4. Try downloading fresh DMG from dashboard
-
-**What's happening specifically?**
-- Plugin not showing in Lightroom?
-- Ratings not syncing?
-- App won't open?
-- Something else?
-
-Tell me more and I'll help you fix it!`;
-  }
-
-  // General help
-  if (lowerMessage.includes('help') || lowerMessage.includes('how') || lowerMessage.includes('what')) {
-    return `I can help you with:
-
-💿 **Installation** - macOS app and Lightroom plugin setup
-🤖 **AI Models** - Which model to use for your photos
-⭐ **Ratings** - How the 1-5 star system works
-💳 **Billing** - Trial, subscription, and cancellation
-🔧 **Troubleshooting** - Fixing any issues you encounter
-📊 **Plans** - Comparing Professional vs Studio
-
-What would you like to know about?`;
-  }
-
   // Default response
   return `Thanks for your question! I'm here to help with Kull AI.
 
@@ -287,9 +286,69 @@ I can assist you with:
 - Managing your subscription or trial
 - Troubleshooting any issues
 
-Could you tell me more about what you'd like help with? Or ask me one of these:
+What would you like to know about? Or ask me:
 - "How do I install Kull AI?"
 - "Which AI model should I use?"
 - "How do I cancel my trial?"
-- "What's the difference between Professional and Studio plans?"`;
+- "How do I request a refund?"`;
+}
+
+// Export streaming version for future use
+export async function getChatResponseStream(
+  userMessage: string,
+  history: ChatMessage[]
+): Promise<ReadableStream> {
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  
+  if (!openaiApiKey) {
+    // Return fallback as stream
+    const fallbackMessage = getFallbackResponse(userMessage);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(fallbackMessage));
+        controller.close();
+      },
+    });
+  }
+
+  // Build messages array with system prompt
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content: SYSTEM_PROMPT,
+    },
+    ...history.slice(-10),
+    {
+      role: 'user',
+      content: userMessage,
+    },
+  ];
+
+  // Call OpenAI API with streaming
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages,
+      temperature: 0.7,
+      max_tokens: 500,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    const fallbackMessage = getFallbackResponse(userMessage);
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(fallbackMessage));
+        controller.close();
+      },
+    });
+  }
+
+  return response.body;
 }
