@@ -243,7 +243,7 @@ export function ReferralForm() {
                 {nextReward.type === 'complete' && (
                   <>
                     <strong>Amazing! You're at maximum rewards!</strong>
-                    <span className="ml-1 text-primary">All bonuses unlocked 🎉</span>
+                    <span className="ml-1 text-primary">All bonuses unlocked!</span>
                   </>
                 )}
               </AlertDescription>

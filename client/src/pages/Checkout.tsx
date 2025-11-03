@@ -82,7 +82,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
         const data = await response.json();
         
         toast({
-          title: "Trial Started! 🎉",
+          title: "Trial Started!",
           description: "Your 24-hour free trial has begun. Download the app now!",
         });
         
@@ -114,7 +114,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
       }
 
       toast({
-        title: "Trial Started! 🎉",
+        title: "Trial Started!",
         description: "Your 24-hour free trial has begun with monthly billing. Download the app now!",
       });
       
@@ -162,21 +162,33 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
         <Alert className="mb-6 border-primary/50 bg-primary/10">
           <Gift className="h-4 w-4 text-primary" />
           <AlertDescription className="text-sm text-foreground">
-            <p className="font-bold text-primary">🎉 {bonus.description}</p>
+            <p className="font-bold text-primary">{bonus.description}</p>
             <p className="mt-1">You've earned <strong>{bonus.freeMonths} month{bonus.freeMonths > 1 ? 's' : ''} free</strong> through referrals. This discount has been applied to your annual price below!</p>
             {bonus.prioritySupport && (
-              <p className="mt-1 text-primary font-semibold">✨ Plus priority support access!</p>
+              <p className="mt-1 text-primary font-semibold">Plus priority support access!</p>
             )}
           </AlertDescription>
         </Alert>
       )}
 
       {showDowngrade && downgradeInfo && (
-        <Alert className="mb-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-          <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
-            <p className="font-semibold mb-2">Unable to authorize ${downgradeInfo.annualAmount} for annual billing</p>
-            <p className="mb-3">Would you like to try monthly billing at ${downgradeInfo.monthlyAmount}/month instead?</p>
+        <Alert className={`mb-6 ${downgradeInfo.bonus?.freeMonths > 0 ? 'border-primary/50 bg-primary/10' : 'border-amber-500/50 bg-amber-50 dark:bg-amber-950/20'}`}>
+          {downgradeInfo.bonus?.freeMonths > 0 ? (
+            <Gift className="h-4 w-4 text-primary" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+          )}
+          <AlertDescription className={`text-sm ${downgradeInfo.bonus?.freeMonths > 0 ? 'text-foreground' : 'text-amber-900 dark:text-amber-100'}`}>
+            <p className="font-semibold mb-2">
+              {downgradeInfo.bonus?.freeMonths > 0 
+                ? 'Good news about your referral bonuses!' 
+                : `Unable to authorize $${downgradeInfo.annualAmount} for annual billing`}
+            </p>
+            <p className="mb-3">
+              {downgradeInfo.bonus?.freeMonths > 0 
+                ? `You earned ${downgradeInfo.bonus.freeMonths} month${downgradeInfo.bonus.freeMonths > 1 ? 's' : ''} free! Switch to monthly billing with $${downgradeInfo.monthlyAmount === 0 ? '0' : downgradeInfo.monthlyAmount} for your first month?`
+                : `Would you like to try monthly billing at $${downgradeInfo.monthlyAmount}/month instead?`}
+            </p>
             <div className="flex gap-3">
               <Button 
                 size="sm" 
@@ -184,7 +196,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
                 disabled={isProcessing}
                 data-testid="button-downgrade-monthly"
               >
-                {isProcessing ? 'Processing...' : 'Switch to Monthly'}
+                {isProcessing ? 'Processing...' : downgradeInfo.monthlyAmount === 0 ? 'Start Free Trial' : 'Switch to Monthly'}
               </Button>
               <Button 
                 size="sm" 
@@ -214,7 +226,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
           <p className="text-xs text-primary mb-4">{planDetails.savings}</p>
           
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mt-4">
-            <p className="text-sm font-semibold text-foreground mb-2">💳 Card Pre-Authorization</p>
+            <p className="text-sm font-semibold text-foreground mb-2">Card Pre-Authorization</p>
             <p className="text-xs text-muted-foreground">
               To prevent fraud, we require a {planDetails.annualTotal} hold on your card for the annual plan 1-day trial. We will email you to remind you 6 hours and 1 hour before it goes through, and only actually charge you once your 24-hour trial ends, but the hold will show on your card until then. Cancel anytime in that period for zero charge and the hold will be immediately removed.
             </p>
