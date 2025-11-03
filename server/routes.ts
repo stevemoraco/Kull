@@ -217,14 +217,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If annual authorization fails, offer monthly downgrade
         console.log('Annual authorization failed, offering monthly fallback:', authError.message);
         
+        // Calculate discounted monthly amount based on referral bonuses
+        const baseMonthlyAmount = tier === 'professional' 
+          ? STRIPE_PRICES.professional.monthlyAmount 
+          : STRIPE_PRICES.studio.monthlyAmount;
+        
+        // If they have free months, first month is free ($0 authorization)
+        const discountedMonthlyAmount = freeMonths > 0 ? 0 : baseMonthlyAmount;
+        
         return res.status(402).json({
           requiresDowngrade: true,
-          message: 'Unable to authorize annual amount. Would you like to try monthly billing instead?',
+          message: freeMonths > 0 
+            ? 'Unable to authorize annual amount. Good news: You earned free months! Switch to monthly billing with no charge for your first month?'
+            : 'Unable to authorize annual amount. Would you like to try monthly billing instead?',
           tier,
           annualAmount: amount / 100,
-          monthlyAmount: tier === 'professional' 
-            ? STRIPE_PRICES.professional.monthlyAmount / 100
-            : STRIPE_PRICES.studio.monthlyAmount / 100,
+          monthlyAmount: discountedMonthlyAmount / 100,
+          baseMonthlyAmount: baseMonthlyAmount / 100,
+          bonus: { freeMonths, discountAmount: (baseMonthlyAmount - discountedMonthlyAmount) / 100 },
         });
       }
     } catch (error: any) {
@@ -246,31 +256,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
       const paymentMethodId = setupIntent.payment_method as string;
-      const monthlyAmount = tier === 'professional'
+      
+      // Check referral bonuses and apply discount to monthly amount too
+      const referrals = await storage.getUserReferrals(userId);
+      const totalSent = referrals.length;
+      const completedReferrals = referrals.filter(r => r.status === 'completed').length;
+      
+      let freeMonths = 0;
+      if (totalSent >= 10 || completedReferrals >= 3) {
+        freeMonths = 3;
+      } else if (totalSent >= 3) {
+        freeMonths = 1;
+      }
+      
+      const baseMonthlyAmount = tier === 'professional'
         ? STRIPE_PRICES.professional.monthlyAmount
         : STRIPE_PRICES.studio.monthlyAmount;
+      
+      // For monthly billing, apply pro-rated discount if they have free months
+      // If they have 1+ free months, they get the first month free (no charge during trial)
+      const monthlyAmount = freeMonths > 0 ? 0 : baseMonthlyAmount;
 
-      // Try authorization with monthly amount
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: monthlyAmount,
-        currency: 'usd',
-        customer: user.stripeCustomerId || undefined,
-        payment_method: paymentMethodId,
-        confirm: true,
-        capture_method: 'manual',
-        metadata: {
-          userId: user.id,
-          tier,
-          billing: 'monthly',
-          purpose: 'trial_authorization_monthly',
-        },
-      });
+      let authorizationId = null;
 
-      if (paymentIntent.status !== 'requires_capture') {
-        throw new Error('Monthly authorization also failed');
+      // Only create PaymentIntent if there's an amount to authorize (Stripe requires amount > 0)
+      if (monthlyAmount > 0) {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: monthlyAmount,
+          currency: 'usd',
+          customer: user.stripeCustomerId || undefined,
+          payment_method: paymentMethodId,
+          confirm: true,
+          capture_method: 'manual',
+          metadata: {
+            userId: user.id,
+            tier,
+            billing: 'monthly',
+            purpose: 'trial_authorization_monthly',
+            freeMonths: freeMonths.toString(),
+            discountApplied: (baseMonthlyAmount - monthlyAmount).toString(),
+          },
+        });
+
+        if (paymentIntent.status !== 'requires_capture') {
+          throw new Error('Monthly authorization also failed');
+        }
+
+        authorizationId = paymentIntent.id;
       }
 
-      // Start trial with monthly billing
+      // Start trial with monthly billing (no authorization needed if they earned free months)
       const updatedUser = await storage.startTrial(userId, tier, paymentMethodId, setupIntentId);
       await cancelDripCampaign(userId);
       await schedulePostCheckoutEmails(updatedUser);
@@ -279,7 +314,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         user: updatedUser,
         billing: 'monthly',
-        authorizationId: paymentIntent.id,
+        authorizationId,
+        bonus: { freeMonths, discountAmount: (baseMonthlyAmount - monthlyAmount) / 100 },
       });
     } catch (error: any) {
       console.error("Error downgrading to monthly:", error);
