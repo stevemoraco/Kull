@@ -1,33 +1,19 @@
-import { PROVIDERS, getProviderConfig } from "../culling/providers";
-import { ProviderId } from "../culling/schemas";
+import { PROVIDERS } from "../culling/providers";
 
-const PROFIT_MARGIN_MULTIPLIER = 2; // 50% margin baked into credit usage
-
-export const estimateCreditsForImages = (
-  providerId: ProviderId,
+export const estimateCostForImages = (
+  providerId: string,
   imageCount: number,
 ): number => {
-  const provider = getProviderConfig(providerId);
-  if (provider.onDevice) {
-    return 0;
-  }
-  const baseCostPerImage = provider.baseCostPerThousandImagesUSD / 1000;
-  const rawCost = baseCostPerImage * imageCount;
-  const creditedCost = rawCost * PROFIT_MARGIN_MULTIPLIER;
-  return Math.max(Math.ceil(creditedCost), 0);
+  const p = PROVIDERS.find((x) => x.id === providerId);
+  if (!p) return 0;
+  const per1k = p.estimatedCostPer1kImages;
+  return (per1k / 1000) * imageCount;
 };
 
-export const estimateCostUSD = (
-  providerId: ProviderId,
-  imageCount: number,
-): number => {
-  const provider = getProviderConfig(providerId);
-  if (provider.onDevice) {
-    return 0;
-  }
-  const baseCostPerImage = provider.baseCostPerThousandImagesUSD / 1000;
-  return baseCostPerImage * imageCount * PROFIT_MARGIN_MULTIPLIER;
-};
+// alias to preserve older import names in server code
+export const estimateCreditsForImages = estimateCostForImages;
 
-export const getProviderBatchSize = (providerId: ProviderId): number =>
-  PROVIDERS[providerId]?.maxBatchSize ?? 20;
+export const sortProvidersByCost = () =>
+  [...PROVIDERS].sort(
+    (a, b) => a.estimatedCostPer1kImages - b.estimatedCostPer1kImages,
+  );

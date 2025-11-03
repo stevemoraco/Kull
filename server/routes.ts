@@ -719,6 +719,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Providers/models listing sorted by effective cost
+  app.get('/api/kull/models', isAuthenticated, async (_req: any, res) => {
+    try {
+      const { sortProvidersByCost } = await import('@shared');
+      const providers = sortProvidersByCost();
+      res.json({ providers });
+    } catch (err: any) {
+      console.error('models list error', err);
+      res.status(500).json({ message: 'Failed to list models' });
+    }
+  });
+
+  // Seed default prompt presets (protected by secret header)
+  app.post('/api/kull/prompts/seed', async (req: any, res) => {
+    try {
+      const secret = req.headers['x-seed-secret'];
+      if (secret !== process.env.SEED_SECRET) return res.status(401).json({ message: 'Unauthorized' });
+
+      const { defaultPrompts } = await import('../packages/prompt-presets');
+      const authorEmail = 'system@kullai.com';
+      await storage.seedDefaultPrompts(defaultPrompts, authorEmail);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('seed prompts error', err);
+      res.status(500).json({ message: 'Failed to seed prompts' });
+    }
+  });
+
   // Referral endpoints
   app.post('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {
