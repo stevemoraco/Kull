@@ -57,13 +57,12 @@ export function Footer() {
                       {link.name}
                     </a>
                   ) : (
-                    <Link href={link.href}>
-                      <a
-                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        {link.name}
-                      </a>
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {link.name}
                     </Link>
                   )}
                 </li>
@@ -77,13 +76,12 @@ export function Footer() {
             <ul className="space-y-2">
               {legalLinks.map((link) => (
                 <li key={link.name}>
-                  <Link href={link.href}>
-                    <a
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      {link.name}
-                    </a>
+                  <Link
+                    href={link.href}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {link.name}
                   </Link>
                 </li>
               ))}
