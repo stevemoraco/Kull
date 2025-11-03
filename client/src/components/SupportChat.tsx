@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, X, Send, Loader2, RotateCcw } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +19,14 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 // Helper function to render markdown with purple theme
@@ -172,6 +188,41 @@ function parseInlineMarkdown(text: string, onLinkClick: (url: string) => void, b
   return parts;
 }
 
+// Helper to create default welcome message
+const createWelcomeMessage = (): Message => ({
+  id: '1',
+  role: 'assistant',
+  content: "Hi! I'm here to help you with Kull AI. Check out the [Dashboard](/dashboard) to download and get started, or ask me anything about installation, features, or how to use the app!",
+  timestamp: new Date(),
+});
+
+// Helper to load sessions from localStorage
+const loadSessions = (): ChatSession[] => {
+  const stored = localStorage.getItem('kull-chat-sessions');
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      return parsed.map((session: any) => ({
+        ...session,
+        createdAt: new Date(session.createdAt),
+        updatedAt: new Date(session.updatedAt),
+        messages: session.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        })),
+      }));
+    } catch (e) {
+      console.error('Failed to parse stored sessions:', e);
+    }
+  }
+  return [];
+};
+
+// Helper to save sessions to localStorage
+const saveSessions = (sessions: ChatSession[]) => {
+  localStorage.setItem('kull-chat-sessions', JSON.stringify(sessions));
+};
+
 export function SupportChat() {
   // Persist chat open state
   const [isOpen, setIsOpen] = useState(() => {
@@ -179,31 +230,65 @@ export function SupportChat() {
     return stored === 'true';
   });
 
-  // Load messages from localStorage on mount
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const stored = localStorage.getItem('kull-chat-messages');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Convert timestamp strings back to Date objects
-        return parsed.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-        }));
-      } catch (e) {
-        console.error('Failed to parse stored messages:', e);
-      }
+  // Load all chat sessions
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const loadedSessions = loadSessions();
+    if (loadedSessions.length === 0) {
+      // Create initial session if none exist
+      const initialSession: ChatSession = {
+        id: Date.now().toString(),
+        title: 'New Chat',
+        messages: [createWelcomeMessage()],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      saveSessions([initialSession]);
+      return [initialSession];
     }
-    // Default welcome message
-    return [
-      {
-        id: '1',
-        role: 'assistant',
-        content: "Hi! I'm here to help you with Kull AI. Check out the [Dashboard](/dashboard) to download and get started, or ask me anything about installation, features, or how to use the app!",
-        timestamp: new Date(),
-      },
-    ];
+    return loadedSessions;
   });
+
+  // Track current session ID
+  const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    const stored = localStorage.getItem('kull-current-session-id');
+    if (stored && sessions.find(s => s.id === stored)) {
+      return stored;
+    }
+    return sessions[0]?.id || '';
+  });
+
+  // Get current session
+  const currentSession = sessions.find(s => s.id === currentSessionId);
+  const messages = currentSession?.messages || [];
+
+  const setMessages = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
+    setSessions(prevSessions => {
+      const updatedSessions = prevSessions.map(session => {
+        if (session.id === currentSessionId) {
+          const updatedMessages = typeof newMessages === 'function' ? newMessages(session.messages) : newMessages;
+
+          // Generate title from first user message if still default
+          let title = session.title;
+          if (title === 'New Chat' && updatedMessages.length > 1) {
+            const firstUserMsg = updatedMessages.find(m => m.role === 'user');
+            if (firstUserMsg) {
+              title = firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '');
+            }
+          }
+
+          return {
+            ...session,
+            messages: updatedMessages,
+            title,
+            updatedAt: new Date(),
+          };
+        }
+        return session;
+      });
+      saveSessions(updatedSessions);
+      return updatedSessions;
+    });
+  };
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -212,10 +297,10 @@ export function SupportChat() {
   const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Save messages to localStorage whenever they change
+  // Save current session ID to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('kull-chat-messages', JSON.stringify(messages));
-  }, [messages]);
+    localStorage.setItem('kull-current-session-id', currentSessionId);
+  }, [currentSessionId]);
 
   // Save chat open state to localStorage whenever it changes
   useEffect(() => {
@@ -393,15 +478,27 @@ export function SupportChat() {
                 <p className="text-xs text-primary-foreground/80">Usually responds instantly</p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsOpen(false)}
-              className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
-              data-testid="button-close-chat"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleResetChat}
+                className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                data-testid="button-reset-chat"
+                title="Reset chat"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOpen(false)}
+                className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                data-testid="button-close-chat"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Messages */}
