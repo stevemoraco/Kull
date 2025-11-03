@@ -85,7 +85,7 @@ export function ValueStack() {
           </div>
           <p className="text-muted-foreground leading-relaxed">
             Start with a <strong className="text-foreground">1-day unlimited free trial</strong>. 
-            No credit card required. Cancel anytime—no questions asked.
+            Cancel anytime—no questions asked.
           </p>
         </div>
       </div>

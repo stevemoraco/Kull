@@ -9,7 +9,7 @@ export function FAQSection() {
   const faqs = [
     {
       question: "How does the 1-day free trial work?",
-      answer: "Sign up with no credit card required and get unlimited access to Kull AI for 24 hours. Rate as many photos as you want during your trial. If you love it, choose a plan. If not, your trial simply expires—no charges, no hassle."
+      answer: "Sign up and get unlimited access to Kull AI for 24 hours. Rate as many photos as you want during your trial. After entering your payment details, you can cancel anytime during the trial period with no charge. If you don't cancel, your subscription starts after 24 hours."
     },
     {
       question: "What's the 24-hour special offer?",

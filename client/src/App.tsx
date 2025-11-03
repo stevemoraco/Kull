@@ -9,12 +9,25 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Checkout from "@/pages/Checkout";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+import Refunds from "@/pages/Refunds";
+import Support from "@/pages/Support";
+import Contact from "@/pages/Contact";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <Switch>
+      {/* Public pages */}
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/refunds" component={Refunds} />
+      <Route path="/support" component={Support} />
+      <Route path="/contact" component={Contact} />
+
+      {/* Auth-conditional pages */}
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (

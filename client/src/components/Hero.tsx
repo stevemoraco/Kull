@@ -53,12 +53,7 @@ export function Hero() {
           </Button>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2" data-testid="text-no-credit-card">
-            <Star className="w-4 h-4 text-primary" />
-            <span>No credit card required</span>
-          </div>
-          <div className="hidden sm:block w-1 h-1 rounded-full bg-muted-foreground/40" />
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-2" data-testid="text-user-count">
             <Star className="w-4 h-4 text-primary" />
             <span>Used by 500+ professional photographers</span>

@@ -10,14 +10,14 @@ export function Footer() {
 
   const companyLinks = [
     { name: "About", href: "#about" },
-    { name: "Contact", href: "#contact" },
-    { name: "Support", href: "#support" }
+    { name: "Contact", href: "/contact" },
+    { name: "Support", href: "/support" }
   ];
 
   const legalLinks = [
-    { name: "Privacy Policy", href: "#privacy" },
-    { name: "Terms of Service", href: "#terms" },
-    { name: "Refund Policy", href: "#refunds" }
+    { name: "Privacy Policy", href: "/privacy" },
+    { name: "Terms of Service", href: "/terms" },
+    { name: "Refund Policy", href: "/refunds" }
   ];
 
   return (
@@ -48,13 +48,24 @@ export function Footer() {
             <ul className="space-y-2">
               {companyLinks.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    {link.name}
-                  </a>
+                  {link.href.startsWith('#') ? (
+                    <a
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {link.name}
+                    </a>
+                  ) : (
+                    <Link href={link.href}>
+                      <a
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {link.name}
+                      </a>
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -66,13 +77,14 @@ export function Footer() {
             <ul className="space-y-2">
               {legalLinks.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    {link.name}
-                  </a>
+                  <Link href={link.href}>
+                    <a
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {link.name}
+                    </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -86,7 +98,7 @@ export function Footer() {
               © 2025 Lander Media, 31 N Tejon St Colorado Springs CO 80903
             </p>
             <p data-testid="text-powered-by">
-              Powered by <a href="https://heydata.org" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">heydata.org</a>
+              Built and powered by <a href="https://heydata.org" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">heydata.org</a>
             </p>
           </div>
         </div>

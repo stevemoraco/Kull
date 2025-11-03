@@ -44,7 +44,7 @@
   - Hero headline emphasizing AI-powered rating + time savings
   - Subheadline with specific benefit (e.g., "Rate 1,000+ photos in minutes using 5 AI models")
   - Two-button CTA group: Primary "Start 1-Day Free Trial" + Secondary "Watch Demo"
-  - Trust indicators below CTAs: "No credit card required" + "Used by 500+ pro photographers"
+  - Trust indicators below CTAs: "Used by 500+ pro photographers"
   - Subtle scroll indicator at bottom
 
 ### 2. Urgency Banner (Sticky, appears after scroll)
