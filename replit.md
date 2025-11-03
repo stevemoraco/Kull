@@ -31,7 +31,8 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models you can cho
 #### SendGrid Email Automation
 - **Welcome Email (5min)**: Sent 5 minutes after trial starts with installation instructions
 - **Installation Check (1hr)**: Follow-up at 1 hour to ensure successful app installation
-- **Trial Ending Warning (18hr)**: Reminder 6 hours before trial ends with cancellation instructions
+- **Trial Ending Warning (18hr)**: First reminder 6 hours before trial ends with cancellation instructions
+- **Final Warning (23hr)**: Urgent reminder 1 hour before trial ends with last chance to cancel
 - **Email Queue System**: Database-backed queue with scheduling, retry logic, and cancellation
 - **Cron Job Endpoint**: `/api/cron/process-emails` for automated email sending
 - **Smart Cancellation**: Emails automatically cancelled when user converts or cancels trial

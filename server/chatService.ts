@@ -91,7 +91,7 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - **Slow performance**: Try using Grok model for faster processing
 
 ### Account & Billing
-- **Trial ending**: You'll receive email 6 hours before trial ends
+- **Trial ending**: You'll receive emails at 6 hours and 1 hour before trial ends
 - **Cancellation**: Go to Account Settings > Subscription > Cancel
 - **Billing issues**: Email support@kullai.com or use this chat
 
@@ -202,7 +202,7 @@ Pro tip: Different AI models may rate the same photo differently - try multiple 
 
 ✅ During trial (before 24 hours): Zero charge
 ✅ After trial starts: Cancel anytime, no refund for current period
-✅ We'll send you an email 6 hours before your trial ends
+✅ We'll send you emails at 6 hours and 1 hour before your trial ends
 
 No tricks, no hassle - just click and you're done!`;
     }
@@ -216,7 +216,7 @@ No tricks, no hassle - just click and you're done!`;
 
 We place a pre-authorization hold on your card to verify it can handle the annual subscription amount. You won't be charged until the trial period ends.
 
-You'll receive reminder emails at 6 hours before your trial ends!`;
+You'll receive reminder emails at 6 hours and 1 hour before your trial ends!`;
   }
 
   // Plan/pricing questions

@@ -221,6 +221,77 @@ The Kull AI Team
 © 2025 Lander Media
 `,
   }),
+
+  trialEnding23hr: (user: User) => ({
+    subject: "🚨 Final Reminder: Your Kull AI Trial Ends in 1 Hour",
+    htmlBody: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.6; color: #1f2937; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .alert { background: #FEE2E2; border-left: 4px solid #DC2626; padding: 20px; margin-bottom: 20px; border-radius: 6px; }
+            .content { background: white; padding: 30px; border: 1px solid #e5e7eb; border-radius: 8px; }
+            .button { display: inline-block; background: #8B5CF6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+            .button-cancel { background: #DC2626; }
+            .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="alert">
+              <strong>🚨 FINAL REMINDER:</strong> Your free trial ends in <strong>1 HOUR</strong> at ${new Date(user.trialEndsAt!).toLocaleString()}.
+            </div>
+            <div class="content">
+              <p>Hi ${user.firstName},</p>
+              <p>This is your <strong>final reminder</strong> before your trial ends and billing begins.</p>
+
+              <h3>⚠️ What Happens in 1 Hour?</h3>
+              <p>Your ${user.subscriptionTier === 'professional' ? '$99/mo Professional' : '$499/mo Studio'} subscription will <strong>automatically activate</strong> and your card will be charged for the annual amount:</p>
+              <ul>
+                <li>${user.subscriptionTier === 'professional' ? '💳 $1,188 for Professional Annual' : '💳 $5,988 for Studio Annual'}</li>
+                <li>⏰ Charge occurs at: ${new Date(user.trialEndsAt!).toLocaleString()}</li>
+              </ul>
+
+              <h3>🛑 Last Chance to Cancel</h3>
+              <p>If you want to cancel, <strong>you must do it now</strong>. After the trial ends, you cannot get a refund.</p>
+              <a href="${process.env.REPLIT_DOMAINS?.split(',')[0] || 'https://kullai.com'}" class="button button-cancel">Cancel My Trial Now →</a>
+
+              <h3>✅ Ready to Continue?</h3>
+              <p>If you're happy with Kull AI, no action needed! Your subscription will activate automatically in 1 hour.</p>
+
+              <p><strong>Questions?</strong> Contact us immediately via chat on our website.</p>
+
+              <p>The Kull AI Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2025 Lander Media, 31 N Tejon St Colorado Springs CO 80903</p>
+              <p>Powered by heydata.org</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    textBody: `🚨 FINAL REMINDER - 1 HOUR LEFT
+
+Hi ${user.firstName},
+
+Your free trial ends in 1 HOUR at ${new Date(user.trialEndsAt!).toLocaleString()}.
+
+What Happens in 1 Hour?
+Your ${user.subscriptionTier === 'professional' ? '$99/mo Professional ($1,188 annual)' : '$499/mo Studio ($5,988 annual)'} subscription will automatically activate and your card will be charged.
+
+Last Chance to Cancel:
+Visit ${process.env.REPLIT_DOMAINS?.split(',')[0] || 'https://kullai.com'} NOW to cancel with zero charge.
+
+Ready to Continue?
+No action needed! Your subscription activates automatically in 1 hour.
+
+The Kull AI Team
+© 2025 Lander Media
+`,
+  }),
 };
 
 // Schedule all trial emails for a user
@@ -290,7 +361,26 @@ export async function scheduleTrialEmails(user: User): Promise<void> {
     cancelled: false,
   });
 
-  console.log(`Scheduled 3 trial emails for user ${user.id}`);
+  // Final reminder email - 23 hours after trial starts (1 hour before end)
+  const trialEnding23hrTime = new Date(trialStart.getTime() + 23 * 60 * 60 * 1000);
+  const trialEnding23hrEmail = emailTemplates.trialEnding23hr(user);
+  await storage.scheduleEmail({
+    userId: user.id,
+    emailType: 'trial_ending_23hr',
+    recipientEmail: user.email,
+    subject: trialEnding23hrEmail.subject,
+    htmlBody: trialEnding23hrEmail.htmlBody,
+    textBody: trialEnding23hrEmail.textBody,
+    metadata: { userName: user.firstName, tier: user.subscriptionTier },
+    scheduledFor: trialEnding23hrTime,
+    sentAt: null,
+    failedAt: null,
+    errorMessage: null,
+    retryCount: '0',
+    cancelled: false,
+  });
+
+  console.log(`Scheduled 4 trial emails for user ${user.id}`);
 }
 
 // SendGrid email sender (will be activated when API key is provided)
