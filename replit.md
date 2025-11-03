@@ -12,12 +12,16 @@ Kull AI is built with a modern web stack. The **Frontend** uses React with TypeS
 **Feature Specifications**:
 - **Authentication**: Replit Auth provides secure login with various providers and integrates a 1-day free trial with a 24-hour special offer timer.
 - **Subscription Management**: Supports two pricing tiers (Professional and Studio) with annual billing as default and a smart downgrade option to monthly if annual authorization fails.
-- **Referral System**: Comprehensive referral program with:
+- **Referral System**: Comprehensive referral program with full Stripe integration:
   - Multi-email submission (3 stacked fields by default, add more with "Add Photographer" button)
-  - Real-time reward milestone reminders as users fill in emails
+  - Purple glow visual highlight on first email field to draw attention
+  - Real-time reward milestone reminders positioned below "Send Invites" button for mobile visibility
+  - Dynamic milestone tracking that accounts for existing referrals
+  - Reward tiers: 1 month free (3 referrals sent), 3 months free (10 referrals sent OR 3 referrals completed), priority support (5 referrals sent)
   - Personalized invitation emails sent to referred photographers from referrer's name and email
-  - Tracks up to 10 photographer referrals with 4 bonus tiers (1, 3, 5, 10 referrals)
   - Beautiful SendGrid-powered referral invitation emails with full referrer details
+  - **Stripe Checkout Integration**: Earned bonuses automatically adjust pricing during checkout, showing discounted amounts and applying reduced authorization holds
+  - **Smart Monthly Downgrade**: When annual authorization fails, monthly downgrade dialog displays bonus-aware pricing and skips PaymentIntent creation for $0 amounts
   - Both referrer and referred photographer receive rewards when signup completes
 - **Self-Service & Support**: Features an instant self-service refund system with mandatory survey (capturing reason, recommendation, feedback) and optional voice transcription, plus chat-first customer support strategy leveraging an AI chatbot with GitHub context.
 
