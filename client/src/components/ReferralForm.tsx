@@ -4,33 +4,37 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Gift, Mail, Check, Users } from "lucide-react";
+import { Gift, Mail, Check, Users, Plus, X, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Referral } from "@shared/schema";
 
 export function ReferralForm() {
-  const [email, setEmail] = useState("");
+  const [emails, setEmails] = useState<string[]>(["", "", ""]); // 3 fields by default
   const { toast } = useToast();
 
   const { data: referrals = [], isLoading } = useQuery<Referral[]>({
     queryKey: ['/api/referrals'],
   });
 
-  const createReferralMutation = useMutation({
-    mutationFn: async (referredEmail: string) => {
-      const response = await apiRequest("POST", "/api/referrals", { referredEmail });
-      return response.json();
+  const createReferralsMutation = useMutation({
+    mutationFn: async (referredEmails: string[]) => {
+      // Send all emails in parallel
+      const promises = referredEmails.map(email =>
+        apiRequest("POST", "/api/referrals", { referredEmail: email }).then(r => r.json())
+      );
+      return Promise.all(promises);
     },
-    onSuccess: () => {
+    onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
-      setEmail("");
+      setEmails(["", "", ""]);
       toast({
-        title: "Referral Sent!",
-        description: "Your photographer friend will receive an invitation to try Kull AI.",
+        title: `${results.length} Referral${results.length > 1 ? 's' : ''} Sent!`,
+        description: "Your photographer friends will receive invitations to try Kull AI.",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to Send Referral",
+        title: "Failed to Send Referrals",
         description: error.message,
         variant: "destructive",
       });
@@ -40,16 +44,66 @@ export function ReferralForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !email.includes('@')) {
+    const validEmails = emails.filter(email => email && email.includes('@'));
+    
+    if (validEmails.length === 0) {
       toast({
-        title: "Invalid Email",
-        description: "Please enter a valid email address",
+        title: "No Valid Emails",
+        description: "Please enter at least one valid email address",
         variant: "destructive",
       });
       return;
     }
 
-    createReferralMutation.mutate(email);
+    // Check for duplicates within the form
+    const uniqueEmails = Array.from(new Set(validEmails));
+    if (uniqueEmails.length !== validEmails.length) {
+      toast({
+        title: "Duplicate Emails",
+        description: "Please remove duplicate email addresses",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if any email is already referred
+    const alreadyReferred = uniqueEmails.filter(email => 
+      referrals.some(r => r.referredEmail === email)
+    );
+    
+    if (alreadyReferred.length > 0) {
+      toast({
+        title: "Email Already Referred",
+        description: `${alreadyReferred[0]} has already been invited`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createReferralsMutation.mutate(uniqueEmails);
+  };
+
+  const updateEmail = (index: number, value: string) => {
+    const newEmails = [...emails];
+    newEmails[index] = value;
+    setEmails(newEmails);
+  };
+
+  const addEmailField = () => {
+    if (emails.length + referrals.length >= 10) {
+      toast({
+        title: "Maximum Limit",
+        description: "You can only have up to 10 total referrals",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEmails([...emails, ""]);
+  };
+
+  const removeEmailField = (index: number) => {
+    if (emails.length <= 1) return;
+    setEmails(emails.filter((_, i) => i !== index));
   };
 
   const completedReferrals = referrals.filter(r => r.status === 'completed').length;
@@ -58,6 +112,22 @@ export function ReferralForm() {
                         completedReferrals >= 3 ? '1 month free' :
                         completedReferrals >= 1 ? 'Bonus features' :
                         'None yet';
+
+  // Calculate next reward
+  const getNextReward = () => {
+    const filledEmails = emails.filter(email => email && email.includes('@')).length;
+    const potentialCompleted = completedReferrals + filledEmails;
+    
+    if (potentialCompleted === 0) return null;
+    if (potentialCompleted < 1) return { count: 1, reward: "Bonus features unlock" };
+    if (potentialCompleted < 3) return { count: 3, reward: "1 month free" };
+    if (potentialCompleted < 5) return { count: 5, reward: "Priority support upgrade" };
+    if (potentialCompleted < 10) return { count: 10, reward: "3 months free (save hundreds!)" };
+    return { count: 10, reward: "Maximum bonuses unlocked!" };
+  };
+
+  const nextReward = getNextReward();
+  const filledCount = emails.filter(email => email && email.includes('@')).length;
 
   return (
     <div className="space-y-6">
@@ -80,32 +150,85 @@ export function ReferralForm() {
         </div>
       </div>
 
+      {/* Reward reminder */}
+      {nextReward && filledCount > 0 && (
+        <Alert className="bg-primary/10 border-primary/30">
+          <Gift className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-foreground">
+            <strong>{filledCount} photographer{filledCount > 1 ? 's' : ''} ready to invite!</strong>
+            {completedReferrals + filledCount < nextReward.count && (
+              <span className="ml-1">
+                Just {nextReward.count - (completedReferrals + filledCount)} more to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+              </span>
+            )}
+            {completedReferrals + filledCount >= nextReward.count && (
+              <span className="ml-1">
+                On track to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+              </span>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Referral form */}
       {referrals.length < 10 && (
         <form onSubmit={handleSubmit} className="bg-card border border-card-border rounded-xl p-6">
           <h3 className="font-bold text-lg mb-4 text-card-foreground flex items-center gap-2">
             <Mail className="w-5 h-5 text-primary" />
-            Invite a Photographer
+            Invite Photographers
           </h3>
-          <div className="flex gap-3">
-            <Input
-              type="email"
-              placeholder="photographer@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="flex-1"
-              data-testid="input-referral-email"
-            />
+          
+          <div className="space-y-3">
+            {emails.map((email, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder={`Photographer ${index + 1} email`}
+                  value={email}
+                  onChange={(e) => updateEmail(index, e.target.value)}
+                  className="flex-1"
+                  data-testid={`input-referral-email-${index}`}
+                />
+                {emails.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeEmailField(index)}
+                    data-testid={`button-remove-email-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3 mt-4">
+            {emails.length + referrals.length < 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addEmailField}
+                className="flex-1"
+                data-testid="button-add-photographer"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Photographer
+              </Button>
+            )}
             <Button
               type="submit"
-              disabled={createReferralMutation.isPending}
-              data-testid="button-send-referral"
+              disabled={createReferralsMutation.isPending}
+              className="flex-1"
+              data-testid="button-send-referrals"
             >
-              {createReferralMutation.isPending ? 'Sending...' : 'Send Invite'}
+              {createReferralsMutation.isPending ? 'Sending...' : 'Send Invites'}
             </Button>
           </div>
+
           <p className="text-xs text-muted-foreground mt-3">
-            {10 - referrals.length} referrals remaining to reach maximum bonuses
+            {10 - referrals.length} referral slots remaining. Both you and your friends receive rewards!
           </p>
         </form>
       )}

@@ -979,6 +979,143 @@ Founder, Kull AI
 Follow me: https://x.com/steveMoraco`
 });
 
+// REFERRAL INVITATION EMAIL
+const referralInvitationEmail = (referrerName: string, referrerEmail: string, referredEmail: string) => ({
+  subject: `${referrerName} invited you to try Kull AI - Free 1-Day Trial!`,
+  html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${emailStyles}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎁 You've Been Invited!</h1>
+    </div>
+    <div class="content">
+      <p style="font-size: 18px; font-weight: 600; color: #111827;">Hi there!</p>
+      
+      <p><strong>${referrerName}</strong> (${referrerEmail}) thinks you'd love Kull AI and invited you to try our AI-powered photo rating system for free!</p>
+
+      <div class="alert alert-success">
+        <p style="margin: 0; font-weight: 600;">🎉 Special Referral Offer for You</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">Get a FREE 1-day unlimited trial of Kull AI, plus if you become a paid customer, both you and ${referrerName} will receive exclusive bonus rewards!</p>
+      </div>
+
+      <h2>Why Kull AI?</h2>
+      <p>Stop wasting hours manually rating thousands of photos in Lightroom. Our advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) automatically rate your photos with 1-5 stars in real-time.</p>
+
+      <ul class="feature-list">
+        <li>Rate thousands of photos in minutes, not hours</li>
+        <li>5 cutting-edge AI models working together</li>
+        <li>Real-time Lightroom integration</li>
+        <li>Professional-grade accuracy</li>
+        <li>1-day free trial - unlimited photos</li>
+        <li>7-day money-back guarantee</li>
+      </ul>
+
+      <div style="text-align: center;">
+        <a href="${baseUrl}" class="button" style="display: inline-block;">
+          🚀 Start Your Free Trial Now
+        </a>
+      </div>
+
+      <h3>🎁 Referral Rewards</h3>
+      <p>When you sign up as a paid customer:</p>
+      
+      <div class="stats-box">
+        <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">✓ ${referrerName} unlocks exclusive bonuses</p>
+        <p style="margin: 0 0 12px 0; font-weight: 600; color: #111827;">✓ You get the same amazing AI-powered photo rating</p>
+        <p style="margin: 0; font-weight: 600; color: #111827;">✓ Both of you can refer more photographers for even bigger rewards!</p>
+      </div>
+
+      <h3>Referral Bonus Tiers:</h3>
+      <ul class="feature-list">
+        <li><strong>1 referral</strong>: Bonus feature unlock</li>
+        <li><strong>3 referrals</strong>: 1 month free</li>
+        <li><strong>5 referrals</strong>: Priority support upgrade</li>
+        <li><strong>10 referrals</strong>: 3 months free (save hundreds!)</li>
+      </ul>
+
+      <h3>How It Works:</h3>
+      <p>1. Click the button above to visit Kull AI<br>
+      2. Sign up with this email (${referredEmail})<br>
+      3. Start your 1-day free trial instantly<br>
+      4. Install our plugin and watch the magic happen<br>
+      5. If you love it, subscribe and we both win!</p>
+
+      <div class="alert">
+        <p style="margin: 0; font-weight: 600;">⏰ Limited Time Offer</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">New signups get 3 FREE MONTHS on annual plans - but this special offer won't last long!</p>
+      </div>
+
+      <p style="margin-top: 32px;">Best regards,<br>
+      <strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
+    </div>
+    <div class="footer">
+      <div class="footer-links">
+        <a href="${baseUrl}/support">Support</a>
+        <a href="${baseUrl}/refunds">Refunds</a>
+        <a href="${baseUrl}/terms">Terms</a>
+        <a href="${baseUrl}/contact">Contact</a>
+      </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
+      <p>© 2025 Lander Media, 31 N Tejon St, Colorado Springs, CO 80903</p>
+      <p><a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
+    </div>
+  </div>
+</body>
+</html>
+  `,
+  text: `You've Been Invited to Try Kull AI!
+
+Hi there!
+
+${referrerName} (${referrerEmail}) thinks you'd love Kull AI and invited you to try our AI-powered photo rating system for free!
+
+SPECIAL REFERRAL OFFER:
+- FREE 1-day unlimited trial
+- When you become a paid customer, both you and ${referrerName} receive exclusive bonus rewards!
+
+WHY KULL AI?
+Stop wasting hours manually rating thousands of photos in Lightroom. Our advanced AI models automatically rate your photos with 1-5 stars in real-time.
+
+FEATURES:
+✓ Rate thousands of photos in minutes, not hours
+✓ 5 cutting-edge AI models working together
+✓ Real-time Lightroom integration
+✓ Professional-grade accuracy
+✓ 1-day free trial - unlimited photos
+✓ 7-day money-back guarantee
+
+REFERRAL REWARDS:
+When you sign up as a paid customer, both you and ${referrerName} benefit:
+• 1 referral: Bonus feature unlock
+• 3 referrals: 1 month free
+• 5 referrals: Priority support upgrade
+• 10 referrals: 3 months free (save hundreds!)
+
+HOW IT WORKS:
+1. Visit ${baseUrl}
+2. Sign up with this email (${referredEmail})
+3. Start your 1-day free trial instantly
+4. Install our plugin and watch the magic happen
+5. If you love it, subscribe and we both win!
+
+LIMITED TIME: New signups get 3 FREE MONTHS on annual plans!
+
+Start your free trial: ${baseUrl}
+
+Best regards,
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
+});
+
 export const emailTemplates = {
   // Post-checkout
   welcome5min: welcome5minEmail,
@@ -994,4 +1131,7 @@ export const emailTemplates = {
   drip3_11hr: drip3_11hrEmail,
   drip4_16hr: drip4_16hrEmail,
   drip5_21hr: drip5_21hrEmail,
+  
+  // Referral invitation
+  referralInvitation: referralInvitationEmail,
 };

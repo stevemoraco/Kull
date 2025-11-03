@@ -399,10 +399,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Email already referred" });
       }
 
+      // Create referral first
       const referral = await storage.createReferral({
         referrerId: userId,
         referredEmail,
       });
+
+      // Send referral invitation email (don't block referral creation if this fails)
+      try {
+        const referrerUser = await storage.getUser(userId);
+        const { sendEmail } = await import('./emailService');
+        const { emailTemplates } = await import('./emailTemplates');
+        
+        const referrerName = referrerUser 
+          ? `${referrerUser.firstName || 'A fellow photographer'} ${referrerUser.lastName || ''}`.trim()
+          : 'A fellow photographer';
+        const referrerEmail = referrerUser?.email || '';
+        
+        const emailTemplate = emailTemplates.referralInvitation(referrerName, referrerEmail, referredEmail);
+        
+        await sendEmail(
+          referredEmail,
+          emailTemplate.subject,
+          emailTemplate.html,
+          emailTemplate.text
+        );
+      } catch (emailError) {
+        console.error("Failed to send referral email:", emailError);
+        // Don't fail the referral creation if email fails
+      }
 
       res.json(referral);
     } catch (error: any) {
