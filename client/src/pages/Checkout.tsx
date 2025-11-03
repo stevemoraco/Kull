@@ -6,20 +6,27 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Crown, Zap } from "lucide-react";
+import { ArrowLeft, Crown, Zap, AlertCircle } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
 }
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-const CheckoutForm = ({ tier }: { tier: 'professional' | 'studio' }) => {
+const CheckoutForm = ({ tier, setupIntentId, onDowngrade }: { 
+  tier: 'professional' | 'studio'; 
+  setupIntentId: string | null;
+  onDowngrade: () => void;
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDowngrade, setShowDowngrade] = useState(false);
+  const [downgradeInfo, setDowngradeInfo] = useState<any>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,26 +37,94 @@ const CheckoutForm = ({ tier }: { tier: 'professional' | 'studio' }) => {
 
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/`,
-      },
-    });
+    try {
+      // Submit the SetupIntent
+      const { error, setupIntent } = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/`,
+        },
+        redirect: 'if_required',
+      });
 
-    if (error) {
+      if (error) {
+        toast({
+          title: "Payment Setup Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Now confirm the trial with our backend
+      if (setupIntent && setupIntent.id) {
+        const response = await apiRequest("POST", "/api/trial/confirm", {
+          setupIntentId: setupIntent.id,
+          tier,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          
+          // Check if it's a downgrade required response
+          if (response.status === 402 && errorData.requiresDowngrade) {
+            setDowngradeInfo(errorData);
+            setShowDowngrade(true);
+            setIsProcessing(false);
+            return;
+          }
+
+          throw new Error(errorData.message || 'Failed to confirm trial');
+        }
+
+        const data = await response.json();
+        
+        toast({
+          title: "Trial Started! 🎉",
+          description: "Your 24-hour free trial has begun. Download the app now!",
+        });
+        
+        setLocation('/');
+      }
+    } catch (error: any) {
       toast({
-        title: "Payment Failed",
-        description: error.message,
+        title: "Error",
+        description: error.message || "Failed to start trial. Please try again.",
         variant: "destructive",
       });
       setIsProcessing(false);
-    } else {
-      toast({
-        title: "Payment Successful",
-        description: "Welcome to Kull AI! Download your app now.",
+    }
+  };
+
+  const handleDowngradeToMonthly = async () => {
+    if (!setupIntentId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const response = await apiRequest("POST", "/api/trial/downgrade-monthly", {
+        setupIntentId,
+        tier,
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to downgrade to monthly');
+      }
+
+      toast({
+        title: "Trial Started! 🎉",
+        description: "Your 24-hour free trial has begun with monthly billing. Download the app now!",
+      });
+      
       setLocation('/');
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to switch to monthly billing.",
+        variant: "destructive",
+      });
+      setIsProcessing(false);
     }
   };
 
@@ -58,54 +133,97 @@ const CheckoutForm = ({ tier }: { tier: 'professional' | 'studio' }) => {
     price: '$499',
     period: '/month',
     annual: '$5,988/year',
+    annualTotal: '$5,988',
+    monthlyTotal: '$499',
     savings: 'Save $2,004 vs monthly'
   } : {
     name: 'Professional',
     price: '$99',
     period: '/month',
     annual: '$1,188/year',
+    annualTotal: '$1,188',
+    monthlyTotal: '$99',
     savings: 'Save $396 vs monthly'
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-card border border-card-border rounded-xl p-6 mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          {tier === 'studio' && <Crown className="w-6 h-6 text-primary" />}
-          {tier === 'professional' && <Zap className="w-6 h-6 text-primary" />}
-          <h3 className="text-2xl font-bold text-card-foreground">{planDetails.name} Plan</h3>
+    <>
+      {showDowngrade && downgradeInfo && (
+        <Alert className="mb-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+          <AlertDescription className="text-sm text-amber-900 dark:text-amber-100">
+            <p className="font-semibold mb-2">Unable to authorize ${downgradeInfo.annualAmount} for annual billing</p>
+            <p className="mb-3">Would you like to try monthly billing at ${downgradeInfo.monthlyAmount}/month instead?</p>
+            <div className="flex gap-3">
+              <Button 
+                size="sm" 
+                onClick={handleDowngradeToMonthly}
+                disabled={isProcessing}
+                data-testid="button-downgrade-monthly"
+              >
+                {isProcessing ? 'Processing...' : 'Switch to Monthly'}
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => setShowDowngrade(false)}
+                data-testid="button-cancel-downgrade"
+              >
+                Cancel
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-card border border-card-border rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            {tier === 'studio' && <Crown className="w-6 h-6 text-primary" />}
+            {tier === 'professional' && <Zap className="w-6 h-6 text-primary" />}
+            <h3 className="text-2xl font-bold text-card-foreground">{planDetails.name} Plan</h3>
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-4xl font-black text-foreground">{planDetails.price}</span>
+            <span className="text-muted-foreground">{planDetails.period}</span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-1">Billed annually at {planDetails.annual}</p>
+          <p className="text-xs text-primary mb-4">{planDetails.savings}</p>
+          
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mt-4">
+            <p className="text-sm font-semibold text-foreground mb-2">💳 Card Pre-Authorization</p>
+            <p className="text-xs text-muted-foreground">
+              We'll verify your card can handle {planDetails.annualTotal} for the annual plan. 
+              No charge until your 24-hour trial ends. Cancel anytime with zero charge.
+            </p>
+          </div>
         </div>
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-4xl font-black text-foreground">{planDetails.price}</span>
-          <span className="text-muted-foreground">{planDetails.period}</span>
+
+        <div className="bg-muted/30 border border-border rounded-xl p-6">
+          <PaymentElement />
         </div>
-        <p className="text-sm text-muted-foreground mb-1">Billed annually at {planDetails.annual}</p>
-        <p className="text-xs text-primary">{planDetails.savings}</p>
-      </div>
 
-      <div className="bg-muted/30 border border-border rounded-xl p-6">
-        <PaymentElement />
-      </div>
+        <Button
+          type="submit"
+          disabled={!stripe || isProcessing}
+          className="w-full h-12 text-base"
+          data-testid="button-start-trial"
+        >
+          {isProcessing ? 'Processing...' : 'Start Free 24-Hour Trial'}
+        </Button>
 
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full h-12 text-base"
-        data-testid="button-submit-payment"
-      >
-        {isProcessing ? 'Processing...' : 'Subscribe Now'}
-      </Button>
-
-      <p className="text-xs text-center text-muted-foreground">
-        By subscribing, you agree to our Terms of Service and Privacy Policy.
-        Cancel anytime from your account settings.
-      </p>
-    </form>
+        <p className="text-xs text-center text-muted-foreground">
+          By starting your trial, you agree to our Terms of Service and Privacy Policy.
+          You can cancel anytime during your 24-hour trial with zero charge.
+        </p>
+      </form>
+    </>
   );
 };
 
 export default function Checkout() {
   const [clientSecret, setClientSecret] = useState("");
+  const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
@@ -128,16 +246,16 @@ export default function Checkout() {
     }
 
     if (user) {
-      // Create subscription
-      apiRequest("POST", "/api/create-subscription", { tier })
+      // Create SetupIntent for trial
+      apiRequest("POST", "/api/trial/setup-intent", { tier })
         .then((res) => res.json())
         .then((data) => {
           if (data.clientSecret) {
             setClientSecret(data.clientSecret);
           } else {
             toast({
-              title: "Subscription Active",
-              description: "You already have an active subscription!",
+              title: "Trial Already Active",
+              description: "You already have an active trial or subscription!",
             });
             setLocation('/');
           }
@@ -145,7 +263,7 @@ export default function Checkout() {
         .catch((error) => {
           toast({
             title: "Error",
-            description: "Failed to initialize checkout. Please try again.",
+            description: "Failed to initialize trial. Please try again.",
             variant: "destructive",
           });
         });
@@ -195,15 +313,19 @@ export default function Checkout() {
       <main className="max-w-2xl mx-auto px-4 py-12 md:py-20">
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-4xl font-black mb-4 text-foreground" data-testid="text-checkout-headline">
-            Complete Your Subscription
+            Start Your Free Trial
           </h1>
           <p className="text-muted-foreground">
-            Start rating photos with AI in minutes
+            24 hours of unlimited AI photo rating. No charge until trial ends.
           </p>
         </div>
 
         <Elements stripe={stripePromise} options={{ clientSecret }}>
-          <CheckoutForm tier={tier} />
+          <CheckoutForm 
+            tier={tier} 
+            setupIntentId={setupIntentId}
+            onDowngrade={() => {}}
+          />
         </Elements>
       </main>
 

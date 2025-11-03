@@ -32,12 +32,17 @@ export const users = pgTable("users", {
   // Stripe fields
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  stripePaymentMethodId: varchar("stripe_payment_method_id"),
+  stripeSetupIntentId: varchar("stripe_setup_intent_id"),
   subscriptionTier: varchar("subscription_tier"), // 'professional' or 'studio'
-  subscriptionStatus: varchar("subscription_status"), // 'active', 'canceled', 'trial'
+  subscriptionStatus: varchar("subscription_status"), // 'trial', 'active', 'canceled', 'past_due'
   // Trial tracking
   trialStartedAt: timestamp("trial_started_at"),
   trialEndsAt: timestamp("trial_ends_at"),
+  trialConvertedAt: timestamp("trial_converted_at"),
   specialOfferExpiresAt: timestamp("special_offer_expires_at"), // 24 hours after sign-in
+  // App installation tracking
+  appInstalledAt: timestamp("app_installed_at"),
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -63,3 +68,6 @@ export const insertReferralSchema = createInsertSchema(referrals).pick({
 
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Referral = typeof referrals.$inferSelect;
+
+// Re-export email queue types
+export * from "./emailQueue";
