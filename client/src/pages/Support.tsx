@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { LifeBuoy, ArrowLeft, MessageCircle, Mail, BookOpen, Video } from "lucide-react";
+import { LifeBuoy, ArrowLeft, MessageCircle, BookOpen } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { SupportChat } from "@/components/SupportChat";
 
@@ -32,89 +32,73 @@ export default function Support() {
               Support Center
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get help with Kull AI. Choose the option that works best for you.
+              Get instant help with Kull AI. Our AI-powered chat support is available 24/7.
             </p>
           </div>
 
           {/* Support Options Grid */}
-          <div className="grid md:grid-cols-2 gap-6 mb-16">
-            {/* Live Chat */}
-            <div className="bg-card border border-card-border rounded-2xl p-8 hover-elevate">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
-                <MessageCircle className="w-6 h-6 text-primary" />
+          <div className="grid md:grid-cols-1 gap-6 mb-16 max-w-2xl mx-auto">
+            {/* Live Chat - Primary Support Method */}
+            <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/20 rounded-2xl p-8">
+              <div className="w-16 h-16 rounded-xl bg-primary/20 flex items-center justify-center mb-4 mx-auto">
+                <MessageCircle className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold mb-3 text-foreground">Live Chat Support</h2>
-              <p className="text-muted-foreground leading-relaxed mb-6">
-                Get instant answers from our support team. Click the chat widget in the bottom-right corner of any page.
+              <h2 className="text-3xl font-bold mb-3 text-foreground text-center">Live Chat Support</h2>
+              <p className="text-muted-foreground leading-relaxed mb-6 text-center text-lg">
+                Get instant answers from our AI assistant trained on Kull AI's documentation and codebase. Click the chat widget in the bottom-right corner of any page.
               </p>
-              <div className="bg-muted/30 rounded-lg p-4">
+              <div className="bg-card/50 backdrop-blur-sm rounded-lg p-6 text-center">
+                <p className="text-foreground font-semibold mb-2">Available 24/7</p>
                 <p className="text-sm text-muted-foreground">
-                  <strong className="text-foreground">Available:</strong> 24/7 automated assistance, with human support during business hours (9am-5pm MT)
+                  Powered by advanced AI with complete knowledge of Kull AI features, installation, troubleshooting, and billing. For additional support, founder Steve Moraco is available via Twitter DM.
                 </p>
               </div>
-            </div>
-
-            {/* Email Support */}
-            <div className="bg-card border border-card-border rounded-2xl p-8 hover-elevate">
-              <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
-                <Mail className="w-6 h-6 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold mb-3 text-foreground">Email Support</h2>
-              <p className="text-muted-foreground leading-relaxed mb-6">
-                Send us a detailed message and we'll respond within 24 hours (usually much faster).
-              </p>
-              <a
-                href="mailto:support@kullai.com"
-                className="inline-block"
-              >
-                <Button className="w-full" data-testid="button-email-support">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email support@kullai.com
-                </Button>
-              </a>
             </div>
           </div>
 
           {/* Common Questions */}
           <div className="mb-16">
-            <h2 className="text-3xl font-bold mb-8 text-foreground text-center">Common Questions</h2>
+            <div className="flex items-center justify-center gap-3 mb-8">
+              <BookOpen className="w-8 h-8 text-primary" />
+              <h2 className="text-3xl font-bold text-foreground">Common Questions</h2>
+            </div>
             <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">How do I install Kull AI?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   Download the Mac DMG file from your account dashboard. Double-click to install, then open Lightroom. The AI ratings will appear automatically as you browse photos.
                 </p>
               </div>
 
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">Which AI models does Kull AI use?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   We use 5 advanced models you can choose from: Gemini (Google), Grok (xAI), Kimi k2 (via Groq), Claude (Anthropic), and GPT-5 (OpenAI). All 5 analyze each photo using their low-cost batch APIs when possible, and rate each based on context in the photoshoot for maximum accuracy.
                 </p>
               </div>
 
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">How accurate are the ratings?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   Our multi-model consensus approach achieves professional-level accuracy. The AI analyzes composition, exposure, focus, and artistic merit—similar to how an expert photographer would evaluate images.
                 </p>
               </div>
 
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">Can I cancel my subscription?</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  Yes, cancel anytime from your account dashboard. You'll retain access until the end of your current billing period. No cancellation fees.
+                  Yes, cancel anytime from your account dashboard or use our self-service refund button within 7 days of payment. You'll retain access until the end of your current billing period. No cancellation fees.
                 </p>
               </div>
 
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">Do you store my photos?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   No. We never store your actual photos. They're processed in real-time and only the ratings (1-5 stars) are saved. Your creative work stays on your device, always.
                 </p>
               </div>
 
-              <div className="bg-card border border-card-border rounded-xl p-6">
+              <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">What's included in the free trial?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   Full access to all features for 24 hours. Rate unlimited photos. Cancel anytime during the trial with no charge. Perfect for testing with your own photography workflow.
@@ -124,49 +108,35 @@ export default function Support() {
           </div>
 
           {/* Additional Resources */}
-          <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-8 md:p-12">
-            <h2 className="text-3xl font-bold mb-6 text-foreground text-center">Additional Resources</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-foreground mb-2">Documentation</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Detailed guides on installation, features, and troubleshooting. Coming soon to our knowledge base.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Video className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-foreground mb-2">Video Tutorials</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Step-by-step video guides for getting started and advanced features. Available in your dashboard.
-                  </p>
-                </div>
-              </div>
+          <div className="bg-card border border-card-border rounded-2xl p-8">
+            <h2 className="text-2xl font-bold mb-6 text-foreground text-center">Additional Resources</h2>
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <Link href="/refunds">
+                <Button variant="outline" className="w-full" data-testid="button-refund-policy">
+                  Refund Policy
+                </Button>
+              </Link>
+              <Link href="/privacy">
+                <Button variant="outline" className="w-full" data-testid="button-privacy">
+                  Privacy Policy
+                </Button>
+              </Link>
+              <Link href="/terms">
+                <Button variant="outline" className="w-full" data-testid="button-terms">
+                  Terms of Service
+                </Button>
+              </Link>
             </div>
           </div>
 
-          {/* Contact Information */}
-          <div className="mt-16 text-center">
-            <h2 className="text-2xl font-bold mb-4 text-foreground">Still Need Help?</h2>
-            <p className="text-muted-foreground mb-6">
-              Our team is here to ensure you get the most out of Kull AI.
+          {/* Chat Reminder */}
+          <div className="mt-12 text-center">
+            <p className="text-muted-foreground mb-4">
+              Still have questions? Our AI chat support can help with installation, billing, technical issues, and more.
             </p>
-            <div className="inline-block p-6 bg-card border border-card-border rounded-xl">
-              <p className="text-foreground font-semibold">Lander Media</p>
-              <p className="text-muted-foreground">31 N Tejon St</p>
-              <p className="text-muted-foreground">Colorado Springs, CO 80903</p>
-              <p className="text-muted-foreground mt-3">
-                Email: <a href="mailto:support@kullai.com" className="text-primary hover:underline">support@kullai.com</a>
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Click the chat icon in the bottom-right corner to get started.
+            </p>
           </div>
         </div>
       </main>

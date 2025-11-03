@@ -92,8 +92,8 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 
 ### Account & Billing
 - **Trial ending**: You'll receive emails at 6 hours and 1 hour before trial ends
-- **Cancellation**: Go to Account Settings > Subscription > Cancel
-- **Billing issues**: Email support@kullai.com or use this chat
+- **Cancellation**: Go to Account Settings > Subscription > Cancel, or use self-service refund within 7 days
+- **Billing issues**: Use this chat for instant help, or DM founder on Twitter after 5 minutes
 
 ## System Requirements
 - macOS 10.15 (Catalina) or later
@@ -102,10 +102,10 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - 4GB RAM minimum, 8GB recommended
 
 ## Support
-- Chat support: Available 24/7 (this chat!)
-- Email: support@kullai.com
-- Response time: Usually within 1 hour
-- Phone support: Available for Studio plan customers
+- Chat support: Available 24/7 (this chat powered by advanced AI!)
+- Twitter DM: Founder Steve Moraco (@stevemoraco) responds within 24 hours
+- Response time: Instant via chat, usually within 1 hour via Twitter DM
+- Self-service refund: Available within 7 days of payment on /refund page
 
 ## Best Practices
 1. Start with a small batch to test the AI model
@@ -118,7 +118,9 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 Lander Media
 31 N Tejon St
 Colorado Springs, CO 80903
-support@kullai.com
+Founded 2014
+Chat support available 24/7
+Founder: @stevemoraco on Twitter
 `;
 
 export async function getChatResponse(
