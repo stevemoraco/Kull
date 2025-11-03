@@ -4,7 +4,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Gift, Mail, Check, Users, Plus, X, AlertCircle } from "lucide-react";
+import { Gift, Mail, Check, Users, Plus, X, AlertCircle, Calendar, HeadphonesIcon, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Referral } from "@shared/schema";
 
@@ -228,7 +228,7 @@ export function ReferralForm() {
                   <>
                     <strong>Type in your first email to start earning rewards!</strong>
                     <span className="ml-1">
-                      Just {nextReward.count} referral{nextReward.count > 1 ? 's' : ''} to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+                      {nextReward.count} more for a total of {totalSent + filledCount + nextReward.count} to unlock: <strong className="text-primary">{nextReward.reward}</strong>
                     </span>
                   </>
                 )}
@@ -236,7 +236,7 @@ export function ReferralForm() {
                   <>
                     <strong>{filledCount} photographer{filledCount > 1 ? 's' : ''} ready to invite!</strong>
                     <span className="ml-1">
-                      Just {nextReward.count} more to unlock: <strong className="text-primary">{nextReward.reward}</strong>
+                      {nextReward.count} more for a total of {totalSent + filledCount + nextReward.count} to unlock: <strong className="text-primary">{nextReward.reward}</strong>
                     </span>
                   </>
                 )}
@@ -249,6 +249,103 @@ export function ReferralForm() {
               </AlertDescription>
             </Alert>
           )}
+
+          {/* Visual Progress Diagram */}
+          <div className="mt-6 bg-card border border-card-border rounded-xl p-6">
+            <h4 className="font-semibold text-sm text-card-foreground mb-4">Your Reward Progress</h4>
+            <div className="relative">
+              {/* Progress Line */}
+              <div className="absolute top-5 left-0 right-0 h-1 bg-muted">
+                <div 
+                  className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-500 ease-out"
+                  style={{ 
+                    width: `${Math.min(100, ((totalSent + filledCount) / 10) * 100)}%` 
+                  }}
+                />
+              </div>
+              
+              {/* Milestones */}
+              <div className="relative flex justify-between">
+                {/* Milestone 1: Start (0 referrals) */}
+                <div className="flex flex-col items-center flex-1">
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      totalSent + filledCount >= 0 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs font-medium mt-2 text-center">Start</div>
+                  <div className="text-xs text-muted-foreground mt-1">0 sent</div>
+                </div>
+
+                {/* Milestone 2: 3 referrals - 1 month free */}
+                <div className="flex flex-col items-center flex-1">
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      totalSent + filledCount >= 3 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50 animate-pulse' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {totalSent + filledCount >= 3 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <Calendar className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 3 ? 'text-primary' : ''}`}>
+                    1 Month Free
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">3 sent</div>
+                </div>
+
+                {/* Milestone 3: 5 referrals - Priority Support */}
+                <div className="flex flex-col items-center flex-1">
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      totalSent + filledCount >= 5 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50 animate-pulse' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {totalSent + filledCount >= 5 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <HeadphonesIcon className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 5 ? 'text-primary' : ''}`}>
+                    Priority Support
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">5 sent</div>
+                </div>
+
+                {/* Milestone 4: 10 referrals - 3 months free */}
+                <div className="flex flex-col items-center flex-1">
+                  <div 
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      totalSent + filledCount >= 10 || totalCompleted >= 3
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50 animate-pulse' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {totalSent + filledCount >= 10 || totalCompleted >= 3 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <Sparkles className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 10 || totalCompleted >= 3 ? 'text-primary' : ''}`}>
+                    3 Months Free
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">10 sent</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <p className="text-xs text-muted-foreground mt-3">
             {10 - referrals.length} referral slots remaining. Both you and your friends receive rewards!
