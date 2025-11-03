@@ -11,8 +11,10 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 export default function Refunds() {
+  usePageTracking('refunds');
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();

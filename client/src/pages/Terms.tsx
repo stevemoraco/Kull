@@ -2,8 +2,10 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { FileText, ArrowLeft } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 export default function Terms() {
+  usePageTracking('terms');
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

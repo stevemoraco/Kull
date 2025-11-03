@@ -6,9 +6,11 @@ import { ReferralForm } from "@/components/ReferralForm";
 import { Button } from "@/components/ui/button";
 import { Download, Smartphone, LogOut, Gift, Clock } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import type { User } from "@shared/schema";
 
 export default function Home() {
+  usePageTracking('home');
   const { user } = useAuth();
   const typedUser = user as User;
 

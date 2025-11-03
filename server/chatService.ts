@@ -4,7 +4,7 @@
 import { getRepoContent } from './fetchRepo';
 
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'developer';
   content: string;
 }
 
@@ -26,16 +26,16 @@ INSTRUCTIONS:
 Answer based on the codebase above.`;
 
 
-export async function getChatResponse(
+export async function getChatResponseStream(
   userMessage: string,
   history: ChatMessage[]
-): Promise<{ message: string; tokensIn: number; tokensOut: number; cost: number }> {
+): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
   if (!openaiApiKey) {
     console.log('[Chat] OpenAI API key not configured');
     const errorMsg = getErrorResponse();
-    return { message: errorMsg, tokensIn: 0, tokensOut: 0, cost: 0 };
+    return createErrorStream(errorMsg);
   }
 
   try {
@@ -45,21 +45,24 @@ export async function getChatResponse(
     // Build system prompt with repo content
     const systemPrompt = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
 
-    // Build messages array with system prompt
-    const messages: ChatMessage[] = [
+    // Build messages array for Responses API
+    const input = [
       {
-        role: 'system',
+        role: 'developer',
         content: systemPrompt,
       },
-      ...history.slice(-10), // Keep last 10 messages for context
+      ...history.slice(-10).map(msg => ({
+        role: msg.role === 'system' ? 'developer' : msg.role,
+        content: msg.content,
+      })),
       {
         role: 'user',
         content: userMessage,
       },
     ];
 
-    // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call OpenAI Responses API with streaming
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiApiKey}`,
@@ -67,50 +70,35 @@ export async function getChatResponse(
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages,
-        temperature: 0.7,
-        max_tokens: 500,
-        stream: false, // We'll implement streaming in the next iteration
+        input,
+        max_output_tokens: 500,
+        stream: true,
       }),
     });
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       const errorText = await response.text();
       console.error('[Chat] OpenAI API error:', errorText);
       const errorMsg = getErrorResponse();
-      return { message: errorMsg, tokensIn: 0, tokensOut: 0, cost: 0 };
+      return createErrorStream(errorMsg);
     }
 
-    const data = await response.json();
-    const assistantMessage = data.choices[0]?.message?.content;
-    const usage = data.usage;
-
-    if (!assistantMessage) {
-      const errorMsg = getErrorResponse();
-      return { message: errorMsg, tokensIn: 0, tokensOut: 0, cost: 0 };
-    }
-
-    // Calculate cost based on GPT-4o-mini pricing
-    // Input: $0.150 / 1M tokens, Output: $0.600 / 1M tokens
-    const tokensIn = usage?.prompt_tokens || 0;
-    const tokensOut = usage?.completion_tokens || 0;
-    const costIn = (tokensIn / 1_000_000) * 0.150;
-    const costOut = (tokensOut / 1_000_000) * 0.600;
-    const totalCost = costIn + costOut;
-
-    console.log(`[Chat] Response generated: ${tokensIn} tokens in, ${tokensOut} tokens out, $${totalCost.toFixed(6)} cost`);
-
-    return {
-      message: assistantMessage,
-      tokensIn,
-      tokensOut,
-      cost: totalCost,
-    };
+    return response.body;
   } catch (error) {
     console.error('[Chat] Error calling OpenAI:', error);
     const errorMsg = getErrorResponse();
-    return { message: errorMsg, tokensIn: 0, tokensOut: 0, cost: 0 };
+    return createErrorStream(errorMsg);
   }
+}
+
+// Helper to create an error stream
+function createErrorStream(errorMessage: string): ReadableStream {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`));
+      controller.close();
+    },
+  });
 }
 
 // Simple error when AI unavailable

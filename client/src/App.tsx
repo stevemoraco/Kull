@@ -24,8 +24,7 @@ function Router() {
     <Switch>
       {/* Public pages accessible to all */}
       <Route path="/landing" component={Landing} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/account" component={Dashboard} />
+      <Route path="/pricing" component={Dashboard} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/refunds" component={Refunds} />
@@ -39,6 +38,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/dashboard" component={Admin} />
           <Route path="/admin" component={Admin} />
         </>
       )}

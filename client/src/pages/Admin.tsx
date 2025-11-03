@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 interface Analytics {
   totalUsers: number;
@@ -39,6 +40,7 @@ interface SupportAnalytics {
 }
 
 export default function Admin() {
+  usePageTracking('admin');
   const { toast } = useToast();
   const [testEmail, setTestEmail] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");

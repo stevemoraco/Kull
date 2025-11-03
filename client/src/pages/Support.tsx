@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { LifeBuoy, ArrowLeft, MessageCircle, BookOpen } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { SupportChat } from "@/components/SupportChat";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 export default function Support() {
+  usePageTracking('support');
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

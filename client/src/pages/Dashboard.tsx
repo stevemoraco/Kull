@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Check, Zap, Crown, Download, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 export default function Dashboard() {
+  usePageTracking('dashboard');
   const { user, isAuthenticated } = useAuth();
 
   const professionalFeatures = [

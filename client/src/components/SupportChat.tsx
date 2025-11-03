@@ -419,15 +419,22 @@ export function SupportChat() {
     "Can I cancel my trial?",
   ]);
 
-  const handleResetChat = () => {
-    // Clear messages
-    const defaultMessage: Message = {
-      id: '1',
-      role: 'assistant',
-      content: "Hi! I'm here to help you with Kull AI. Check out the [Dashboard](/dashboard) to download and get started, or ask me anything about installation, features, or how to use the app!",
-      timestamp: new Date(),
+  const handleNewSession = () => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      messages: [createWelcomeMessage()],
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    setMessages([defaultMessage]);
+
+    setSessions(prev => {
+      const updated = [newSession, ...prev];
+      saveSessions(updated);
+      return updated;
+    });
+
+    setCurrentSessionId(newSession.id);
 
     // Reset quick questions to defaults
     setQuickQuestions([
@@ -437,8 +444,49 @@ export function SupportChat() {
       "Can I cancel my trial?",
     ]);
 
-    // Clear localStorage
-    localStorage.setItem('kull-chat-messages', JSON.stringify([defaultMessage]));
+    toast({
+      title: 'New Chat Started',
+      description: 'You can access your previous chats in the history.',
+    });
+  };
+
+  const handleSwitchSession = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+
+    // Reset quick questions when switching
+    setQuickQuestions([
+      "How do I install Kull AI?",
+      "Which AI model is best?",
+      "How does the rating system work?",
+      "Can I cancel my trial?",
+    ]);
+  };
+
+  const handleResetChat = () => {
+    // Replace current session with fresh one
+    setSessions(prevSessions => {
+      const updated = prevSessions.map(session => {
+        if (session.id === currentSessionId) {
+          return {
+            ...session,
+            title: 'New Chat',
+            messages: [createWelcomeMessage()],
+            updatedAt: new Date(),
+          };
+        }
+        return session;
+      });
+      saveSessions(updated);
+      return updated;
+    });
+
+    // Reset quick questions to defaults
+    setQuickQuestions([
+      "How do I install Kull AI?",
+      "Which AI model is best?",
+      "How does the rating system work?",
+      "Can I cancel my trial?",
+    ]);
 
     toast({
       title: 'Chat Reset',
@@ -479,6 +527,54 @@ export function SupportChat() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                    data-testid="button-chat-history"
+                    title="Chat history"
+                  >
+                    <History className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Chat History</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleNewSession} data-testid="button-new-chat">
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Chat
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {sessions.length > 0 ? (
+                    sessions
+                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                      .map((session) => (
+                        <DropdownMenuItem
+                          key={session.id}
+                          onClick={() => handleSwitchSession(session.id)}
+                          className={session.id === currentSessionId ? 'bg-accent' : ''}
+                          data-testid={`session-${session.id}`}
+                        >
+                          <div className="flex flex-col gap-1 w-full">
+                            <div className="font-medium truncate">{session.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(session.updatedAt).toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      ))
+                  ) : (
+                    <DropdownMenuItem disabled>No chat history</DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
                 variant="ghost"
                 size="icon"

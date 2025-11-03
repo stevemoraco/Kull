@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Crown, Zap, AlertCircle, Gift } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { usePageTracking } from "@/hooks/usePageTracking";
 
 if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
@@ -256,6 +257,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: {
 };
 
 export default function Checkout() {
+  usePageTracking('checkout');
   const [clientSecret, setClientSecret] = useState("");
   const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
   const [bonus, setBonus] = useState<{ freeMonths: number; prioritySupport: boolean; description: string } | null>(null);
