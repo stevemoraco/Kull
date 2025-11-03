@@ -641,6 +641,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Compact cache for offline prompt search on mobile/desktop
+  app.get('/api/kull/prompts/cache', isAuthenticated, async (_req: any, res) => {
+    try {
+      const presets = await storage.listPromptPresets({ limit: 500 });
+      const cache = presets.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        summary: p.summary,
+        tags: p.tags,
+        shootTypes: p.shootTypes,
+        aiScore: p.aiScore ?? 0,
+        humanScoreAverage: p.humanScoreAverage ?? 0,
+        ratingsCount: p.ratingsCount ?? 0,
+        updatedAt: p.updatedAt,
+      }));
+      res.json({ cache, count: cache.length });
+    } catch (err: any) {
+      console.error('prompt cache error', err);
+      res.status(500).json({ message: 'Failed to export prompt cache' });
+    }
+  });
+
   // Create prompt preset
   app.post('/api/kull/prompts', isAuthenticated, async (req: any, res) => {
     try {
