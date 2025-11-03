@@ -22,14 +22,24 @@ export function ReferralForm() {
       const promises = referredEmails.map(email =>
         apiRequest("POST", "/api/referrals", { referredEmail: email }).then(r => r.json())
       );
-      return Promise.all(promises);
+      const results = await Promise.all(promises);
+      
+      // Send confirmation email to referrer
+      try {
+        await apiRequest("POST", "/api/referrals/confirm", { referredEmails });
+      } catch (confirmError) {
+        console.error("Failed to send confirmation email:", confirmError);
+        // Don't fail the whole operation if confirmation email fails
+      }
+      
+      return results;
     },
     onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
       setEmails(["", "", ""]);
       toast({
         title: `${results.length} Referral${results.length > 1 ? 's' : ''} Sent!`,
-        description: "Your photographer friends will receive invitations to try Kull AI.",
+        description: "Your photographer friends will receive invitations. Check your email for confirmation!",
       });
     },
     onError: (error: Error) => {

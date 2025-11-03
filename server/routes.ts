@@ -527,6 +527,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send referral confirmation email (called after all referrals are sent)
+  app.post('/api/referrals/confirm', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { referredEmails } = req.body;
+
+      if (!referredEmails || !Array.isArray(referredEmails) || referredEmails.length === 0) {
+        return res.status(400).json({ message: "Referred emails array required" });
+      }
+
+      const referrerUser = await storage.getUser(userId);
+      if (!referrerUser || !referrerUser.email) {
+        return res.status(400).json({ message: "User not found" });
+      }
+
+      const allReferrals = await storage.getUserReferrals(userId);
+      const totalSent = allReferrals.length;
+      const totalCompleted = allReferrals.filter(r => r.status === 'completed').length;
+
+      // Calculate unlocked and potential rewards
+      const unlockedRewards: string[] = [];
+      const potentialRewards: string[] = [];
+
+      if (totalSent >= 3) unlockedRewards.push("1 month free");
+      if (totalSent >= 5) unlockedRewards.push("Priority support");
+      if (totalSent >= 10 || totalCompleted >= 3) unlockedRewards.push("3 months free");
+
+      // Calculate potential rewards if the newly invited users subscribe
+      const potentialTotal = totalSent + referredEmails.length;
+      if (totalSent < 3 && potentialTotal >= 3) potentialRewards.push("1 month free");
+      if (totalSent < 5 && potentialTotal >= 5) potentialRewards.push("Priority support");
+      if (totalSent < 10 && potentialTotal >= 10) potentialRewards.push("3 months free");
+
+      const { sendEmail } = await import('./emailService');
+      const { emailTemplates } = await import('./emailTemplates');
+      
+      const confirmationEmail = emailTemplates.referralConfirmation(
+        referrerUser,
+        referredEmails,
+        unlockedRewards,
+        potentialRewards
+      );
+
+      await sendEmail({
+        to: referrerUser.email,
+        subject: confirmationEmail.subject,
+        html: confirmationEmail.html,
+        text: confirmationEmail.text,
+      });
+
+      res.json({ success: true, message: "Confirmation email sent" });
+    } catch (error: any) {
+      console.error("Error sending referral confirmation:", error);
+      res.status(500).json({ message: "Failed to send confirmation: " + error.message });
+    }
+  });
+
   // Audio transcription endpoint using OpenAI Whisper
   app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
     try {

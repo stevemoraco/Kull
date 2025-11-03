@@ -65,9 +65,21 @@ async function upsertUser(
     profileImageUrl: claims["profile_image_url"],
   });
 
-  // Schedule drip campaign for new users (if they haven't started trial)
+  // Send welcome email immediately for new users and schedule drip campaign
   if (isNewUser && user.email && !user.trialStartedAt) {
-    const { scheduleNonCheckoutDripCampaign } = await import("./emailService");
+    const { sendEmail, scheduleNonCheckoutDripCampaign } = await import("./emailService");
+    const { emailTemplates } = await import("./emailTemplates");
+    
+    // Send welcome email immediately
+    const welcomeEmail = emailTemplates.firstLoginWelcome(user);
+    await sendEmail({
+      to: user.email,
+      subject: welcomeEmail.subject,
+      html: welcomeEmail.html,
+      text: welcomeEmail.text,
+    });
+    
+    // Schedule drip campaign
     await scheduleNonCheckoutDripCampaign(user);
   }
   
