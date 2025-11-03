@@ -15,10 +15,11 @@ if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
 }
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
-const CheckoutForm = ({ tier, setupIntentId, onDowngrade }: { 
+const CheckoutForm = ({ tier, setupIntentId, onDowngrade, bonus }: { 
   tier: 'professional' | 'studio'; 
   setupIntentId: string | null;
   onDowngrade: () => void;
+  bonus: { freeMonths: number; prioritySupport: boolean; description: string } | null;
 }) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -128,26 +129,48 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade }: {
     }
   };
 
+  const monthlyPrice = tier === 'studio' ? 499 : 99;
+  const annualPrice = monthlyPrice * 12;
+  const discountAmount = (bonus?.freeMonths || 0) * monthlyPrice;
+  const finalAnnualPrice = annualPrice - discountAmount;
+  
   const planDetails = tier === 'studio' ? {
     name: 'Studio',
     price: '$499',
     period: '/month',
-    annual: '$5,988/year',
-    annualTotal: '$5,988',
+    annual: bonus?.freeMonths ? `$${finalAnnualPrice.toLocaleString()}/year` : '$5,988/year',
+    annualTotal: bonus?.freeMonths ? `$${finalAnnualPrice.toLocaleString()}` : '$5,988',
     monthlyTotal: '$499',
-    savings: 'Save $2,004 vs monthly'
+    savings: bonus?.freeMonths 
+      ? `${bonus.freeMonths} month${bonus.freeMonths > 1 ? 's' : ''} free = Save $${(discountAmount + 2004).toLocaleString()}!`
+      : 'Save $2,004 vs monthly'
   } : {
     name: 'Professional',
     price: '$99',
     period: '/month',
-    annual: '$1,188/year',
-    annualTotal: '$1,188',
+    annual: bonus?.freeMonths ? `$${finalAnnualPrice.toLocaleString()}/year` : '$1,188/year',
+    annualTotal: bonus?.freeMonths ? `$${finalAnnualPrice.toLocaleString()}` : '$1,188',
     monthlyTotal: '$99',
-    savings: 'Save $396 vs monthly'
+    savings: bonus?.freeMonths 
+      ? `${bonus.freeMonths} month${bonus.freeMonths > 1 ? 's' : ''} free = Save $${(discountAmount + 396).toLocaleString()}!`
+      : 'Save $396 vs monthly'
   };
 
   return (
     <>
+      {bonus && bonus.freeMonths > 0 && (
+        <Alert className="mb-6 border-primary/50 bg-primary/10">
+          <Gift className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-sm text-foreground">
+            <p className="font-bold text-primary">🎉 {bonus.description}</p>
+            <p className="mt-1">You've earned <strong>{bonus.freeMonths} month{bonus.freeMonths > 1 ? 's' : ''} free</strong> through referrals. This discount has been applied to your annual price below!</p>
+            {bonus.prioritySupport && (
+              <p className="mt-1 text-primary font-semibold">✨ Plus priority support access!</p>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {showDowngrade && downgradeInfo && (
         <Alert className="mb-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
           <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
@@ -223,6 +246,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade }: {
 export default function Checkout() {
   const [clientSecret, setClientSecret] = useState("");
   const [setupIntentId, setSetupIntentId] = useState<string | null>(null);
+  const [bonus, setBonus] = useState<{ freeMonths: number; prioritySupport: boolean; description: string } | null>(null);
   const [, setLocation] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
@@ -251,6 +275,7 @@ export default function Checkout() {
         .then((data) => {
           if (data.clientSecret) {
             setClientSecret(data.clientSecret);
+            setBonus(data.bonus || null);
           } else {
             toast({
               title: "Trial Already Active",
@@ -324,6 +349,7 @@ export default function Checkout() {
             tier={tier} 
             setupIntentId={setupIntentId}
             onDowngrade={() => {}}
+            bonus={bonus}
           />
         </Elements>
       </main>

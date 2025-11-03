@@ -66,6 +66,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('No user email on file');
       }
 
+      // Check referral bonuses: 1mo free (3 sent), 3mo free (10 sent OR 3 completed), priority support (5 sent)
+      const referrals = await storage.getUserReferrals(userId);
+      const totalSent = referrals.length;
+      const completedReferrals = referrals.filter(r => r.status === 'completed').length;
+      
+      const bonus = {
+        freeMonths: 0,
+        prioritySupport: false,
+        description: ''
+      };
+      
+      if (totalSent >= 10 || completedReferrals >= 3) {
+        bonus.freeMonths = 3;
+        bonus.description = '3 months free earned!';
+      } else if (totalSent >= 3) {
+        bonus.freeMonths = 1;
+        bonus.description = '1 month free earned!';
+      }
+      
+      if (totalSent >= 5) {
+        bonus.prioritySupport = true;
+      }
+
       // Create Stripe customer if doesn't exist or find existing by email
       let customerId = user.stripeCustomerId;
       if (!customerId) {
@@ -105,6 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         clientSecret: setupIntent.client_secret,
         customerId,
+        bonus, // Include bonus information for the frontend
       });
     } catch (error: any) {
       console.error("Error creating setup intent:", error);
@@ -131,11 +155,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const paymentMethodId = setupIntent.payment_method as string;
-      const amount = tier === 'professional' 
+      
+      // Calculate amount with referral bonus discount
+      const referrals = await storage.getUserReferrals(userId);
+      const totalSent = referrals.length;
+      const completedReferrals = referrals.filter(r => r.status === 'completed').length;
+      
+      let freeMonths = 0;
+      if (totalSent >= 10 || completedReferrals >= 3) {
+        freeMonths = 3;
+      } else if (totalSent >= 3) {
+        freeMonths = 1;
+      }
+      
+      const baseAnnualAmount = tier === 'professional' 
         ? STRIPE_PRICES.professional.annualAmount 
         : STRIPE_PRICES.studio.annualAmount;
+      
+      const monthlyRate = tier === 'professional' ? 99 * 100 : 499 * 100;
+      const discountAmount = freeMonths * monthlyRate;
+      const amount = Math.max(0, baseAnnualAmount - discountAmount);
 
-      // Place authorization hold for the annual subscription amount
+      // Place authorization hold for the annual subscription amount (minus bonus)
       // This verifies the card can handle the charge without actually charging
       try {
         const paymentIntent = await stripe.paymentIntents.create({
@@ -149,6 +190,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: user.id,
             tier,
             purpose: 'trial_authorization',
+            freeMonths: freeMonths.toString(),
+            discountApplied: discountAmount.toString(),
           },
         });
 
@@ -168,6 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true,
           user: updatedUser,
           authorizationId: paymentIntent.id,
+          bonus: { freeMonths, discountAmount: discountAmount / 100 },
         });
       } catch (authError: any) {
         // If annual authorization fails, offer monthly downgrade
