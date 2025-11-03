@@ -1,9 +1,15 @@
 import type { Express } from "express";
+import { z } from "zod";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { defaultPrompts } from "../packages/prompt-presets";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
 import { insertRefundSurveySchema } from "@shared/schema";
+import { PromptStyleSchema, ProviderIdSchema } from "@shared/culling/schemas";
+import { estimateCreditsForImages } from "@shared/utils/cost";
+import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
+import { getProviderConfig } from "@shared/culling/providers";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -33,6 +39,7 @@ const STRIPE_PRICES = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  await storage.seedDefaultPrompts(defaultPrompts, "team@kullai.com");
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -43,6 +50,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Prompt marketplace routes
+  app.get('/api/prompts', async (req, res) => {
+    try {
+      const { shootType, search, limit } = req.query;
+      const prompts = await storage.listPromptPresets({
+        shootType: typeof shootType === 'string' && shootType.length > 0 ? shootType : undefined,
+        search: typeof search === 'string' && search.length > 0 ? search : undefined,
+        limit: typeof limit === 'string' ? Number.parseInt(limit, 10) || undefined : undefined,
+      });
+      res.json(prompts);
+    } catch (error) {
+      console.error('Error fetching prompts:', error);
+      res.status(500).json({ message: 'Failed to fetch prompts' });
+    }
+  });
+
+  app.get('/api/prompts/:slug', async (req, res) => {
+    try {
+      const preset = await storage.getPromptPresetBySlug(req.params.slug);
+      if (!preset) {
+        return res.status(404).json({ message: 'Prompt not found' });
+      }
+      res.json(preset);
+    } catch (error) {
+      console.error('Error fetching prompt:', error);
+      res.status(500).json({ message: 'Failed to fetch prompt' });
+    }
+  });
+
+  app.get('/api/prompts/my', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [created, saved] = await Promise.all([
+        storage.listUserPrompts(userId),
+        storage.listSavedPrompts(userId),
+      ]);
+      res.json({ created, saved });
+    } catch (error) {
+      console.error('Error fetching user prompts:', error);
+      res.status(500).json({ message: 'Failed to fetch user prompts' });
+    }
+  });
+
+  const createPromptBodySchema = z.object({
+    title: z.string().min(3),
+    summary: z.string().min(10),
+    instructions: z.string().min(10),
+    shootTypes: z.array(z.string()).min(1),
+    tags: z.array(z.string()).default([]),
+    style: PromptStyleSchema,
+    shareWithMarketplace: z.boolean().default(true),
+  });
+
+  app.post('/api/prompts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userEmail = req.user.claims.email ?? '';
+      const parsed = createPromptBodySchema.parse(req.body);
+
+      const preset = await storage.createPromptPreset({
+        userId,
+        userEmail,
+        title: parsed.title,
+        summary: parsed.summary,
+        instructions: parsed.instructions,
+        shootTypes: parsed.shootTypes,
+        tags: parsed.tags,
+        style: parsed.style,
+        shareWithMarketplace: parsed.shareWithMarketplace,
+      });
+
+      res.status(201).json(preset);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid prompt payload', issues: error.flatten() });
+      }
+      console.error('Error creating prompt:', error);
+      res.status(500).json({ message: 'Failed to create prompt' });
+    }
+  });
+
+  const voteBodySchema = z.object({
+    value: z.enum(['up', 'down', 'neutral']).default('up'),
+    rating: z.number().int().min(1).max(5).optional(),
+    comment: z.string().max(280).optional(),
+  });
+
+  app.post('/api/prompts/:slug/vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preset = await storage.getPromptPresetBySlug(req.params.slug);
+      if (!preset) {
+        return res.status(404).json({ message: 'Prompt not found' });
+      }
+      const parsed = voteBodySchema.parse(req.body);
+      const valueMap = { up: 1, down: -1, neutral: 0 } as const;
+      const updated = await storage.voteOnPrompt(
+        userId,
+        preset.id,
+        valueMap[parsed.value],
+        parsed.rating,
+        parsed.comment,
+      );
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid vote payload', issues: error.flatten() });
+      }
+      console.error('Error voting on prompt:', error);
+      res.status(500).json({ message: 'Failed to record vote' });
+    }
+  });
+
+  app.post('/api/prompts/:slug/save', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const preset = await storage.getPromptPresetBySlug(req.params.slug);
+      if (!preset) {
+        return res.status(404).json({ message: 'Prompt not found' });
+      }
+      const saved = await storage.togglePromptSave(userId, preset.id);
+      res.json({ saved });
+    } catch (error) {
+      console.error('Error toggling prompt save:', error);
+      res.status(500).json({ message: 'Failed to toggle prompt save' });
+    }
+  });
+
+  const forecastSchema = z.object({
+    providerId: ProviderIdSchema,
+    imageCount: z.number().int().positive(),
+  });
+
+  app.get('/api/credits/summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getCreditSummary(userId);
+      res.json({ ...summary, topUpPackages: CREDIT_TOP_UP_PACKAGES });
+    } catch (error) {
+      console.error('Error fetching credit summary:', error);
+      res.status(500).json({ message: 'Failed to fetch credit summary' });
+    }
+  });
+
+  app.get('/api/credits/options', isAuthenticated, async (_req, res) => {
+    res.json({
+      plans: PLANS,
+      topUpPackages: CREDIT_TOP_UP_PACKAGES,
+    });
+  });
+
+  app.post('/api/credits/forecast', isAuthenticated, async (req, res) => {
+    try {
+      const { providerId, imageCount } = forecastSchema.parse(req.body);
+      const config = getProviderConfig(providerId);
+      const credits = estimateCreditsForImages(providerId, imageCount);
+      const costUSD = credits; // 1 credit == $1 user cost
+      res.json({
+        provider: config,
+        creditsRequired: credits,
+        costUSD,
+        batchSize: config.maxBatchSize,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid forecast payload', issues: error.flatten() });
+      }
+      console.error('Error forecasting credits:', error);
+      res.status(500).json({ message: 'Failed to forecast credits' });
     }
   });
 
@@ -418,6 +597,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error processing chat message:", error);
       res.status(500).json({ message: "Failed to process message" });
+    }
+  });
+
+  // =============== Kull Prompt Marketplace & Credits APIs ===============
+  // List marketplace prompts
+  app.get('/api/kull/prompts', isAuthenticated, async (req: any, res) => {
+    try {
+      const { shootType, search, limit } = req.query as Record<string, string>;
+      const presets = await storage.listPromptPresets({
+        shootType: shootType || undefined,
+        search: search || undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      res.json({ presets });
+    } catch (err: any) {
+      console.error('list prompts error', err);
+      res.status(500).json({ message: 'Failed to list prompts' });
+    }
+  });
+
+  // List my prompts
+  app.get('/api/kull/prompts/mine', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const presets = await storage.listUserPrompts(userId);
+      res.json({ presets });
+    } catch (err: any) {
+      console.error('list my prompts error', err);
+      res.status(500).json({ message: 'Failed to list my prompts' });
+    }
+  });
+
+  // List saved prompts
+  app.get('/api/kull/prompts/saved', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const presets = await storage.listSavedPrompts(userId);
+      res.json({ presets });
+    } catch (err: any) {
+      console.error('list saved prompts error', err);
+      res.status(500).json({ message: 'Failed to list saved prompts' });
+    }
+  });
+
+  // Create prompt preset
+  app.post('/api/kull/prompts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, summary, instructions, shootTypes, tags, style, shareWithMarketplace } = req.body;
+      const user = await storage.getUser(userId);
+      if (!user?.email) return res.status(400).json({ message: 'User email required' });
+
+      const preset = await storage.createPromptPreset({
+        userId,
+        userEmail: user.email,
+        title,
+        summary,
+        instructions,
+        shootTypes: Array.isArray(shootTypes) ? shootTypes : [],
+        tags: Array.isArray(tags) ? tags : [],
+        style,
+        shareWithMarketplace: Boolean(shareWithMarketplace),
+      });
+      res.json({ preset });
+    } catch (err: any) {
+      console.error('create prompt error', err);
+      res.status(500).json({ message: 'Failed to create prompt' });
+    }
+  });
+
+  // Vote on prompt (up/down + optional rating/comment)
+  app.post('/api/kull/prompts/:id/vote', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { value, rating, comment } = req.body as { value: number; rating?: number; comment?: string };
+      const preset = await storage.voteOnPrompt(userId, id, Number(value), rating ? Number(rating) : undefined, comment);
+      res.json({ preset });
+    } catch (err: any) {
+      console.error('vote prompt error', err);
+      res.status(500).json({ message: 'Failed to vote' });
+    }
+  });
+
+  // Toggle save prompt
+  app.post('/api/kull/prompts/:id/save', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const saved = await storage.togglePromptSave(userId, id);
+      res.json({ saved });
+    } catch (err: any) {
+      console.error('save prompt error', err);
+      res.status(500).json({ message: 'Failed to toggle save' });
+    }
+  });
+
+  // Credits summary
+  app.get('/api/kull/credits/summary', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getCreditSummary(userId);
+      res.json(summary);
+    } catch (err: any) {
+      console.error('credit summary error', err);
+      res.status(500).json({ message: 'Failed to get summary' });
+    }
+  });
+
+  // Credits ledger
+  app.get('/api/kull/credits/ledger', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { limit } = req.query as Record<string, string>;
+      const ledger = await storage.getCreditLedger(userId, { limit: limit ? Number(limit) : undefined });
+      res.json({ ledger });
+    } catch (err: any) {
+      console.error('credit ledger error', err);
+      res.status(500).json({ message: 'Failed to get ledger' });
     }
   });
 

@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { PromptStyle } from './culling';
 import {
   index,
   jsonb,
@@ -7,6 +8,9 @@ import {
   varchar,
   integer,
   boolean,
+  text,
+  doublePrecision,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -95,6 +99,112 @@ export const insertRefundSurveySchema = createInsertSchema(refundSurveys).omit({
 
 export type InsertRefundSurvey = z.infer<typeof insertRefundSurveySchema>;
 export type RefundSurvey = typeof refundSurveys.$inferSelect;
+
+
+export const promptPresets = pgTable("prompt_presets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 160 }).notNull(),
+  title: varchar("title", { length: 160 }).notNull(),
+  summary: text("summary").notNull(),
+  instructions: text("instructions").notNull(),
+  shootTypes: jsonb("shoot_types").notNull().$type<string[]>(),
+  tags: jsonb("tags").notNull().$type<string[]>(),
+  style: jsonb("style").notNull().$type<PromptStyle>(),
+  authorId: varchar("author_id").references(() => users.id),
+  authorEmail: varchar("author_email"),
+  isDefault: boolean("is_default").notNull().default(false),
+  sharedWithMarketplace: boolean("shared_with_marketplace").notNull().default(true),
+  aiScore: doublePrecision("ai_score"),
+  aiSummary: text("ai_summary"),
+  humanScoreAverage: doublePrecision("human_score_average").notNull().default(0),
+  upvotes: integer("upvotes").notNull().default(0),
+  downvotes: integer("downvotes").notNull().default(0),
+  ratingsCount: integer("ratings_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_presets_slug_key").on(table.slug),
+  index("prompt_presets_author_idx").on(table.authorId),
+]);
+
+export const promptVotes = pgTable("prompt_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  presetId: varchar("preset_id").notNull().references(() => promptPresets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  value: integer("value").notNull(),
+  rating: integer("rating"),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_votes_user_unique").on(table.presetId, table.userId),
+  index("prompt_votes_preset_idx").on(table.presetId),
+]);
+
+export const promptSaves = pgTable("prompt_saves", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  presetId: varchar("preset_id").notNull().references(() => promptPresets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_saves_unique").on(table.presetId, table.userId),
+]);
+
+export type PromptPreset = typeof promptPresets.$inferSelect;
+export type InsertPromptPreset = typeof promptPresets.$inferInsert;
+export const insertPromptPresetSchema = createInsertSchema(promptPresets).omit({
+  id: true,
+  aiScore: true,
+  aiSummary: true,
+  humanScoreAverage: true,
+  upvotes: true,
+  downvotes: true,
+  ratingsCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PromptVote = typeof promptVotes.$inferSelect;
+export type InsertPromptVote = typeof promptVotes.$inferInsert;
+export const insertPromptVoteSchema = createInsertSchema(promptVotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PromptSave = typeof promptSaves.$inferSelect;
+export type InsertPromptSave = typeof promptSaves.$inferInsert;
+export const insertPromptSaveSchema = createInsertSchema(promptSaves).omit({
+  id: true,
+  createdAt: true,
+});
+
+
+export const creditLedger = pgTable("credit_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  entryType: varchar("entry_type", { length: 10 }).notNull(),
+  credits: integer("credits").notNull(),
+  currency: varchar("currency", { length: 16 }).notNull().default('credits'),
+  metadata: jsonb("metadata").$type<{
+    providerId?: string;
+    shootId?: string;
+    imagesProcessed?: number;
+  }>(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("credit_ledger_user_idx").on(table.userId),
+  index("credit_ledger_created_idx").on(table.createdAt),
+]);
+
+export type CreditLedger = typeof creditLedger.$inferSelect;
+export type InsertCreditLedger = typeof creditLedger.$inferInsert;
+export const insertCreditLedgerSchema = createInsertSchema(creditLedger).omit({
+  id: true,
+  createdAt: true,
+});
+
 
 // Re-export email queue types
 export * from "./emailQueue";
