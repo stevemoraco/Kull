@@ -15,6 +15,7 @@ import { eq, lte, and, isNull } from "drizzle-orm";
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Trial and subscription operations
@@ -34,12 +35,19 @@ export interface IStorage {
   markEmailSent(id: string): Promise<void>;
   markEmailFailed(id: string, errorMessage: string): Promise<void>;
   cancelUserEmails(userId: string, emailType?: string): Promise<void>;
+  cancelDripEmails(userId: string): Promise<void>;
+  cancelEmail(id: string): Promise<void>;
+  incrementEmailRetry(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.getUser(id);
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
@@ -228,6 +236,61 @@ export class DatabaseStorage implements IStorage {
         cancelled: true,
       })
       .where(and(...conditions));
+  }
+
+  async cancelDripEmails(userId: string): Promise<void> {
+    await db
+      .update(emailQueue)
+      .set({
+        cancelled: true,
+      })
+      .where(
+        and(
+          eq(emailQueue.userId, userId),
+          isNull(emailQueue.sentAt),
+          // Cancel all drip emails (drip_1_2hr, drip_2_6hr, etc.)
+          eq(emailQueue.emailType, 'drip_1_2hr')
+        )
+      );
+    
+    // Cancel each drip type individually
+    const dripTypes = ['drip_1_2hr', 'drip_2_6hr', 'drip_3_11hr', 'drip_4_16hr', 'drip_5_21hr'];
+    for (const dripType of dripTypes) {
+      await db
+        .update(emailQueue)
+        .set({
+          cancelled: true,
+        })
+        .where(
+          and(
+            eq(emailQueue.userId, userId),
+            isNull(emailQueue.sentAt),
+            eq(emailQueue.emailType, dripType)
+          )
+        );
+    }
+  }
+
+  async cancelEmail(id: string): Promise<void> {
+    await db
+      .update(emailQueue)
+      .set({
+        cancelled: true,
+      })
+      .where(eq(emailQueue.id, id));
+  }
+
+  async incrementEmailRetry(id: string): Promise<void> {
+    const [email] = await db.select().from(emailQueue).where(eq(emailQueue.id, id));
+    if (email) {
+      const currentRetryCount = parseInt(email.retryCount || '0');
+      await db
+        .update(emailQueue)
+        .set({
+          retryCount: (currentRetryCount + 1).toString(),
+        })
+        .where(eq(emailQueue.id, id));
+    }
   }
 }
 

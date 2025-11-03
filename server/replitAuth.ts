@@ -53,13 +53,25 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
+  // Check if user exists before upserting
+  const existingUser = await storage.getUser(claims["sub"]);
+  const isNewUser = !existingUser;
+  
+  const user = await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+
+  // Schedule drip campaign for new users (if they haven't started trial)
+  if (isNewUser && user.email && !user.trialStartedAt) {
+    const { scheduleNonCheckoutDripCampaign } = await import("./emailService");
+    await scheduleNonCheckoutDripCampaign(user);
+  }
+  
+  return user;
 }
 
 export async function setupAuth(app: Express) {

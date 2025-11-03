@@ -18,7 +18,10 @@ Kull AI is built with a modern web stack. The **Frontend** uses React with TypeS
 **System Design Choices**:
 - **Database**: PostgreSQL (Neon) is used for relational data, ensuring ACID compliance.
 - **Payment Processing**: Stripe Subscriptions handle all payment logic securely.
-- **Email Automation**: SendGrid for automated trial-related emails, managed by a robust email queue system with scheduling and retry logic.
+- **Email Automation**: Comprehensive SendGrid-powered email system with three distinct sequences:
+  - **Post-Checkout Sequence**: 5min welcome email + 45min installation check + 6hr trial ending warning + 1hr final reminder
+  - **Non-Checkout Drip Campaign**: For users who sign up but don't start trial within 2 hours, automated drip emails at 2hr, 6hr, 11hr, 16hr, and 21hr intervals providing educational content, tutorials, FAQs, and value
+  - **Smart Scheduling**: Drip campaign automatically cancelled when user starts trial; all emails include links to support, refunds, terms, and contact pages; emails designed with beautiful HTML matching website aesthetic
 - **Customer Support**: Integrates OpenAI's GPT-4o-mini for cost-effective, 24/7 AI-powered chat support, providing comprehensive answers sourced from project documentation and GitHub repository context.
 - **No Public Email Addresses**: To funnel support through the AI chat first, reducing manual support burden.
 - **SEO & Social Sharing**: Implemented with comprehensive meta tags (Open Graph, Twitter Cards) and custom OG images for optimal discoverability and sharing.
@@ -27,6 +30,6 @@ Kull AI is built with a modern web stack. The **Frontend** uses React with TypeS
 - **PostgreSQL (Neon)**: Main database for user, subscription, referral, and email queue data.
 - **Stripe**: Handles all payment processing, subscriptions, pre-authorizations, and refunds.
 - **Replit Auth**: Provides user authentication and session management.
-- **SendGrid**: Used for sending automated transactional emails. (API Key pending activation)
+- **SendGrid**: Fully integrated for automated transactional emails with 9 beautiful HTML templates, database-backed email queue, retry logic, and 1-minute processor interval
 - **OpenAI**: Powers the AI customer support chat using GPT-4o-mini.
 - **Lucide React**: Provides icons for the UI.

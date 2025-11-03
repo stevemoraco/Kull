@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { scheduleTrialEmails, processPendingEmails } from "./emailService";
+import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -159,7 +159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedUser = await storage.startTrial(userId, tier, paymentMethodId, setupIntentId);
 
         // Schedule welcome emails
-        await scheduleTrialEmails(updatedUser);
+        // Start trial emails and cancel any drip campaign emails
+        await cancelDripCampaign(userId);
+        await schedulePostCheckoutEmails(updatedUser);
 
         res.json({
           success: true,
@@ -225,7 +227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Start trial with monthly billing
       const updatedUser = await storage.startTrial(userId, tier, paymentMethodId, setupIntentId);
-      await scheduleTrialEmails(updatedUser);
+      await cancelDripCampaign(userId);
+      await schedulePostCheckoutEmails(updatedUser);
 
       res.json({
         success: true,
