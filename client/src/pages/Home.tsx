@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { UrgencyBanner } from "@/components/UrgencyBanner";
 import { PricingSection } from "@/components/PricingSection";
+import { ReferralForm } from "@/components/ReferralForm";
 import { Button } from "@/components/ui/button";
 import { Download, Smartphone, LogOut, Gift, Clock } from "lucide-react";
 import { Footer } from "@/components/Footer";
@@ -125,20 +126,20 @@ export default function Home() {
           </div>
         )}
 
-        {/* Referral CTA */}
-        <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-8 md:p-12 text-center max-w-3xl mx-auto">
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
-            <Gift className="w-8 h-8 text-primary" />
+        {/* Referral Section */}
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Gift className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-foreground">
+              Refer Friends & Earn Rewards
+            </h2>
+            <p className="text-muted-foreground">
+              Invite up to 10 photographers and unlock bonuses from extra features to free months
+            </p>
           </div>
-          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">
-            Refer Friends & Earn Rewards
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            Invite up to 10 photographers and unlock bonuses from extra features to free months
-          </p>
-          <Button size="lg" data-testid="button-open-referrals">
-            View My Referrals
-          </Button>
+          <ReferralForm />
         </div>
       </main>
 
