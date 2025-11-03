@@ -173,7 +173,8 @@ export const welcome5minEmail = (user: User) => ({
       <p><strong>Need Help?</strong> Click the chat icon on any page for instant AI-powered support, or visit our <a href="${baseUrl}/support">Support Center</a>.</p>
 
       <p>Happy rating! 📸</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -182,6 +183,7 @@ export const welcome5minEmail = (user: User) => ({
         <a href="${baseUrl}/terms">Terms</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media, 31 N Tejon St, Colorado Springs, CO 80903</p>
       <p><a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
@@ -209,7 +211,10 @@ Trial Ends: ${new Date(user.trialEndsAt!).toLocaleString()}
 
 Need help? Visit ${baseUrl}/support
 
-The Kull AI Team
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco
+
 © 2025 Lander Media`
 });
 
@@ -262,7 +267,8 @@ export const installCheck45minEmail = (user: User) => ({
       </div>
 
       <p>Make the most of your trial!</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -270,6 +276,7 @@ export const installCheck45minEmail = (user: User) => ({
         <a href="${baseUrl}/refunds">Refunds</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -293,7 +300,9 @@ Running into issues? Chat with us at ${baseUrl}/support
 
 Trial Status: ${Math.ceil((new Date(user.trialEndsAt!).getTime() - Date.now()) / (1000 * 60 * 60))} hours remaining
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 // TRIAL ENDING WARNINGS
@@ -347,7 +356,8 @@ export const trialEnding6hrEmail = (user: User) => ({
       <p><strong>Questions?</strong> Chat with us instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
       <p>Thanks for trying Kull AI!</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -356,6 +366,7 @@ export const trialEnding6hrEmail = (user: User) => ({
         <a href="${baseUrl}/terms">Terms</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -379,7 +390,9 @@ Your Options:
 Manage subscription: ${baseUrl}/home
 Refund policy: ${baseUrl}/refunds
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const trialEnding1hrEmail = (user: User) => ({
@@ -428,7 +441,8 @@ export const trialEnding1hrEmail = (user: User) => ({
       <p><strong>Questions?</strong> Chat instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
       <p>Whatever you decide, thank you for trying Kull AI!</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -436,6 +450,7 @@ export const trialEnding1hrEmail = (user: User) => ({
         <a href="${baseUrl}/refunds">Refunds</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -457,7 +472,9 @@ Risk-Free Promise: 7-day money-back guarantee even after billing
 Cancel trial: ${baseUrl}/home
 Questions: ${baseUrl}/support
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 // NON-CHECKOUT DRIP CAMPAIGN (Every 4-5 hours if no checkout in first 2 hours)
@@ -512,14 +529,17 @@ export const drip1_2hrEmail = (user: User) => ({
       <p><strong>Questions?</strong> Chat with us instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
       <p>Ready to transform your workflow?</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
         <a href="${baseUrl}/support">Support</a> •
         <a href="${baseUrl}/refunds">Refunds</a> •
-        <a href="${baseUrl}/terms">Terms</a>
+        <a href="${baseUrl}/terms">Terms</a> •
+        <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -541,7 +561,9 @@ Start free trial: ${baseUrl}
 
 Special Offer: ${getOfferHoursRemaining(user)} hours left - 3 extra months free!
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const drip2_6hrEmail = (user: User) => ({
@@ -609,13 +631,17 @@ export const drip2_6hrEmail = (user: User) => ({
 
       <p>Questions about AI models? <a href="${baseUrl}/support">Chat with us →</a></p>
 
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
         <a href="${baseUrl}/support">Support</a> •
+        <a href="${baseUrl}/refunds">Refunds</a> •
+        <a href="${baseUrl}/terms">Terms</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -640,7 +666,9 @@ Try free: ${baseUrl}
 
 Offer: ${getOfferHoursRemaining(user)} hours left!
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const drip3_11hrEmail = (user: User) => ({
@@ -703,14 +731,17 @@ export const drip3_11hrEmail = (user: User) => ({
 
       <p><strong>Still have questions?</strong> <a href="${baseUrl}/support">Chat with us</a> or check our <a href="${baseUrl}/refunds">refund policy</a></p>
 
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
         <a href="${baseUrl}/support">Support</a> •
         <a href="${baseUrl}/refunds">Refunds</a> •
-        <a href="${baseUrl}/terms">Terms</a>
+        <a href="${baseUrl}/terms">Terms</a> •
+        <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -738,7 +769,9 @@ Try free: ${baseUrl}
 
 Special offer: ${getOfferHoursRemaining(user)} hours left!
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const drip4_16hrEmail = (user: User) => ({
@@ -803,13 +836,17 @@ export const drip4_16hrEmail = (user: User) => ({
 
       <p>Questions about workflow? <a href="${baseUrl}/support">Ask our AI chat →</a></p>
 
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
         <a href="${baseUrl}/support">Support</a> •
+        <a href="${baseUrl}/refunds">Refunds</a> •
+        <a href="${baseUrl}/terms">Terms</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media | <a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
   </div>
@@ -842,7 +879,9 @@ Try AI rating: ${baseUrl}
 
 Bonus expires: ${getOfferHoursRemaining(user)} hours!
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const drip5_21hrEmail = (user: User) => ({
@@ -899,7 +938,8 @@ export const drip5_21hrEmail = (user: User) => ({
       <p><strong>Questions?</strong> Get instant answers at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
       <p>This is your moment. Don't let it pass!</p>
-      <p><strong>The Kull AI Team</strong></p>
+      <p><strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -908,6 +948,7 @@ export const drip5_21hrEmail = (user: User) => ({
         <a href="${baseUrl}/terms">Terms</a> •
         <a href="${baseUrl}/contact">Contact</a>
       </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
       <p>© 2025 Lander Media, 31 N Tejon St, Colorado Springs, CO 80903</p>
       <p><a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
     </div>
@@ -933,7 +974,9 @@ Claim now: ${baseUrl}
 
 After this expires: Regular pricing (no bonus)
 
-The Kull AI Team`
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
 });
 
 export const emailTemplates = {
