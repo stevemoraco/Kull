@@ -29,7 +29,7 @@ export function Hero() {
         </h1>
 
         <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed" data-testid="text-hero-subheadline">
-          Kull AI uses 5 advanced AI models to instantly rate your Lightroom photos with 1-5 stars. 
+          Universal Mac/iPhone/iPad app that uses 5 advanced AI models to instantly rate, organize, title, describe, tag, and color-code your photos from any folder. 
           Save hours on photo selection and focus on what you do best—creating stunning images.
         </p>
 

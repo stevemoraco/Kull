@@ -9,10 +9,10 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
   const professionalFeatures = [
     "5 AI models (Gemini, Grok, Groq, Claude, OpenAI)",
     "Unlimited photo rating",
-    "Desktop app (Mac DMG)",
-    "iOS companion app",
-    "Real-time Lightroom integration",
-    "Auto-sync across devices",
+    "Universal Mac app",
+    "iPhone & iPad companion apps",
+    "Works with any folder on your Mac",
+    "Auto-sync across all devices",
     "Email support"
   ];
 

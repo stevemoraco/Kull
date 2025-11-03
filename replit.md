@@ -1,7 +1,7 @@
 # Kull AI - AI-Powered Photo Rating Sales Funnel
 
 ### Overview
-Kull AI is a premium SaaS application designed to empower photographers by using advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to rate photos in Lightroom with 1-5 stars in real-time. This project is a high-converting sales funnel website built on Alex Hormozi's Grand Slam Offer framework, aiming for significant market potential in the photography industry. It provides a seamless user journey from trial to paid subscription, incorporating sophisticated payment, referral, and AI-powered customer support systems.
+Kull AI is a premium SaaS application designed to empower photographers with a universal Mac/iPhone/iPad app that uses advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with 1-5 stars in real-time. This project is a high-converting sales funnel website built on Alex Hormozi's Grand Slam Offer framework, aiming for significant market potential in the photography industry. It provides a seamless user journey from trial to paid subscription, incorporating sophisticated payment, referral, and AI-powered customer support systems.
 
 ### User Preferences
 I prefer simple language in explanations. I want iterative development with clear communication at each step. Ask before making major changes or decisions. Do not make changes to the existing folder structure unless explicitly requested. I prefer detailed explanations for complex technical decisions.

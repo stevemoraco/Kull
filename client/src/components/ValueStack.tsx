@@ -3,10 +3,10 @@ import { Check, Gift, Shield } from "lucide-react";
 export function ValueStack() {
   const coreFeatures = [
     "5 AI models analyzing every photo (Gemini, Grok, Groq, Claude, OpenAI)",
-    "Real-time 1-5 star ratings appearing live in Lightroom",
-    "Unlimited photo rating during your subscription",
-    "Desktop app for Mac (DMG download after purchase)",
-    "iOS companion app for on-the-go rating",
+    "Real-time 1-5 star ratings, titles, descriptions, tags, and color-coding",
+    "Unlimited photo rating and organization during your subscription",
+    "Universal Mac app (works with any folder)",
+    "iPhone & iPad companion apps for on-the-go organization",
     "Automatic sync across all your devices",
     "Priority processing queue for faster results",
     "Regular AI model updates and improvements"

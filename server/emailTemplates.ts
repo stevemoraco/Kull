@@ -158,7 +158,7 @@ export const firstLoginWelcomeEmail = (user: User) => ({
       <h3>✨ What You'll Get:</h3>
       <ul class="feature-list">
         <li>5 advanced AI models (Gemini, GPT-5, Claude, Grok, Kimi k2)</li>
-        <li>Real-time Lightroom integration</li>
+        <li>Works with any folder on your Mac</li>
         <li>Unlimited photo rating for 24 hours</li>
         <li>24/7 AI-powered chat support</li>
         <li>7-day money-back guarantee after trial</li>
@@ -212,7 +212,7 @@ Start your free trial: ${baseUrl}/home
 
 WHAT YOU'LL GET:
 ✓ 5 advanced AI models
-✓ Real-time Lightroom integration
+✓ Works with any folder on your Mac
 ✓ Unlimited rating for 24 hours
 ✓ 24/7 AI-powered support
 ✓ 7-day money-back guarantee
@@ -367,7 +367,7 @@ export const welcome5minEmail = (user: User) => ({
       
       <ol>
         <li><strong>Download Kull AI:</strong> One-click Mac installation (2 minutes)</li>
-        <li><strong>Connect Lightroom:</strong> Seamless plugin integration</li>
+        <li><strong>Launch the app:</strong> Point it to any photo folder</li>
         <li><strong>Start Rating:</strong> Watch AI analyze your photos in real-time</li>
       </ol>
 
@@ -379,7 +379,7 @@ export const welcome5minEmail = (user: User) => ({
       <ul class="feature-list">
         <li>Unlimited photo ratings for 24 hours</li>
         <li>All 5 AI models (Gemini, GPT-5, Claude, Grok, Kimi k2)</li>
-        <li>Real-time Lightroom integration</li>
+        <li>Works with any folder on your Mac</li>
         <li>24/7 AI-powered chat support</li>
         <li>No credit card charge until trial ends</li>
       </ul>
@@ -461,10 +461,10 @@ export const installCheck45minEmail = (user: User) => ({
       <ol>
         <li><strong>Open the DMG</strong> file you downloaded</li>
         <li><strong>Drag Kull AI</strong> to Applications folder</li>
-        <li><strong>Launch Lightroom Classic</strong></li>
-        <li><strong>Go to File → Plug-in Manager</strong></li>
+        <li><strong>Open Kull AI app</strong></li>
+        <li><strong>Go to Select photo folder</strong></li>
         <li><strong>Click "Add"</strong> and select Kull AI</li>
-        <li><strong>Enable the plugin</strong> and restart Lightroom</li>
+        <li><strong>and start organizing</strong> and begin rating</li>
       </ol>
 
       <center>
@@ -512,8 +512,8 @@ export const installCheck45minEmail = (user: User) => ({
 🎯 5-Minute Quick Start:
 1. Open DMG file
 2. Drag to Applications
-3. Launch Lightroom Classic
-4. File → Plug-in Manager → Add Kull AI
+3. Open Kull AI app
+4. Select photo folder → Add Kull AI
 5. Enable and restart
 
 💡 Pro Tip: Start with Gemini model for balanced ratings.
@@ -570,7 +570,7 @@ export const trialEnding6hrEmail = (user: User) => ({
       <ul class="feature-list">
         <li>Unlimited photo rating across all projects</li>
         <li>All 5 AI models (Gemini, GPT-5, Claude, Grok, Kimi k2)</li>
-        <li>Real-time Lightroom sync</li>
+        <li>Universal app with cross-device sync</li>
         <li>24/7 AI-powered support</li>
         <li>Regular feature updates & new AI models</li>
       </ul>
@@ -649,7 +649,7 @@ export const trialEnding1hrEmail = (user: User) => ({
       <ul class="feature-list">
         <li>Unlimited photo rating forever</li>
         <li>All 5 AI models for different styles</li>
-        <li>Lightroom integration that just works</li>
+        <li>Universal Mac/iPhone/iPad app that works with any folder</li>
         <li>24/7 support via AI chat</li>
         <li><strong>7-day money-back guarantee</strong> - instant self-service refund</li>
       </ul>
@@ -729,7 +729,7 @@ export const drip1_2hrEmail = (user: User) => ({
         <li><strong>Rate 1,000 photos in 10-15 minutes</strong> using AI batch processing</li>
         <li><strong>5 different AI perspectives</strong> - Gemini, GPT-5, Claude, Grok, Kimi k2</li>
         <li><strong>Context-aware ratings</strong> - AI sees the whole photoshoot, not just individual images</li>
-        <li><strong>Works in Lightroom</strong> - Real-time ratings as you browse your catalog</li>
+        <li><strong>Works with any folder on your Mac</strong> - Real-time ratings as you browse your catalog</li>
       </ul>
 
       <center>
@@ -738,7 +738,7 @@ export const drip1_2hrEmail = (user: User) => ({
 
       <h3>💡 Pro Photographer Workflow:</h3>
       <ol>
-        <li>Import shoot to Lightroom (as usual)</li>
+        <li>Open your photo folder in Kull AI</li>
         <li>Let Kull AI rate everything (10-15 minutes for 1,000 photos)</li>
         <li>Review AI suggestions, adjust as needed</li>
         <li>Export keepers - done in 1/3 the time!</li>
@@ -777,7 +777,7 @@ Hi ${user.firstName},
 🚀 The Solution: Kull AI rates 1,000 photos in 10-15 minutes
 • 5 different AI models
 • Context-aware ratings
-• Works in Lightroom
+• Works with any folder on your Mac
 
 Start free trial: ${baseUrl}
 
@@ -1233,7 +1233,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       <ul class="feature-list">
         <li>Rate thousands of photos in minutes, not hours</li>
         <li>5 cutting-edge AI models working together</li>
-        <li>Real-time Lightroom integration</li>
+        <li>Works with any folder on your Mac</li>
         <li>Professional-grade accuracy</li>
         <li>1-day free trial - unlimited photos</li>
         <li>7-day money-back guarantee</li>
@@ -1266,7 +1266,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       <p>1. Click the button above to visit Kull AI<br>
       2. Sign up with this email (${referredEmail})<br>
       3. Start your 1-day free trial instantly<br>
-      4. Install our plugin and watch the magic happen<br>
+      4. Download the app and watch the magic happen<br>
       5. If you love it, subscribe and we both win!</p>
 
       <div class="alert">
@@ -1309,7 +1309,7 @@ Stop wasting hours manually rating thousands of photos in Lightroom. Our advance
 ✨ FEATURES:
 ✓ Rate thousands of photos in minutes, not hours
 ✓ 5 cutting-edge AI models working together
-✓ Real-time Lightroom integration
+✓ Works with any folder on your Mac
 ✓ Professional-grade accuracy
 ✓ 1-day free trial - unlimited photos
 ✓ 7-day money-back guarantee
@@ -1325,7 +1325,7 @@ When you sign up as a paid customer, both you and ${referrerName} benefit:
 1. Visit ${baseUrl}
 2. Sign up with this email (${referredEmail})
 3. Start your 1-day free trial instantly
-4. Install our plugin and watch the magic happen
+4. Download the app and watch the magic happen
 5. If you love it, subscribe and we both win!
 
 ⏰ LIMITED TIME: New signups get 3 FREE MONTHS on annual plans!

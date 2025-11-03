@@ -16,12 +16,12 @@ export function SolutionSection() {
     {
       icon: Gauge,
       title: "Live Preview",
-      description: "Watch the AI work directly inside your Lightroom workspace"
+      description: "Watch the AI work on photos from any folder on your Mac"
     },
     {
       icon: RefreshCw,
       title: "Instant Sync",
-      description: "Ratings automatically sync to your Lightroom catalog"
+      description: "Organize and tag across Mac, iPhone, and iPad seamlessly"
     }
   ];
 
@@ -36,8 +36,8 @@ export function SolutionSection() {
           Introducing <span className="text-primary">Kull AI</span>
         </h2>
         <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
-          The first AI-powered photo rating system that works live inside Lightroom, 
-          combining 5 advanced AI models to rate your photos with professional-level accuracy.
+          The first AI-powered photo rating and organization system for Mac, iPhone, and iPad, 
+          combining 5 advanced AI models to rate and organize your photos with professional-level accuracy.
         </p>
 
         {/* Demo mockup placeholder */}

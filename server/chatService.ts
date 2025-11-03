@@ -11,7 +11,7 @@ const KULL_AI_KNOWLEDGE = `
 # Kull AI Documentation
 
 ## Overview
-Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can choose from (Gemini, Grok, Kimi k2, Claude, GPT-5) to automatically rate your photos from 1-5 stars in real-time using low-cost batch APIs when possible.
+Kull AI is a universal Mac/iPhone/iPad app that uses 5 advanced AI models you can choose from (Gemini, Grok, Kimi k2, Claude, GPT-5) to automatically rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with 1-5 stars in real-time using low-cost batch APIs when possible.
 
 ## Installation
 
@@ -23,13 +23,11 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 5. Click "Open Anyway" to allow Kull AI
 6. Launch Kull AI from Applications
 
-### Lightroom Plugin Setup
-1. Open Adobe Lightroom Classic
-2. Go to File > Plug-in Manager
-3. Click "Add" and navigate to the Kull AI plugin folder
-4. Enable the plugin
-5. Restart Lightroom
-6. You should see the Kull AI panel in the Library module
+### Getting Started
+1. Open Kull AI app on your Mac
+2. Point it to any photo folder on your Mac
+3. The AI instantly rates, organizes, titles, describes, tags, and color-codes your images
+4. Continue organizing on your iPhone or iPad with automatic sync across all devices
 
 ## Features
 
@@ -50,19 +48,20 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
   - Technical quality
 
 ### Professional Plan ($99/mo)
-- Unlimited photo ratings
+- Unlimited photo ratings and organization
 - All 5 AI models
-- Lightroom integration
+- Universal Mac app (works with any folder)
+- iPhone & iPad companion apps
+- Auto-sync across all devices
 - Chat support 24/7
-- DMG download for macOS
 
 ### Studio Plan ($499/mo)
 - Everything in Professional
 - Priority AI processing
 - Batch processing up to 10,000 photos
-- Team collaboration features
+- Team collaboration features (up to 5 users)
 - Priority support
-- Advanced export options
+- API access for automation
 
 ## Trial Information
 - 24-hour free trial
@@ -84,12 +83,12 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 ### Installation Problems
 - **"App can't be opened"**: Go to System Preferences > Security & Privacy and click "Open Anyway"
 - **"Damaged app"**: Download a fresh copy from your dashboard
-- **Plugin not showing**: Restart Lightroom after installation
+- **App not showing photos**: Make sure you've pointed it to the correct folder containing your photos
 
-### Lightroom Integration
-- **Plugin not loading**: Check Plug-in Manager, ensure it's enabled
-- **Ratings not syncing**: Restart Lightroom or check internet connection
+### Syncing Issues
+- **Ratings not syncing across devices**: Check internet connection and ensure you're signed in on all devices
 - **Slow performance**: Try using Grok model for faster processing
+- **Photos not appearing**: Verify the folder permissions and refresh the app
 
 ### Account & Billing
 - **Trial ending**: You'll receive emails at 6 hours and 1 hour before trial ends
@@ -97,8 +96,8 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - **Billing issues**: Use this chat for instant help, or DM founder on Twitter after 5 minutes
 
 ## System Requirements
-- macOS 10.15 (Catalina) or later
-- Adobe Lightroom Classic 9.0 or later
+- macOS 10.15 (Catalina) or later for Mac app
+- iOS 15.0 or later for iPhone & iPad apps
 - Internet connection for AI processing
 - 4GB RAM minimum, 8GB recommended
 
@@ -109,11 +108,11 @@ Kull AI is a powerful Lightroom plugin that uses 5 advanced AI models you can ch
 - Self-service refund: Available within 7 days of payment on /refund page
 
 ## Best Practices
-1. Start with a small batch to test the AI model
+1. Start with a small folder to test the AI model
 2. Use different models for different photography styles
 3. Review AI ratings - they're suggestions, not rules
-4. Export rated photos to new collection for easier workflow
-5. Use keyboard shortcuts in Lightroom for efficiency
+4. Organize photos across Mac, iPhone, and iPad seamlessly
+5. Take advantage of automatic titles, descriptions, and tags
 
 ## Contact
 Lander Media
@@ -128,7 +127,7 @@ Technical documentation and code: https://github.com/stevemoraco/kull
 `;
 
 // System prompt for the AI assistant
-const SYSTEM_PROMPT = `You are a helpful customer support AI assistant for Kull AI, a Lightroom plugin that uses 5 advanced AI models to rate photos.
+const SYSTEM_PROMPT = `You are a helpful customer support AI assistant for Kull AI, a universal Mac/iPhone/iPad app that uses 5 advanced AI models to rate, organize, title, describe, tag, and color-code photos from any folder.
 
 Your role:
 - Help users with installation, features, billing, and troubleshooting
@@ -208,27 +207,16 @@ function getFallbackResponse(userMessage: string): string {
 
   // Installation questions
   if (lowerMessage.includes('install') || lowerMessage.includes('setup') || lowerMessage.includes('download')) {
-    if (lowerMessage.includes('lightroom') || lowerMessage.includes('plugin')) {
-      return `To install the Lightroom plugin:
-
-1. Download the DMG from your dashboard
-2. Drag Kull AI to Applications
-3. In Lightroom Classic, go to File > Plug-in Manager
-4. Click "Add" and select the Kull AI plugin
-5. Enable it and restart Lightroom
-
-If you see "App can't be opened", go to System Preferences > Security & Privacy and click "Open Anyway".
-
-Need more help? I can walk you through any specific step!`;
-    }
     return `Installation is easy!
 
 1. Download the DMG file from your account dashboard
 2. Double-click to mount it
 3. Drag Kull AI.app to Applications
 4. If macOS blocks it, go to System Preferences > Security & Privacy and click "Open Anyway"
+5. Launch Kull AI and point it to any photo folder on your Mac
+6. The AI instantly rates, organizes, titles, describes, tags, and color-codes your images
 
-For the Lightroom plugin setup, ask me "How do I install the Lightroom plugin?"`;
+Also download the iPhone & iPad apps to continue organizing on the go with automatic sync!`;
   }
 
   // AI model questions
@@ -281,7 +269,7 @@ You'll receive reminder emails at 6 hours and 1 hour before your trial ends!`;
   return `Thanks for your question! I'm here to help with Kull AI.
 
 I can assist you with:
-- Installing the app and Lightroom plugin
+- Installing the Mac/iPhone/iPad app
 - Understanding AI models and ratings
 - Managing your subscription or trial
 - Troubleshooting any issues

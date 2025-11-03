@@ -66,7 +66,7 @@ export default function Support() {
               <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
                 <h3 className="text-xl font-bold mb-3 text-foreground">How do I install Kull AI?</h3>
                 <p className="text-muted-foreground leading-relaxed">
-                  Download the Mac DMG file from your account dashboard. Double-click to install, then open Lightroom. The AI ratings will appear automatically as you browse photos.
+                  Download the Mac app from your account dashboard. Double-click to install, then point it to any photo folder on your Mac. The AI ratings, titles, descriptions, tags, and color-coding appear automatically as you browse.
                 </p>
               </div>
 

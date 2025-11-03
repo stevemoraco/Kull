@@ -20,8 +20,8 @@ export function FAQSection() {
       answer: "The Professional plan ($99/mo) is perfect for individual photographers rating their own work. The Studio plan ($499/mo) is ideal for teams, studios, or high-volume photographers who need priority processing, team collaboration, and advanced features."
     },
     {
-      question: "Does it really work with Lightroom?",
-      answer: "Yes! Kull AI integrates directly into your Lightroom workflow. Download the Mac desktop app (DMG file), and the AI ratings appear in real-time as you browse your photos. The iOS app lets you continue rating on the go, with automatic sync."
+      question: "How does the app work?",
+      answer: "Kull AI is a universal Mac/iPhone/iPad app that works with any folder on your Mac. Download the Mac app, point it to your photo folders, and the AI instantly rates, organizes, titles, describes, tags, and color-codes your images. Continue organizing on your iPhone or iPad with automatic sync across all devices."
     },
     {
       question: "How accurate are the AI ratings?",
