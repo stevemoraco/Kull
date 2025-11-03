@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paymentIntent = await stripe.paymentIntents.create({
           amount,
           currency: 'usd',
-          customer: user.stripeCustomerId,
+          customer: user.stripeCustomerId || undefined,
           payment_method: paymentMethodId,
           confirm: true,
           capture_method: 'manual', // Don't capture yet, just authorize
@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentIntent = await stripe.paymentIntents.create({
         amount: monthlyAmount,
         currency: 'usd',
-        customer: user.stripeCustomerId,
+        customer: user.stripeCustomerId || undefined,
         payment_method: paymentMethodId,
         confirm: true,
         capture_method: 'manual',

@@ -4,8 +4,8 @@
 Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Grok, Groq, Claude, OpenAI) to rate photos in Lightroom with 1-5 stars in real-time. This is a high-converting sales funnel website built following Alex Hormozi's Grand Slam Offer framework.
 
 ## Current State
-- **Status**: MVP Complete - Full sales funnel with authentication, pricing, and referral system
-- **Last Updated**: November 3, 2025
+- **Status**: Advanced Trial System Complete - Stripe pre-authorization, SendGrid emails, and customer support chat
+- **Last Updated**: November 3, 2025 (evening)
 - **Deployment URL**: kullai.com
 
 ## Project Architecture
@@ -18,7 +18,33 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 - **Payments**: Stripe Subscriptions
 - **Email**: SendGrid (planned for future)
 
-### Key Features Implemented
+### Phase 2 - Advanced Trial System (November 3, 2025 - Evening)
+
+#### Stripe Pre-Authorization Trial System
+- **SetupIntent Flow**: Card verification without immediate charging
+- **Pre-Authorization Holds**: Verifies cards can handle full annual amount ($1,188 Professional, $5,988 Studio)
+- **Smart Downgrade**: Automatically offers monthly billing if annual authorization fails
+- **Trial Conversion**: Automatic subscription activation after 24 hours with saved payment method
+- **Status Progression**: none → trial → active (prevents duplicate trials)
+- **Trial Cancellation**: Cancel anytime during trial with automatic email cancellation
+
+#### SendGrid Email Automation
+- **Welcome Email (5min)**: Sent 5 minutes after trial starts with installation instructions
+- **Installation Check (1hr)**: Follow-up at 1 hour to ensure successful app installation
+- **Trial Ending Warning (18hr)**: Reminder 6 hours before trial ends with cancellation instructions
+- **Email Queue System**: Database-backed queue with scheduling, retry logic, and cancellation
+- **Cron Job Endpoint**: `/api/cron/process-emails` for automated email sending
+- **Smart Cancellation**: Emails automatically cancelled when user converts or cancels trial
+
+#### Customer Support Chat
+- **Floating Chat Widget**: Appears on all pages for instant support access
+- **Knowledge Base**: Comprehensive answers for installation, AI models, ratings, billing, troubleshooting
+- **Pattern Matching**: Intelligent responses to common questions
+- **Quick Questions**: Pre-populated questions for new users
+- **Chat History**: Message history with timestamps
+- **Backend Endpoint**: `/api/chat/message` for processing support requests
+
+### Phase 1 - MVP Features (Original Implementation)
 
 #### Landing Page (Public)
 - Hero section with compelling value proposition
@@ -45,11 +71,14 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 - Real-time referral stats
 
 #### Subscription & Checkout
-- Stripe Elements integration for secure payment
+- **Stripe Pre-Authorization**: SetupIntent for card verification before trial
+- **Authorization Holds**: Places hold for annual amount to verify card capacity
+- **Smart Fallback**: Offers monthly billing if annual amount can't be authorized
 - Two pricing tiers:
   - Professional: $99/mo ($1,188/year - save $396)
   - Studio: $499/mo ($5,988/year - save $2,004)
 - Annual billing with monthly price display
+- Trial conversion with saved payment methods
 - Automatic subscription management
 
 #### Referral System
@@ -66,10 +95,19 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 
 #### Users Table
 - Core fields: id, email, firstName, lastName, profileImageUrl
-- Stripe fields: stripeCustomerId, stripeSubscriptionId
-- Subscription: subscriptionTier, subscriptionStatus
-- Trial tracking: trialStartedAt, trialEndsAt, specialOfferExpiresAt
+- Stripe fields: stripeCustomerId, stripeSubscriptionId, stripePaymentMethodId, stripeSetupIntentId
+- Subscription: subscriptionTier, subscriptionStatus (none, trial, active, canceled, past_due)
+- Trial tracking: trialStartedAt, trialEndsAt, trialConvertedAt, specialOfferExpiresAt
+- App tracking: appInstalledAt
 - Timestamps: createdAt, updatedAt
+
+#### Email Queue Table
+- id, userId, emailType (welcome_5min, installation_check_1hr, trial_ending_18hr)
+- recipientEmail, subject, htmlBody, textBody
+- metadata (JSON for user-specific data)
+- scheduledFor, sentAt, failedAt, errorMessage
+- retryCount, cancelled
+- createdAt
 
 #### Referrals Table
 - id, referrerId, referredEmail, referredUserId
@@ -89,16 +127,32 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 - `GET /api/logout` - End user session
 - `GET /api/auth/user` - Get current user (protected)
 
-#### Subscriptions
-- `POST /api/trial/start` - Start 1-day free trial (protected)
-- `POST /api/create-subscription` - Create Stripe subscription (protected)
+#### Trial & Subscriptions
+- `POST /api/trial/setup-intent` - Create SetupIntent for card verification (protected)
   - Request body: `{ tier: 'professional' | 'studio' }`
-  - Returns: `{ subscriptionId, clientSecret }`
+  - Returns: `{ clientSecret, customerId }`
+- `POST /api/trial/confirm` - Confirm trial and place authorization hold (protected)
+  - Request body: `{ setupIntentId, tier }`
+  - Returns: `{ success, user, authorizationId }` or 402 with downgrade offer
+- `POST /api/trial/downgrade-monthly` - Downgrade to monthly if annual fails (protected)
+  - Request body: `{ setupIntentId, tier }`
+  - Returns: `{ success, user, billing, authorizationId }`
+- `POST /api/trial/convert` - Convert trial to paid subscription (protected)
+  - Request body: `{ billing: 'annual' | 'monthly' }`
+  - Returns: `{ success, user, subscription }`
+- `POST /api/trial/cancel` - Cancel active trial (protected)
+- `POST /api/app/installed` - Mark app as installed (protected)
 
 #### Referrals
 - `POST /api/referrals` - Create referral (protected)
   - Request body: `{ referredEmail: string }`
 - `GET /api/referrals` - Get user's referrals (protected)
+
+#### Email & Support
+- `POST /api/cron/process-emails` - Process pending email queue (cron job, requires secret)
+- `POST /api/chat/message` - Handle customer support chat messages
+  - Request body: `{ message: string, history: Message[] }`
+  - Returns: `{ message: string }`
 
 ### Design System
 
@@ -123,15 +177,30 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 
 ### User Journey
 
-#### New User Flow
+#### New User Flow (Updated with Pre-Authorization)
 1. Land on homepage → See hero + value proposition
 2. Click "Start Free Trial" → Redirect to /api/login
-3. Sign in with Replit Auth → Auto-create account with 1-day trial
-4. Redirect to /home → See welcome, trial status, 24h offer timer
-5. Browse pricing → Select plan → Checkout page
-6. Complete Stripe payment → Subscription activated
-7. Access download links for Mac DMG and iOS app
-8. Optionally refer photographers → Unlock bonuses
+3. Sign in with Replit Auth → Auto-create account (status='none')
+4. Redirect to /home → See pricing options and 24h special offer timer
+5. Select plan (Professional or Studio) → Redirect to /checkout?plan=X
+6. Checkout page:
+   - Enter card details (Stripe Elements with SetupIntent)
+   - System verifies card can handle annual amount
+   - If annual fails → Offer downgrade to monthly billing
+   - If successful → Trial starts (status='trial')
+7. Receive 3 automated emails:
+   - 5min: Welcome + installation instructions
+   - 1hr: Installation check-in
+   - 18hr: Trial ending reminder (6hrs before end)
+8. Trial period (24 hours):
+   - Access to customer support chat on all pages
+   - Download links available
+   - Can cancel anytime with zero charge
+9. After 24 hours:
+   - Auto-convert to paid subscription
+   - Stripe charges saved payment method
+   - Status changes to 'active'
+10. Optionally refer photographers → Unlock bonuses
 
 #### Referral Flow
 1. User enters photographer email in referral form
@@ -149,9 +218,17 @@ Kull AI is a premium SaaS application that uses 5 advanced AI models (Gemini, Gr
 - `VITE_STRIPE_PUBLIC_KEY` - Stripe publishable key (configured)
 - `STRIPE_SECRET_KEY` - Stripe secret key (configured)
 
+#### Stripe Price IDs (To Be Configured)
+- `STRIPE_PROFESSIONAL_ANNUAL_PRICE_ID` - Professional annual plan price ID
+- `STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID` - Professional monthly plan price ID
+- `STRIPE_STUDIO_ANNUAL_PRICE_ID` - Studio annual plan price ID
+- `STRIPE_STUDIO_MONTHLY_PRICE_ID` - Studio monthly plan price ID
+
+#### Email & Jobs
+- `SENDGRID_API_KEY` - SendGrid API key for transactional emails (pending)
+- `CRON_SECRET` - Secret for authenticating cron job requests
+
 #### Optional
-- `STRIPE_PROFESSIONAL_PRICE_ID` - Stripe price ID for Professional tier
-- `STRIPE_STUDIO_PRICE_ID` - Stripe price ID for Studio tier
 - `ISSUER_URL` - OIDC issuer (defaults to Replit)
 
 ### Running the Project
@@ -193,15 +270,22 @@ npm run db:push --force # Force push if conflicts
 - Powered by: heydata.org
 - Links: Privacy, Terms, Refunds, Support, Contact
 
-### Future Enhancements (Not in MVP)
+### Completed Advanced Features (Phase 2)
+✅ Stripe pre-authorization with card holds
+✅ SendGrid transactional email sequences
+✅ Customer support chat interface
+✅ Email queue and scheduling system
+✅ Smart downgrade flow for failed authorizations
+✅ Trial conversion automation
 
-#### Email Integration
-- SendGrid for transactional emails
-- Welcome email on signup
-- Trial reminder (20 hours remaining)
-- Special offer expiration warning
-- Referral invitation emails
-- Payment receipts
+### Future Enhancements (Not Yet Implemented)
+
+#### Email Integration (Pending SendGrid API Key)
+- ✅ Email templates created (welcome, installation check, trial ending)
+- ✅ Email queue system implemented
+- ✅ Automated scheduling at 5min, 1hr, 18hr intervals
+- ⏳ Waiting for SendGrid API key to activate sending
+- Future: Referral invitation emails, payment receipts
 
 #### Analytics & Tracking
 - User behavior tracking
@@ -210,13 +294,14 @@ npm run db:push --force # Force push if conflicts
 - Heatmaps and session recordings
 
 #### Features
-- Referral dashboard with sharing tools
-- User account settings
-- Subscription management portal
+- Enhanced referral dashboard with sharing tools
+- User account settings page
+- Self-service subscription management portal
 - Download history tracking
-- Video testimonials
+- Video testimonials section
 - Live user count display
 - Exit intent popup with discount
+- GitHub documentation integration for chat (currently using knowledge base)
 
 ### Notes
 
@@ -236,7 +321,11 @@ npm run db:push --force # Force push if conflicts
 - Clear benefit statements (no jargon)
 
 #### Technical Decisions
-- Annual billing by default (better LTV)
+- **Pre-Authorization over immediate charging**: Better user experience, verifies card capacity
+- **Annual billing by default**: Better LTV, larger upfront validation
+- **Smart downgrade to monthly**: Reduces friction, increases conversion
+- **Email queue system**: Reliable delivery, retry logic, easy monitoring
+- **Pattern-matching chatbot**: Works without API keys, can upgrade to LLM later
 - Stripe over custom payment (security, compliance)
 - Replit Auth over custom (faster to market, better UX)
 - PostgreSQL over NoSQL (relational data, ACID compliance)
