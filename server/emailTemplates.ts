@@ -421,7 +421,7 @@ You've just unlocked the future of photo rating! Your 24-hour free trial gives y
 
 🎯 Get Started:
 1. Download Kull AI (2 minutes)
-2. Connect Lightroom
+2. Open app and select photo folder
 3. Start Rating
 
 Visit ${baseUrl}/home to download now.
@@ -1228,7 +1228,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       </div>
 
       <h2>🚀 Why Kull AI?</h2>
-      <p>Stop wasting hours manually rating thousands of photos in Lightroom. Our advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) automatically rate your photos with 1-5 stars in real-time.</p>
+      <p>Stop wasting hours manually rating thousands of photos. Our universal Mac/iPhone/iPad app uses advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to automatically rate, organize, title, describe, tag, and color-code your photos from any folder with 1-5 stars in real-time.</p>
 
       <ul class="feature-list">
         <li>Rate thousands of photos in minutes, not hours</li>
@@ -1304,7 +1304,7 @@ ${referrerName} (${referrerEmail}) thinks you'd love Kull AI and invited you to 
 - 💰 When you become a paid customer, both you and ${referrerName} receive exclusive bonus rewards!
 
 🚀 WHY KULL AI?
-Stop wasting hours manually rating thousands of photos in Lightroom. Our advanced AI models automatically rate your photos with 1-5 stars in real-time.
+Stop wasting hours manually rating thousands of photos. Our universal Mac/iPhone/iPad app uses advanced AI models to automatically rate, organize, title, describe, tag, and color-code your photos from any folder with 1-5 stars in real-time.
 
 ✨ FEATURES:
 ✓ Rate thousands of photos in minutes, not hours

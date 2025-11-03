@@ -305,7 +305,7 @@ export default function Refunds() {
                     id="technical-issues"
                     value={technicalIssues}
                     onChange={(e) => setTechnicalIssues(e.target.value)}
-                    placeholder="e.g., Installation problems, crashes, slow performance, Lightroom integration issues, etc."
+                    placeholder="e.g., Installation problems, crashes, slow performance, sync issues, etc."
                     className="min-h-[100px]"
                     data-testid="textarea-technical-issues"
                   />

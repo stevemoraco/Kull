@@ -10,7 +10,7 @@ async function createProducts() {
     console.log('Creating Professional product...');
     const professionalProduct = await stripe.products.create({
       name: 'Kull AI Professional',
-      description: 'Unlimited photo ratings with all 5 AI models, Lightroom integration, and email support',
+      description: 'Unlimited photo ratings with all 5 AI models, universal Mac/iPhone/iPad app, and email support',
     });
     console.log(`✓ Professional product created: ${professionalProduct.id}\n`);
 
