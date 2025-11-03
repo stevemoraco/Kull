@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
+import { insertRefundSurveySchema } from "@shared/schema";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -471,11 +472,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { primaryReason, wouldRecommend, missingFeature, technicalIssues, additionalFeedback } = req.body;
       
-      // Validate survey data
-      if (!primaryReason) {
+      // Validate survey data using schema
+      const surveyData: any = {
+        userId,
+        primaryReason,
+        wouldRecommend,
+        additionalFeedback,
+        refundProcessed: true,
+        refundAmount: 0, // Will be updated with actual amount
+      };
+
+      // Only include optional fields if they have values
+      if (missingFeature) {
+        surveyData.missingFeature = missingFeature;
+      }
+      if (technicalIssues) {
+        surveyData.technicalIssues = technicalIssues;
+      }
+
+      const surveyValidation = insertRefundSurveySchema.safeParse(surveyData);
+
+      if (!surveyValidation.success) {
         return res.status(400).json({ 
-          message: "Survey required",
-          detail: "Please complete the refund survey before processing your refund." 
+          message: "Survey validation failed",
+          detail: "Please answer all required questions before processing your refund.",
+          errors: surveyValidation.error.errors,
         });
       }
 
@@ -527,15 +548,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reason: 'requested_by_customer',
       });
 
-      // Store survey feedback
+      // Store survey feedback using validated data
       await storage.createRefundSurvey({
-        userId,
-        primaryReason,
-        wouldRecommend: wouldRecommend === null ? null : wouldRecommend,
-        missingFeature: missingFeature || null,
-        technicalIssues: technicalIssues || null,
-        additionalFeedback: additionalFeedback || null,
-        refundProcessed: true,
+        ...surveyValidation.data,
         refundAmount: refund.amount,
       });
 

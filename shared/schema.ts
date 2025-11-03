@@ -75,10 +75,10 @@ export const refundSurveys = pgTable("refund_surveys", {
   userId: varchar("user_id").notNull().references(() => users.id),
   // Survey questions and answers
   primaryReason: varchar("primary_reason").notNull(), // Why they're requesting a refund
-  wouldRecommend: boolean("would_recommend"), // Would they recommend to others
+  wouldRecommend: boolean("would_recommend").notNull(), // Would they recommend to others
   missingFeature: varchar("missing_feature"), // What feature was missing
   technicalIssues: varchar("technical_issues"), // Any technical problems
-  additionalFeedback: varchar("additional_feedback"), // Open-ended feedback
+  additionalFeedback: varchar("additional_feedback").notNull(), // Open-ended feedback (required)
   // Voice transcription data
   audioTranscriptUrl: varchar("audio_transcript_url"), // S3/storage URL if they used voice
   transcriptionText: varchar("transcription_text", { length: 2000 }), // OpenAI Whisper transcription

@@ -110,10 +110,29 @@ export default function Refunds() {
   };
 
   const handleSubmitSurvey = async () => {
+    // Validate all required fields
     if (!primaryReason) {
       toast({
         title: "Please Complete Survey",
         description: "Please answer the primary reason for your refund request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (wouldRecommend === null) {
+      toast({
+        title: "Please Complete Survey",
+        description: "Please let us know if you would recommend Kull AI.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!additionalFeedback || additionalFeedback.trim() === "") {
+      toast({
+        title: "Please Complete Survey",
+        description: "Please share additional feedback to help us improve.",
         variant: "destructive",
       });
       return;
