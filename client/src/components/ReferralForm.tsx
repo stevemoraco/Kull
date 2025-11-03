@@ -327,18 +327,18 @@ export function ReferralForm() {
                 <div className="flex flex-col items-center flex-1">
                   <div 
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      totalSent + filledCount >= 10 || totalCompleted >= 3
+                      totalSent + filledCount >= 10 || completedReferrals >= 3
                         ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50 animate-pulse' 
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {totalSent + filledCount >= 10 || totalCompleted >= 3 ? (
+                    {totalSent + filledCount >= 10 || completedReferrals >= 3 ? (
                       <Check className="w-5 h-5" />
                     ) : (
                       <Sparkles className="w-5 h-5" />
                     )}
                   </div>
-                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 10 || totalCompleted >= 3 ? 'text-primary' : ''}`}>
+                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 10 || completedReferrals >= 3 ? 'text-primary' : ''}`}>
                     3 Months Free
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">10 sent</div>
