@@ -193,8 +193,7 @@ const CheckoutForm = ({ tier, setupIntentId, onDowngrade }: {
           <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mt-4">
             <p className="text-sm font-semibold text-foreground mb-2">💳 Card Pre-Authorization</p>
             <p className="text-xs text-muted-foreground">
-              We'll verify your card can handle {planDetails.annualTotal} for the annual plan. 
-              No charge until your 24-hour trial ends. Cancel anytime with zero charge.
+              To prevent fraud, we require a {planDetails.annualTotal} hold on your card for the annual plan 1-day trial. We will email you to remind you 6 hours and 1 hour before it goes through, and only actually charge you once your 24-hour trial ends, but the hold will show on your card until then. Cancel anytime in that period for zero charge and the hold will be immediately removed.
             </p>
           </div>
         </div>
