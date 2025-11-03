@@ -110,7 +110,7 @@ export default function Refunds() {
                   <AlertDescription className="text-green-900 dark:text-green-100">
                     <div className="space-y-2">
                       <p className="font-semibold">Refund Processed Successfully!</p>
-                      <p>Amount: ${refundResult.refund.amount}</p>
+                      <p>Amount: ${(refundResult.refund.amount / 100).toFixed(2)}</p>
                       <p className="text-sm">You will see the credit in your account within 5-7 business days.</p>
                     </div>
                   </AlertDescription>
