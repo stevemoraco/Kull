@@ -217,6 +217,45 @@ const saveSessions = (sessions: ChatSession[]) => {
   localStorage.setItem('kull-chat-sessions', JSON.stringify(sessions));
 };
 
+// Helper to get user metadata for anonymous tracking
+const getUserMetadata = async () => {
+  try {
+    // Detect device type
+    const ua = navigator.userAgent;
+    let device = 'Desktop';
+    if (/mobile/i.test(ua)) device = 'Mobile';
+    else if (/tablet|ipad/i.test(ua)) device = 'Tablet';
+
+    // Detect browser
+    let browser = 'Unknown';
+    if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+    else if (ua.includes('Firefox')) browser = 'Firefox';
+    else if (ua.includes('Edg')) browser = 'Edge';
+
+    // Get location from IP (using ipapi.co free API)
+    let location = { city: null, state: null, country: null };
+    try {
+      const response = await fetch('https://ipapi.co/json/');
+      if (response.ok) {
+        const data = await response.json();
+        location = {
+          city: data.city || null,
+          state: data.region || null,
+          country: data.country_name || null,
+        };
+      }
+    } catch (e) {
+      console.log('[Chat] Could not fetch location data');
+    }
+
+    return { device, browser, ...location };
+  } catch (error) {
+    console.error('[Chat] Error getting metadata:', error);
+    return { device: null, browser: null, city: null, state: null, country: null };
+  }
+};
+
 export function SupportChat() {
   // Persist chat open state
   const [isOpen, setIsOpen] = useState(() => {
@@ -289,6 +328,10 @@ export function SupportChat() {
         return session;
       });
       saveSessions(updatedSessions);
+      
+      // Also save to database immediately
+      saveSessionsToDatabase(updatedSessions);
+      
       return updatedSessions;
     });
   };
@@ -297,6 +340,82 @@ export function SupportChat() {
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Function to save sessions to database
+  const saveSessionsToDatabase = async (sessionsToSave: ChatSession[]) => {
+    try {
+      const metadata = await getUserMetadata();
+      await apiRequest("POST", '/api/chat/sessions', { sessions: sessionsToSave, metadata });
+      console.log('[Chat] Saved sessions to database');
+    } catch (error) {
+      console.error('[Chat] Failed to save sessions to database:', error);
+    }
+  };
+
+  // Function to load and merge sessions from database
+  const loadAndMergeSessions = async () => {
+    try {
+      const response = await apiRequest("GET", '/api/chat/sessions');
+      const dbSessions = await response.json();
+      const localSessions = loadSessions();
+      
+      // Create a map of all sessions by ID
+      const sessionMap = new Map<string, ChatSession>();
+      
+      // Add database sessions first
+      dbSessions.forEach((session: any) => {
+        sessionMap.set(session.id, {
+          ...session,
+          createdAt: new Date(session.createdAt),
+          updatedAt: new Date(session.updatedAt),
+          messages: session.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          })),
+        });
+      });
+      
+      // Merge with local sessions (prefer newer updatedAt)
+      localSessions.forEach(session => {
+        const existing = sessionMap.get(session.id);
+        if (!existing || new Date(session.updatedAt) > new Date(existing.updatedAt)) {
+          sessionMap.set(session.id, session);
+        }
+      });
+      
+      const mergedSessions = Array.from(sessionMap.values())
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      
+      if (mergedSessions.length > 0) {
+        setSessions(mergedSessions);
+        saveSessions(mergedSessions);
+        // Also save back to DB to sync any local-only sessions
+        await saveSessionsToDatabase(mergedSessions);
+        console.log(`[Chat] Loaded and merged ${mergedSessions.length} sessions from database`);
+      }
+    } catch (error) {
+      console.error('[Chat] Failed to load sessions from database:', error);
+    }
+  };
+
+  // Auto-sync: Load from DB when user logs in
+  useEffect(() => {
+    if (user?.id) {
+      console.log('[Chat] User logged in, syncing sessions from database...');
+      loadAndMergeSessions();
+    }
+  }, [user?.id]); // Only trigger when user ID changes
+
+  // Auto-save: Save to DB periodically (every 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (sessions.length > 0) {
+        saveSessionsToDatabase(sessions);
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [sessions]);
   const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
