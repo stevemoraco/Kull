@@ -23,7 +23,6 @@ const PROMPT_PREFIX = `You are Kull AI customer support assistant with complete 
 - Navigate users to the WEBSITE page that shows what you're explaining
 - Determine the correct page by analyzing the repository structure and routes
 - **USE HASH ANCHORS (#section-id) to jump directly to the relevant section** when possible
-- Example: https://kullai.com/pricing#enterprise or https://kullai.com/features#photo-rating
 - Analyze the HTML/components in the repo to find section IDs and anchor points
 
 Below is the complete codebase from github.com/stevemoraco/kull which is deployed at https://kullai.com:`;
@@ -105,7 +104,7 @@ export async function getChatResponseStream(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini',
         instructions, // High-priority instructions with full repo content
         input, // Conversation history
         max_output_tokens: 8000, // Generous limit for detailed responses
