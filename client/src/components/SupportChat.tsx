@@ -1823,14 +1823,22 @@ export function SupportChat() {
           <div className="bg-primary px-4 py-3">
             {/* Title Row */}
             <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 relative">
-                <MessageCircle className="w-5 h-5 text-primary-foreground" />
-                {nextMessageIn !== null && nextMessageIn > 0 && (
+              <button
+                onClick={() => setIsProactiveMessagesPaused(!isProactiveMessagesPaused)}
+                className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 relative hover:bg-primary-foreground/30 transition-colors cursor-pointer"
+                title={isProactiveMessagesPaused ? "Resume proactive messages" : "Pause proactive messages"}
+              >
+                {isProactiveMessagesPaused ? (
+                  <Play className="w-5 h-5 text-primary-foreground" />
+                ) : (
+                  <Pause className="w-5 h-5 text-primary-foreground" />
+                )}
+                {nextMessageIn !== null && nextMessageIn > 0 && !isProactiveMessagesPaused && (
                   <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {nextMessageIn}
                   </span>
                 )}
-              </div>
+              </button>
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-primary-foreground">
                   Kull Support

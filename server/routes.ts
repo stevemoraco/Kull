@@ -497,6 +497,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Transfer-Encoding', 'chunked');
       res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
       (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
+      
+      // Send initial comment to establish connection
+      res.write(': connected\n\n');
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
 
@@ -1100,6 +1103,9 @@ ${contextMarkdown}`;
       res.setHeader('Transfer-Encoding', 'chunked');
       res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
       (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
+      
+      // Send initial comment to establish connection
+      res.write(': connected\n\n');
 
       // Track the full response for analytics
       let fullResponse = '';

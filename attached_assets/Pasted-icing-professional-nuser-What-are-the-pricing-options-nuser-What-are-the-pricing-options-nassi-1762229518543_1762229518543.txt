@@ -1,0 +1,52 @@
+icing#professional).\nuser: What are the pricing options?\nuser: What are the pricing options?\nassistant: kull has multiple plans (including Professional and Studio) with monthly or y
+[Chat] Received chunk:  shows the metadata after you “Synchronize Metadata.”\n\nIf you want a guided tour first, the homepage has the core install & features overview — start here: [Kull homepage](https://kullai.com). If yo
+[Chat] Received chunk:  time per shoot) so I can show a quick annual savings estimate before you install? Jump to the install & pricing page here: [Kull — Install & Pricing](https://kullai.com).\nuser: Can you calculate my 
+[Chat] Received chunk: ng\nassistant: Spotted you click the exact line: \"Universal Mac/iPhone/iPad app that uses 508:15 PM\" — nice catch 👀 — are you checking whether Kull will run across your Mac + iPhone/iPad workflow? 
+[Chat] Received chunk:  shave hours off your culling routine? If you want a quick tour of how our AI culling works, take a peek at the AI Culling section: [AI Culling](https://kullai.com/features#ai-culling).\nassistant: Sp
+[Chat] Received chunk: sional)).\nassistant: Spotted you click “Close” — trying to play it cool after peeking at pricing? 👀 If you *were* comparing plans, I can run a quick ROI sketch for your shoots while you take another
+[Chat] Received chunk:  quick text, not essay.\n\nAnswer based on the codebase provided above.","max_output_tokens":8000,"max_tool_calls":null,"model":"gpt-5-mini-2025-08-07","output":[],"parallel_tool_calls":true,"previous
+[Chat] Received chunk: event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_0c0a669e61e22f410069097cea46cc81a3a36decd7f80cd76f","object":"response","created_at":1762229
+[Chat] Received chunk: vbar\"),e=document.getElementById(\"sidebar\"),f=document.getElementById(\"footer\"),g=document.getElementById(\"table-of-contents-content\");if(!f||\"center\"===c)return;let h=f.getBoundingClientRect
+[Chat] Received chunk: **\n- Optional 1M-token context (beta) via the `context-1m-2025-08-07` header.\n- Maximum output: **64K tokens**\n- Knowledge cutoff (reliable): **January 2025**\n- Training data cutoff: **July 2025**
+[Chat] Received chunk: e: dark)\").matches?\"dark\":\"light\":a;k(d)}catch(a){}})(\"class\",\"isDarkMode\",\"light\",null,\\[\"dark\",\"light\",\"true\",\"false\",\"system\"\\],{\"\n... [content truncated]\n\n```\n\n### Fil
+[Chat] Received chunk: , \"bannerDismissed\", \"data-banner-state\", ) document.addEventListener('DOMContentLoaded', () => { const link = document.querySelector('link\\[href=\"https://d4tuoctqmanu0.cloudfront.net/katex.min.
+[Chat] Received chunk: on-device large language model.\n\n## [Overview](/documentation/foundationmodels/generating-content-and-performing-tasks-with-foundation-models#overview)\n\nThe Foundation Models framework lets you ta
+[Chat] Received chunk: stemLanguageModel` refers to the on-device text foundation model that powers Apple Intelligence. Use [`default`](/documentation/foundationmodels/systemlanguagemodel/default) to access the base version
+[Chat] Received chunk: ingConvertible)\n*   [`Equatable`](/documentation/Swift/Equatable)\n*   [`Hashable`](/documentation/Swift/Hashable)\n*   [`NSCopying`](/documentation/Foundation/NSCopying)\n*   [`NSObjectProtocol`](/d
+[Chat] Received chunk: rted, .gemini-api-not-supported, .gemini-api-experimental { border-radius: 8px; display: inline-block; font-size: .9rem; font-weight: 500; line-height: 1rem; padding: .3rem 0.5em; } .gemini-api-suppor
+[Chat] Received chunk:  already have one, you can [get it for free in Google AI Studio](https://aistudio.google.com/app/apikey).\n\n## Install the Google GenAI SDK\n\n[Python](#python)[JavaScript](#javascript)[Go](#go)[Java
+[Chat] Received chunk: margin: 0 auto; } .gemini-api-card { background: var(--devsite-background-1); border: 1px solid var(--googledevai-border-color); border-radius: 9px; box-shadow: var(--gemini-api-elevation-1dp); height
+[Chat] Received chunk: inking
+[Chat] Received chunk: Config)\n*   [ImageConfig](#ImageConfig)\n*   [MediaResolution](#MediaResolution)\n*   [HarmCategory](#harmcategory)\n*   [ModalityTokenCount](#modalitytokencount)\n*   [Modality](#Modality)\n*   [Saf
+[Chat] Received chunk:  response later or to continue the conversation without repeating prior context. New responses will be stored for 30 days and then permanently deleted.\n\n## Request Body\n\nExpand All\n\ninput\n\nstr
+[Chat] Received chunk: rivacy Policy\\\"\",\n    \"timestamp\": \"2025-11-04T04:08:57.652Z\"\n  },\n  {\n    \"type\": \"hover\",\n    \"target\": \"div.flex.justify-start \\\"heeey — i saw you hover over \\\"\\\"\",\n    \
+[Chat] Received chunk: ofessional)\nassistant: saw you click \"What are the pricing options?\" — shopping for price or time-saved mostly? 👀  \ntell me shoots/week and minutes you spend culling and i’ll run a quick savings 
+[Chat] Received chunk: ccess so Kull can store security‑scoped bookmarks and keep your shoot folders in sync. For iPhone/iPad, install the mobile companion (App Store / TestFlight), sign in with the same account, and it wil
+[Chat] Received chunk: rks](https://kullai.com/features#ai-culling) first).\nassistant: Nice — I just saw you click the \"Close\" button 👀 — sneaky move. Want me to reopen the demo or I can show you [how the AI culling wor
+[Chat] Received chunk: event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_0c0a669e61e22f410069097ceb109081a3b19a26e6309f8974","type":"reasoning
+[Chat] Saved 4 sessions for user 13472548 from IP 50.190.74.198
+4:11:23 AM [express] POST /api/chat/sessions 200 in 409ms :: {"success":true,"count":4}
+[Welcome] OpenAI stream reader done
+[Welcome] Finished reading OpenAI stream, total chunks: 195
+[Welcome] ✅ Response format validated - metadata present
+[Welcome] Sending done event to client and closing stream...
+[Welcome] Stream closed
+[Welcome] Error processing stream: TypeError: storage2.trackSupportQuery is not a function
+    at <anonymous> (/home/runner/workspace/server/routes.ts:1240:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+4:11:31 AM [express] POST /api/chat/welcome 200 in 22983ms
+[Welcome] OpenAI stream reader done
+[Welcome] Finished reading OpenAI stream, total chunks: 209
+[Welcome] ✅ Response format validated - metadata present
+[Welcome] Sending done event to client and closing stream...
+[Welcome] Stream closed
+[Welcome] Error processing stream: TypeError: storage2.trackSupportQuery is not a function
+    at <anonymous> (/home/runner/workspace/server/routes.ts:1240:25)
+4:11:35 AM [express] POST /api/chat/welcome 200 in 28321ms
+[Welcome] Received request with history length: 0
+[Welcome] Last AI message time: 2025-11-04T04:11:35.512Z
+[Welcome] Current time: 2025-11-04T04:11:37.131Z
+[Repo] Using database cached content
+[Repo] Using database cached content
