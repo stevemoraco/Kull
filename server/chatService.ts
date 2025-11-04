@@ -1,8 +1,11 @@
 // Chat service powered by OpenAI with GitHub repository integration
 // Uses GPT-4o-mini for cost-effective, high-quality responses
 
-import { getRepoContent } from './fetchRepo';
+import { getRepoContent as fetchRepoContent } from './fetchRepo';
 import { chatResponseJsonSchema } from './chatSchema';
+
+// Re-export for use in routes
+export { fetchRepoContent as getRepoContent };
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
@@ -87,7 +90,7 @@ export async function buildFullPromptMarkdown(
   userMessage: string,
   history: ChatMessage[]
 ): Promise<string> {
-  const repoContent = await getRepoContent();
+  const repoContent = await fetchRepoContent();
   const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
   
   const input = [
@@ -139,7 +142,7 @@ export async function getChatResponseStream(
 
   try {
     // Fetch repo content (cached per session)
-    const repoContent = await getRepoContent();
+    const repoContent = await fetchRepoContent();
 
     // Build full instructions with repo content
     const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
