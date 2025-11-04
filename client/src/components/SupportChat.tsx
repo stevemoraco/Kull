@@ -914,12 +914,18 @@ export function SupportChat() {
           }
         }
 
-        console.log('[Chat] Greeting stream done. Full content:', fullContent);
+        console.log('[Chat] ===== GREETING STREAM COMPLETE =====');
+        console.log('[Chat] Full content length:', fullContent.length);
+        console.log('[Chat] Full content:', fullContent);
+        console.log('[Chat] Is active?', isActive);
 
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
           const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+
+          console.log('[Chat] NEXT_MESSAGE match:', nextMessageMatch);
+          console.log('[Chat] FOLLOW_UP_QUESTIONS match:', followUpMatch);
 
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
@@ -928,18 +934,23 @@ export function SupportChat() {
           const cutoffIndex = fullContent.indexOf('␞');
           const followUpIndex = fullContent.search(/\n\n?FOLLOW_UP_QUESTIONS:/);
 
+          console.log('[Chat] Cutoff index:', cutoffIndex);
+          console.log('[Chat] FollowUp index:', followUpIndex);
+
           if (cutoffIndex !== -1) {
             cleanContent = fullContent.substring(0, cutoffIndex).trim();
           } else if (followUpIndex !== -1) {
             cleanContent = fullContent.substring(0, followUpIndex).trim();
           }
 
+          console.log('[Chat] Clean content:', cleanContent);
+
           // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-            console.log('[Chat] Parsed next message time:', nextMsgSeconds, 'seconds');
+            console.log('[Chat] ✅ Parsed next message time:', nextMsgSeconds, 'seconds');
           } else {
-            console.log('[Chat] No NEXT_MESSAGE found, using default 30s');
+            console.log('[Chat] ❌ No NEXT_MESSAGE found, using default 30s');
           }
 
           // Parse and display follow-up questions
@@ -958,6 +969,7 @@ export function SupportChat() {
             }
           }
 
+          console.log('[Chat] ===== SETTING STATE =====');
           console.log('[Chat] Generated greeting:', cleanContent.substring(0, 100));
           console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
           console.log('[Chat] Greeting generated?', currentGreetingGenerated);
@@ -965,6 +977,7 @@ export function SupportChat() {
 
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
+            console.log('[Chat] 🎉 First greeting - setting countdown to:', nextMsgSeconds);
             setLatestGreeting(cleanContent);
             setGreetingGenerated(true);
             setNextMessageIn(nextMsgSeconds);
