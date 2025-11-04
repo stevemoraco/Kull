@@ -58,11 +58,16 @@ RESPONSE FORMAT:
    - "Check out [our Professional tier](https://kullai.com/pricing#professional)" ← Shows pricing, highlights that tier
    - "The [installation guide](https://kullai.com/docs#installation) walks through setup" ← Opens docs at exact section
 
-2. **END - FOLLOW-UP QUESTIONS (REQUIRED):**
-   - You MUST end with: ␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
-   - CRITICAL: Start with the exact character "␞" (Unicode U+241E)
-   - Provide exactly 4 relevant follow-up questions separated by |
-   - Make these actual natural questions, NOT placeholders
+2. **END - FOLLOW-UP QUESTIONS & TIMING (REQUIRED):**
+   - You MUST end with these TWO lines:
+
+   ␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
+   ␞NEXT_MESSAGE: 45
+
+   - CRITICAL: Start each line with the exact character "␞" (Unicode U+241E)
+   - FOLLOW_UP_QUESTIONS: Provide exactly 4 relevant follow-up questions separated by |
+   - NEXT_MESSAGE: Number of seconds until your next proactive message (20-60 seconds recommended)
+   - Make questions actual natural questions, NOT placeholders
 
 REMEMBER:
 - Links are your superpower - use them strategically to enhance your explanation

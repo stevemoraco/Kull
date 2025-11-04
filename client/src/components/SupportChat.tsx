@@ -292,6 +292,8 @@ export function SupportChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [transcriptSent, setTranscriptSent] = useState(false);
+  const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Store pre-generated greeting for initial use
   const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
@@ -729,14 +731,26 @@ export function SupportChat() {
         }
 
         if (fullContent && isActive) {
+          // Parse next message timing if present
+          const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
+          let cleanContent = fullContent;
+          let nextMsgSeconds = 30; // Default
+
+          if (nextMessageMatch) {
+            nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
+            // Remove the NEXT_MESSAGE line from displayed content
+            cleanContent = fullContent.substring(0, nextMessageMatch.index).trim();
+          }
+
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
-            setLatestGreeting(fullContent);
+            setLatestGreeting(cleanContent);
             setGreetingGenerated(true);
+            setNextMessageIn(nextMsgSeconds);
 
             // Show popover if chat is closed
             if (!currentIsOpen) {
-              setPopoverGreeting(fullContent);
+              setPopoverGreeting(cleanContent);
               setShowGreetingPopover(true);
 
               // Auto-hide after 10 seconds
@@ -753,18 +767,20 @@ export function SupportChat() {
               const newMessage: Message = {
                 id: 'context-' + Date.now(),
                 role: 'assistant',
-                content: fullContent,
+                content: cleanContent,
                 timestamp: new Date(),
               };
 
               setMessages(prev => [...prev, newMessage]);
+              setNextMessageIn(nextMsgSeconds);
 
               // Note: Welcome messages don't auto-navigate, only user chat responses do
               // No toast notifications - rely on popover when chat is closed
             } else if (!currentIsOpen) {
               // Chat is closed: show popover instead
-              setPopoverGreeting(fullContent);
+              setPopoverGreeting(cleanContent);
               setShowGreetingPopover(true);
+              setNextMessageIn(nextMsgSeconds);
 
               // Auto-hide after 10 seconds
               setTimeout(() => {
@@ -800,6 +816,37 @@ export function SupportChat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Countdown effect
+  useEffect(() => {
+    if (nextMessageIn !== null && nextMessageIn > 0) {
+      // Clear any existing countdown
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+
+      // Start countdown
+      countdownIntervalRef.current = setInterval(() => {
+        setNextMessageIn(prev => {
+          if (prev === null || prev <= 1) {
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [nextMessageIn]);
 
   // Reset inactivity timer on any message activity
   const resetInactivityTimer = () => {
@@ -985,7 +1032,7 @@ export function SupportChat() {
                   console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
 
                   // Extract follow-up questions - be more flexible with the pattern
-                  const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)$/is);
+                  const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|␞|$)/is);
 
                   if (followUpMatch) {
                     const questionsText = followUpMatch[1];
@@ -997,11 +1044,16 @@ export function SupportChat() {
                     console.log('[Chat] Extracted questions:', newQuestions);
 
                     if (newQuestions.length > 0) {
-                      setQuickQuestions(prev => {
-                        const combined = [...prev, ...newQuestions];
-                        return combined.slice(-8);
-                      });
+                      setQuickQuestions(newQuestions);
                     }
+                  }
+
+                  // Extract next message timing
+                  const nextMessageMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
+                  if (nextMessageMatch) {
+                    const seconds = parseInt(nextMessageMatch[1], 10);
+                    console.log('[Chat] Next message in:', seconds, 'seconds');
+                    setNextMessageIn(seconds);
                   }
 
                   // Update message with clean content
