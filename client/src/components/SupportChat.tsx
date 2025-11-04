@@ -439,6 +439,7 @@ export function SupportChat() {
 
       let fullContent = '';
       let firstTokenReceived = false;
+      let cutoffDetected = false; // Flag to stop processing after cutoff
 
       while (true) {
         const { done, value } = await reader.read();
@@ -454,31 +455,39 @@ export function SupportChat() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'delta' && data.content) {
+                // Mark that we've received the first token
+                firstTokenReceived = true;
+
+                // If we already detected cutoff, ignore all further deltas
+                if (cutoffDetected) {
+                  continue;
+                }
+
                 fullContent += data.content;
 
-                // Look for cutoff: prefer ␞ marker, fallback to plain text
+                // Look for cutoff markers - be aggressive
                 let cutoffIndex = fullContent.indexOf('␞');
 
-                // Fallback: look for FOLLOW_UP_QUESTIONS without marker
+                // Fallback: look for FOLLOW_UP_QUESTIONS (without requiring newline)
                 if (cutoffIndex === -1) {
-                  const plainMatch = fullContent.match(/\n\s*FOLLOW_UP_QUESTIONS:/i);
-                  if (plainMatch && plainMatch.index !== undefined) {
-                    cutoffIndex = plainMatch.index;
-                  }
+                  cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
                 }
 
                 if (cutoffIndex !== -1) {
-                  // Found cutoff! Hide everything after it
+                  // Found cutoff! Set flag to stop processing further deltas
+                  cutoffDetected = true;
+
+                  // Extract clean content before cutoff
                   const cleanContent = fullContent.substring(0, cutoffIndex).trim();
                   const questionsSection = fullContent.substring(cutoffIndex);
 
-                  // Extract follow-up questions (handle both formats)
-                  const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+                  // Extract follow-up questions
+                  const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|$)/is);
                   if (followUpMatch) {
                     const newQuestions = followUpMatch[1]
                       .split('|')
                       .map((q: string) => q.trim())
-                      .filter((q: string) => q.length > 0);
+                      .filter((q: string) => q.length > 0 && q.length < 200); // Sanity check
 
                     if (newQuestions.length > 0) {
                       setQuickQuestions(prev => {
@@ -488,7 +497,7 @@ export function SupportChat() {
                     }
                   }
 
-                  // Only show clean content
+                  // Update message with clean content and stop
                   setMessages(prev =>
                     prev.map(msg =>
                       msg.id === assistantMessageId
@@ -510,25 +519,23 @@ export function SupportChat() {
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
-                // Final cleanup
-                let cutoffIndex = fullContent.indexOf('␞');
-                if (cutoffIndex === -1) {
-                  const plainMatch = fullContent.match(/\n\s*FOLLOW_UP_QUESTIONS:/i);
-                  if (plainMatch && plainMatch.index !== undefined) {
-                    cutoffIndex = plainMatch.index;
+                // Final cleanup - just in case
+                if (!cutoffDetected) {
+                  let cutoffIndex = fullContent.indexOf('␞');
+                  if (cutoffIndex === -1) {
+                    cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
                   }
-                }
 
-                if (cutoffIndex !== -1) {
-                  const cleanContent = fullContent.substring(0, cutoffIndex).trim();
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: cleanContent }
-                        : msg
-                    )
-                  );
-                  fullContent = cleanContent;
+                  if (cutoffIndex !== -1) {
+                    const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: cleanContent }
+                          : msg
+                      )
+                    );
+                  }
                 }
               }
             } catch (e) {
