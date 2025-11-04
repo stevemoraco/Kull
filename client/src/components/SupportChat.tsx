@@ -341,15 +341,24 @@ export function SupportChat() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Function to save sessions to database
+  // Debounced save to database - prevents rapid-fire saves
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveSessionsToDatabase = async (sessionsToSave: ChatSession[]) => {
-    try {
-      const metadata = await getUserMetadata();
-      await apiRequest("POST", '/api/chat/sessions', { sessions: sessionsToSave, metadata });
-      console.log('[Chat] Saved sessions to database');
-    } catch (error) {
-      console.error('[Chat] Failed to save sessions to database:', error);
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
+
+    // Schedule save after 2 seconds of inactivity
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const metadata = await getUserMetadata();
+        await apiRequest("POST", '/api/chat/sessions', { sessions: sessionsToSave, metadata });
+        console.log('[Chat] Saved', sessionsToSave.length, 'sessions to database');
+      } catch (error) {
+        console.error('[Chat] Failed to save sessions to database:', error);
+      }
+    }, 2000);
   };
 
   // Function to load and merge sessions from database
@@ -407,15 +416,21 @@ export function SupportChat() {
   }, [user?.id]); // Only trigger when user ID changes
 
   // Auto-save: Save to DB periodically (every 30 seconds)
+  const sessionsRef = useRef(sessions);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
   useEffect(() => {
     const interval = setInterval(() => {
-      if (sessions.length > 0) {
-        saveSessionsToDatabase(sessions);
+      if (sessionsRef.current.length > 0) {
+        console.log('[Chat] Auto-save interval triggered');
+        saveSessionsToDatabase(sessionsRef.current);
       }
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
-  }, [sessions]);
+  }, []); // Empty deps - only create interval once
   const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1262,7 +1277,10 @@ export function SupportChat() {
 
               if (data.type === 'delta' && data.content) {
                 // Mark that we've received the first token
-                firstTokenReceived = true;
+                if (!firstTokenReceived) {
+                  firstTokenReceived = true;
+                  console.log('[Chat] 🎉 First token received! Starting to stream...');
+                }
 
                 // If we already detected cutoff, ignore all further deltas
                 if (cutoffDetected) {
@@ -1270,6 +1288,7 @@ export function SupportChat() {
                 }
 
                 fullContent += data.content;
+                console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
 
                 // Check for first link and navigate immediately
                 if (!hasNavigated) {
@@ -1750,6 +1769,12 @@ export function SupportChat() {
                         <div className="flex items-start gap-3 border-l-4 border-purple-400 pl-3 py-1 bg-purple-50/50 rounded-r">
                           <Loader2 className="w-4 h-4 animate-spin text-purple-600 mt-0.5 flex-shrink-0" />
                           <span className="text-purple-700 italic">Thinking...</span>
+                        </div>
+                      ) : message.content.length === 0 ? (
+                        // Waiting for first token
+                        <div className="flex items-start gap-3 border-l-4 border-blue-400 pl-3 py-1 bg-blue-50/50 rounded-r">
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-blue-700 italic">Streaming response...</span>
                         </div>
                       ) : (
                         renderMarkdown(message.content, handleLinkClick)
