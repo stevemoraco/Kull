@@ -1794,7 +1794,10 @@ export function SupportChat() {
                 {quickQuestions.map((question, idx) => (
                   <button
                     key={idx}
-                    onClick={() => sendMessage(question)}
+                    onClick={() => {
+                      console.log('[Chat] Quick question clicked:', question, 'isLoading:', isLoading);
+                      sendMessage(question);
+                    }}
                     disabled={isLoading}
                     className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid={`button-quick-question-${idx}`}
