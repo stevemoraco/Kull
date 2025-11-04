@@ -1550,13 +1550,47 @@ ${contextMarkdown}`;
         .orderBy(desc(supportQueries.createdAt));
       console.log(`[Admin] Found ${allQueries.length} support queries for cost tracking`);
 
-      // Group sessions by user (userId or IP for anonymous)
+      // Group sessions by user (userId or metadata composite for anonymous)
       const chatUserMap = new Map<string, any>();
 
       allSessions.forEach(session => {
         const messages = JSON.parse(session.messages);
-        const userKey = session.userId || session.ipAddress || 'unknown';
         const isAnonymous = !session.userId;
+        
+        // For anonymous users, create composite key from metadata
+        let userKey: string;
+        let displayName: string;
+        
+        if (session.userId) {
+          userKey = session.userId;
+          const userDetails = userMap.get(session.userId);
+          displayName = userDetails?.email || `User ${session.userId}`;
+        } else {
+          // Calculate session length bucket
+          const sessionStart = new Date(session.createdAt).getTime();
+          const sessionEnd = new Date(session.updatedAt).getTime();
+          const durationMinutes = (sessionEnd - sessionStart) / 1000 / 60;
+          
+          let sessionLengthBucket: string;
+          if (durationMinutes < 1) sessionLengthBucket = '0-1min';
+          else if (durationMinutes < 5) sessionLengthBucket = '1-5min';
+          else if (durationMinutes < 15) sessionLengthBucket = '5-15min';
+          else if (durationMinutes < 30) sessionLengthBucket = '15-30min';
+          else sessionLengthBucket = '30min+';
+          
+          // Create composite key for anonymous users based on metadata + session length
+          const parts = [
+            session.device || 'Unknown Device',
+            session.browser || 'Unknown Browser',
+            session.city || '',
+            session.state || '',
+            session.country || 'Unknown Location',
+            sessionLengthBucket
+          ].filter(Boolean);
+          
+          userKey = `anon_${parts.join('_').replace(/\s+/g, '_')}`;
+          displayName = parts.join(' • ');
+        }
 
         console.log(`[Admin] Processing session ${session.id}: userKey=${userKey}, messages=${messages.length}, isAnonymous=${isAnonymous}`);
 
@@ -1569,6 +1603,7 @@ ${contextMarkdown}`;
             userId: session.userId,
             userEmail: userDetails?.email || null,
             userName: userDetails ? `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim() || null : null,
+            displayName,
             ipAddress: session.ipAddress,
             isAnonymous,
             sessions: [],

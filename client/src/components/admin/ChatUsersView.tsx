@@ -9,6 +9,7 @@ interface ChatUser {
   userId?: string;
   userEmail?: string;
   userName?: string;
+  displayName: string;
   ipAddress?: string;
   isAnonymous: boolean;
   sessionCount: number;
@@ -124,10 +125,10 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
             >
               <div className="space-y-2 flex-1">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${user.isAnonymous ? 'bg-red-500' : 'bg-green-500'}`} />
+                  <div className={`w-2 h-2 rounded-full ${user.isAnonymous ? 'bg-orange-500' : 'bg-green-500'}`} />
                   <div className="font-medium">
                     {user.isAnonymous ? (
-                      <span className="text-muted-foreground">Anonymous User</span>
+                      <span className="text-foreground font-semibold">{user.displayName}</span>
                     ) : (
                       <div>
                         {user.userName && <div className="font-semibold">{user.userName}</div>}
@@ -138,7 +139,7 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                 </div>
                 <div className="text-sm text-muted-foreground space-y-1">
                   {user.userId && <div className="text-xs">ID: {user.userId.slice(0, 12)}...</div>}
-                  {user.ipAddress && <div>IP: {user.ipAddress}</div>}
+                  {user.isAnonymous && user.ipAddress && <div className="text-xs">IP: {user.ipAddress}</div>}
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-1">
                       <span className="font-medium">{user.sessionCount}</span> sessions
@@ -156,22 +157,6 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                       Last active {formatDistanceToNow(new Date(user.lastActivity), { addSuffix: true })}
                     </div>
                   </div>
-                  {(user.location.city || user.location.country) && (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>
-                        {[user.location.city, user.location.state, user.location.country]
-                          .filter(Boolean)
-                          .join(', ')}
-                      </span>
-                    </div>
-                  )}
-                  {user.device && (
-                    <div className="flex items-center gap-1">
-                      <Monitor className="h-3 w-3" />
-                      <span>{user.browser} on {user.device}</span>
-                    </div>
-                  )}
                 </div>
               </div>
               <Button
