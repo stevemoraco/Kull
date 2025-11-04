@@ -473,6 +473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
       
@@ -491,6 +493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         console.log('[Chat] Starting to read stream...');
+        let buffer = ''; // Buffer for incomplete SSE lines
 
         while (true) {
           const { done, value } = await reader.read();
@@ -502,7 +505,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const chunk = decoder.decode(value, { stream: true });
           console.log('[Chat] Received chunk:', chunk.substring(0, 200));
-          const lines = chunk.split('\n');
+
+          // Add to buffer and split by lines
+          buffer += chunk;
+          const lines = buffer.split('\n');
+
+          // Keep the last incomplete line in buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -533,8 +542,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     (res as any).flush();
                   }
                 }
+                // Silently ignore other event types (response.in_progress, etc.)
               } catch (e) {
-                // Skip invalid JSON lines
+                // Skip invalid JSON lines - likely incomplete data between chunks
+                console.log('[Chat] Skipped line (parse error):', line.substring(0, 50));
               }
             }
           }
@@ -613,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000) 
             : undefined;
 
-          await storage.trackSupportQuery({
+          await storage.default.trackSupportQuery({
             userEmail,
             userId,
             userMessage: message,
@@ -1042,6 +1053,8 @@ ${contextMarkdown}`;
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
 
       // Track the full response for analytics
       let fullResponse = '';
@@ -1053,6 +1066,8 @@ ${contextMarkdown}`;
 
       try {
         let serverChunkCount = 0;
+        let buffer = ''; // Buffer for incomplete SSE lines
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -1066,7 +1081,12 @@ ${contextMarkdown}`;
             console.log(`[Welcome] OpenAI chunk #${serverChunkCount}:`, chunk.substring(0, 200));
           }
 
-          const lines = chunk.split('\n');
+          // Add to buffer and split by lines
+          buffer += chunk;
+          const lines = buffer.split('\n');
+
+          // Keep the last incomplete line in buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
