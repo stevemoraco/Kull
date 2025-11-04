@@ -1143,6 +1143,81 @@ ${contextMarkdown}`;
     }
   });
 
+  // Chat session persistence endpoints
+  app.post('/api/chat/sessions', async (req: any, res) => {
+    try {
+      const { sessions, metadata } = req.body;
+      
+      if (!sessions || !Array.isArray(sessions)) {
+        return res.status(400).json({ message: "Sessions array required" });
+      }
+
+      const userId = req.user?.claims?.sub || null;
+      const savedSessions = [];
+
+      for (const session of sessions) {
+        const chatSession = {
+          id: session.id,
+          userId: userId,
+          title: session.title,
+          messages: JSON.stringify(session.messages),
+          device: metadata?.device || null,
+          browser: metadata?.browser || null,
+          city: metadata?.city || null,
+          state: metadata?.state || null,
+          country: metadata?.country || null,
+          createdAt: new Date(session.createdAt),
+          updatedAt: new Date(session.updatedAt),
+        };
+
+        const saved = await storage.saveChatSession(chatSession);
+        savedSessions.push(saved);
+      }
+
+      console.log(`[Chat] Saved ${savedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'}`);
+      res.json({ success: true, count: savedSessions.length });
+    } catch (error: any) {
+      console.error("Error saving chat sessions:", error);
+      res.status(500).json({ message: "Failed to save sessions: " + error.message });
+    }
+  });
+
+  app.get('/api/chat/sessions', async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || null;
+      
+      const sessions = await storage.getChatSessions(userId);
+      
+      const formattedSessions = sessions.map(session => ({
+        id: session.id,
+        title: session.title,
+        messages: JSON.parse(session.messages),
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+      }));
+
+      console.log(`[Chat] Loaded ${formattedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'}`);
+      res.json(formattedSessions);
+    } catch (error: any) {
+      console.error("Error loading chat sessions:", error);
+      res.status(500).json({ message: "Failed to load sessions: " + error.message });
+    }
+  });
+
+  app.delete('/api/chat/sessions/:id', async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      
+      await storage.deleteChatSession(id);
+      
+      console.log(`[Chat] Deleted session ${id}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting chat session:", error);
+      res.status(500).json({ message: "Failed to delete session: " + error.message });
+    }
+  });
+
   // Referral endpoints
   app.post('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {
