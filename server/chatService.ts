@@ -19,7 +19,7 @@ const PROMPT_SUFFIX = `
 INSTRUCTIONS:
 
 1. EVERY response MUST start with a markdown link [text](url) - the page will auto-navigate to the first link
-2. EVERY response MUST end with: FOLLOW_UP_QUESTIONS: Question 1? | Question 2? | Question 3? | Question 4?
+2. EVERY response MUST end with: FOLLOW_UP_QUESTIONS: followed by 4 natural, relevant follow-up questions separated by | (pipe character). Make these actual questions the user might want to ask next, NOT placeholders. Example format: "FOLLOW_UP_QUESTIONS: How do I install the app? | What plans are available? | Can I get a refund? | Where's the download link?"
 3. Keep responses 2-4 paragraphs
 4. Use markdown formatting (bold, italic, lists, etc)
 
@@ -42,17 +42,13 @@ export async function getChatResponseStream(
     // Fetch repo content (cached per session)
     const repoContent = await getRepoContent();
 
-    // Build system prompt with repo content
-    const systemPrompt = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
+    // Build full instructions with repo content
+    const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
 
-    // Build messages array for Responses API
+    // Build input array with conversation history (no system prompt in input)
     const input = [
-      {
-        role: 'developer',
-        content: systemPrompt,
-      },
       ...history.slice(-10).map(msg => ({
-        role: msg.role === 'system' ? 'developer' : msg.role,
+        role: msg.role === 'system' || msg.role === 'developer' ? 'developer' : msg.role,
         content: msg.content,
       })),
       {
@@ -60,6 +56,8 @@ export async function getChatResponseStream(
         content: userMessage,
       },
     ];
+
+    console.log(`[Chat] Sending request with ${instructions.length} chars of instructions (includes repo), ${input.length} messages in history`);
 
     // Call OpenAI Responses API with streaming
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -70,7 +68,8 @@ export async function getChatResponseStream(
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        input,
+        instructions, // High-priority instructions with full repo content
+        input, // Conversation history
         max_output_tokens: 500,
         stream: true,
       }),

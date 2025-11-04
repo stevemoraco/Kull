@@ -47,11 +47,11 @@ export default function Admin() {
   const [timerange, setTimerange] = useState("all");
 
   const { data: analytics, isLoading } = useQuery<Analytics>({
-    queryKey: ['/api/admin/analytics', { timerange }],
+    queryKey: [`/api/admin/analytics?timerange=${timerange}`],
   });
 
   const { data: supportAnalytics, isLoading: isLoadingSupportAnalytics } = useQuery<SupportAnalytics>({
-    queryKey: ['/api/admin/support-analytics', { timerange, days: 30 }],
+    queryKey: [`/api/admin/support-analytics?timerange=${timerange}&days=30`],
   });
 
   const sendTestEmailMutation = useMutation({
