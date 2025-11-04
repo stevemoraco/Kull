@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -294,6 +294,7 @@ export function SupportChat() {
   const [transcriptSent, setTranscriptSent] = useState(false);
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Store pre-generated greeting for initial use
   const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
@@ -1225,18 +1226,24 @@ export function SupportChat() {
       {/* Chat Button */}
       {!isOpen && (
         <>
-          <Button
-            onClick={() => {
-              setIsOpen(true);
-              setShowGreetingPopover(false); // Hide popover when opening chat
-            }}
-            className="fixed bottom-4 left-4 md:bottom-6 md:left-6 h-14 w-14 rounded-full shadow-lg hover-elevate z-[9999]"
-            size="icon"
-            data-testid="button-open-chat"
-            style={{ position: 'fixed' }}
-          >
-            <MessageCircle className="w-6 h-6" />
-          </Button>
+          <div className="fixed bottom-4 left-4 md:bottom-6 md:left-6 z-[9999] flex flex-col items-center gap-1">
+            <Button
+              onClick={() => {
+                setIsOpen(true);
+                setShowGreetingPopover(false); // Hide popover when opening chat
+              }}
+              className="h-14 w-14 rounded-full shadow-lg hover-elevate"
+              size="icon"
+              data-testid="button-open-chat"
+            >
+              <MessageCircle className="w-6 h-6" />
+            </Button>
+            {nextMessageIn !== null && nextMessageIn > 0 && (
+              <div className="bg-purple-600 text-white text-xs font-bold rounded-full px-2 py-0.5 shadow-md">
+                {nextMessageIn}s
+              </div>
+            )}
+          </div>
 
           {/* Greeting Popover */}
           {showGreetingPopover && popoverGreeting && (
@@ -1302,25 +1309,42 @@ export function SupportChat() {
       {/* Chat Window */}
       {isOpen && (
         <div
-          className="fixed bottom-4 left-4 md:bottom-6 md:left-6 w-[calc(100vw-2rem)] md:w-96 h-[calc(100vh-2rem)] md:h-[600px] max-h-[600px] bg-card border border-card-border rounded-2xl shadow-2xl flex flex-col z-[9999] overflow-hidden"
+          className={`fixed bg-card border border-card-border rounded-2xl shadow-2xl flex flex-col z-[9999] overflow-hidden transition-all duration-300 ${
+            isFullscreen
+              ? 'inset-4 md:inset-8'
+              : 'bottom-4 left-4 md:bottom-6 md:left-6 w-[calc(100vw-2rem)] md:w-96 h-[calc(100vh-2rem)] md:h-[600px] max-h-[600px]'
+          }`}
           style={{ position: 'fixed' }}
         >
           {/* Header */}
           <div className="bg-primary px-4 py-3">
             {/* Title Row */}
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 relative">
                 <MessageCircle className="w-5 h-5 text-primary-foreground" />
+                {nextMessageIn !== null && nextMessageIn > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {nextMessageIn}
+                  </span>
+                )}
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-primary-foreground">Kull Support</h3>
+                <h3 className="font-bold text-primary-foreground">
+                  Kull Support
+                  {nextMessageIn !== null && nextMessageIn > 0 && (
+                    <span className="ml-2 text-xs font-normal text-primary-foreground/70">
+                      • Next message in {nextMessageIn}s
+                    </span>
+                  )}
+                </h3>
                 <p className="text-xs text-primary-foreground/80 leading-tight">Has access to entire github repo & website backend, can answer any sales, technical, or support question instantly.</p>
               </div>
             </div>
             
             {/* Action Buttons Row */}
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <DropdownMenu>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -1388,6 +1412,24 @@ export function SupportChat() {
                 <X className="w-4 h-4 mr-1.5" />
                 <span className="text-xs font-medium">Close</span>
               </Button>
+              </div>
+
+              {/* Fullscreen button - desktop only */}
+              <div className="hidden md:block">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
+                  data-testid="button-fullscreen-chat"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1450,21 +1492,22 @@ export function SupportChat() {
               data-testid="button-toggle-suggestions"
             >
               <p className="text-xs font-semibold text-muted-foreground">
-                Quick Questions ({quickQuestions.length})
+                Suggested Questions ({quickQuestions.length})
               </p>
               {showSuggestions ? (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
-              ) : (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
               )}
             </button>
-            {showSuggestions && (
+            {showSuggestions && quickQuestions.length > 0 && (
               <div className="px-4 pb-2 flex flex-wrap gap-2">
                 {quickQuestions.map((question, idx) => (
                   <button
                     key={idx}
                     onClick={() => sendMessage(question)}
-                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground"
+                    disabled={isLoading}
+                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid={`button-quick-question-${idx}`}
                   >
                     {question}
