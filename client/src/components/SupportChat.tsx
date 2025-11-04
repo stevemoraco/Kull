@@ -712,21 +712,36 @@ export function SupportChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Questions (always visible) */}
-          <div className="px-4 py-2 border-t border-border bg-muted/30">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Quick Questions:</p>
-            <div className="flex flex-wrap gap-2">
-              {quickQuestions.map((question, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => sendMessage(question)}
-                  className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground"
-                  data-testid={`button-quick-question-${idx}`}
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
+          {/* Quick Questions with toggle */}
+          <div className="border-t border-border bg-muted/30">
+            <button
+              onClick={() => setShowSuggestions(!showSuggestions)}
+              className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              data-testid="button-toggle-suggestions"
+            >
+              <p className="text-xs font-semibold text-muted-foreground">
+                Quick Questions ({quickQuestions.length})
+              </p>
+              {showSuggestions ? (
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              )}
+            </button>
+            {showSuggestions && (
+              <div className="px-4 pb-2 flex flex-wrap gap-2">
+                {quickQuestions.map((question, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => sendMessage(question)}
+                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground"
+                    data-testid={`button-quick-question-${idx}`}
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Input */}
