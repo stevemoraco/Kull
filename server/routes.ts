@@ -12,6 +12,9 @@ import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
 import { getProviderConfig } from "@shared/culling/providers";
 import Stripe from "stripe";
 import { GenerateReportSchema, generateNarrative, summarize } from "./report";
+import { sendEmail } from "./emailService";
+import { emailTemplatesReport } from "./emailTemplatesReport";
+import { writeSidecars } from "./xmpWriter";
 import { runBatches } from "./orchestrator";
 import { submitOpenAIBatch } from "./providers/openai";
 
@@ -811,7 +814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       const { model, images, prompt } = bodySchema.parse(req.body);
 
-      await runBatches({
+      const ratings = await runBatches({
         providerId: 'openai-gpt-5',
         imageIds: images.map((i: any) => i.id),
         toPayload: async (id) => {
@@ -826,7 +829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         concurrency: 3,
         maxRetries: 5,
       });
-      res.json({ ok: true });
+      res.json({ ok: true, ratings });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid run payload', issues: error.flatten() });
@@ -843,17 +846,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = process.env.OPENAI_API_KEY;
       const narrative = await generateNarrative({ shootName, ratings }, apiKey);
       const stats = summarize(ratings);
-      res.json({
+      const payload = {
         shootName,
         narrative,
         stats,
-      });
+      };
+      // Optionally email the report to the user
+      try {
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        if (user?.email) {
+          const tpl = emailTemplatesReport.shootReport(shootName, narrative, {
+            totalImages: stats.totalImages,
+            heroCount: stats.heroCount,
+            keeperCount: stats.keeperCount,
+          });
+          await sendEmail(user.email, tpl.subject, tpl.html, tpl.text);
+        }
+      } catch (e) {
+        console.warn('report email failed', e);
+      }
+      res.json(payload);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid report payload', issues: error.flatten() });
       }
       console.error('report generate error', error);
       res.status(500).json({ message: 'Failed to generate report' });
+    }
+  });
+
+  // Apply metadata by writing XMP sidecars on the server (when running locally)
+  app.post('/api/kull/metadata/write', isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        baseDir: z.string().min(1),
+        updates: z.array(z.object({
+          imageId: z.string().min(1),
+          filename: z.string().optional(),
+          starRating: z.number().int().min(0).max(5).optional(),
+          colorLabel: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+        })),
+      });
+      const { baseDir, updates } = schema.parse(req.body);
+      const results = await writeSidecars(baseDir, updates);
+      res.json({ ok: true, results });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid metadata payload', issues: error.flatten() });
+      }
+      console.error('write sidecars error', error);
+      res.status(500).json({ message: 'Failed to write XMP sidecars' });
     }
   });
 

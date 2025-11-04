@@ -4,7 +4,7 @@ export type SubmitBatchFn = (args: {
   providerId: string;
   images: { id: string; url?: string; b64?: string }[];
   prompt: string;
-}) => Promise<{ ok: boolean; retryAfterMs?: number }>;
+}) => Promise<{ ok: boolean; retryAfterMs?: number; ratings?: any[] }>;
 
 export async function runBatches(args: {
   providerId: string;
@@ -14,7 +14,7 @@ export async function runBatches(args: {
   submit: SubmitBatchFn;
   concurrency?: number;
   maxRetries?: number;
-}): Promise<void> {
+}): Promise<any[]> {
   const provider = getProvider(args.providerId);
   if (!provider) throw new Error("Unknown provider");
   const size = provider.maxBatchImages;
@@ -26,13 +26,14 @@ export async function runBatches(args: {
   const concurrency = Math.max(args.concurrency ?? 3, 1);
   let index = 0;
   const inFlight: Promise<void>[] = [];
+  const allRatings: any[] = [];
 
   const runOne = async (ids: string[]) => {
     const payload = await Promise.all(ids.map(args.toPayload));
     let attempt = 0;
     while (attempt <= (args.maxRetries ?? 5)) {
       const res = await args.submit({ providerId: args.providerId, images: payload, prompt: args.prompt });
-      if (res.ok) return;
+      if (res.ok) { if (Array.isArray(res.ratings)) allRatings.push(...res.ratings); return; }
       const backoff = res.retryAfterMs ?? (2 ** attempt) * 1000 + Math.floor(Math.random() * 500);
       await new Promise((r) => setTimeout(r, backoff));
       attempt += 1;
@@ -49,5 +50,5 @@ export async function runBatches(args: {
 
   for (let c = 0; c < concurrency; c++) inFlight.push(pump());
   await Promise.all(inFlight);
+  return allRatings;
 }
-

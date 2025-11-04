@@ -7,6 +7,7 @@ final class RunController: ObservableObject {
     @Published var processed = 0
     @Published var total = 0
     private let apple = AppleIntelligenceService()
+    private let notifier = RunNotifier()
 
     func run(folder: URL, prompt: String) async {
         do {
@@ -42,7 +43,8 @@ final class RunController: ObservableObject {
         } catch {
             // no-op
         }
+        // Generate a quick report summary and notify
         isRunning = false
+        notifier.notifyCompletion(processed: processed, total: total)
     }
 }
-
