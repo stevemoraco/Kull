@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useToast } from "@/hooks/use-toast";
 import { SupportChat } from "@/components/SupportChat";
+import { hasPaidAccess, getAccessDenialReason } from "@/lib/accessControl";
+import type { User } from "@shared/schema";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
@@ -33,7 +35,9 @@ import SharedReport from "@/pages/SharedReport";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const typedUser = user as User;
   const isAdmin = user?.email === 'steve@lander.media';
+  const hasAccess = hasPaidAccess(typedUser);
   const { toast } = useToast();
 
   // Global WebSocket sync integration
@@ -90,21 +94,210 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/download" component={Download} />
 
-      {/* Marketplace routes */}
-      <Route path="/marketplace" component={Marketplace} />
-      <Route path="/marketplace/:id" component={PromptDetail} />
-      <Route path="/my-prompts" component={MyPrompts} />
+      {/* Marketplace routes - require paid access */}
+      <Route path="/marketplace">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <Marketplace />;
+        }}
+      </Route>
+      <Route path="/marketplace/:id">
+        {(params) => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <PromptDetail />;
+        }}
+      </Route>
+      <Route path="/my-prompts">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <MyPrompts />;
+        }}
+      </Route>
 
-      {/* Shoot progress page */}
-      <Route path="/shoots/:shootId" component={ShootProgress} />
+      {/* Shoot progress page - require paid access */}
+      <Route path="/shoots/:shootId">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <ShootProgress />;
+        }}
+      </Route>
 
-      {/* Device authentication routes */}
-      <Route path="/device-auth" component={DeviceAuth} />
-      <Route path="/settings/devices" component={DeviceSessions} />
+      {/* Device authentication routes - require paid access */}
+      <Route path="/device-auth">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <DeviceAuth />;
+        }}
+      </Route>
+      <Route path="/settings/devices">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <DeviceSessions />;
+        }}
+      </Route>
 
-      {/* Report routes */}
+      {/* Report routes - require paid access (except shared reports) */}
       <Route path="/reports/shared/:token" component={SharedReport} />
-      <Route path="/reports/:id" component={ReportDetail} />
+      <Route path="/reports/:id">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <ReportDetail />;
+        }}
+      </Route>
       <Route path="/reports">
         {() => {
           if (isLoading) {
@@ -119,11 +312,22 @@ function Router() {
             window.location.href = '/landing';
             return null;
           }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
           return <Reports />;
         }}
       </Route>
 
-      {/* Credits page - authenticated users only */}
+      {/* Credits page - require paid access */}
       <Route path="/credits">
         {() => {
           if (isLoading) {
@@ -137,6 +341,17 @@ function Router() {
           if (!isAuthenticated) {
             window.location.href = '/landing';
             return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
           }
           return <Credits />;
         }}

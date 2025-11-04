@@ -184,3 +184,104 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+/**
+ * Middleware to check if user has paid access (active subscription, active trial, or staff)
+ * Requires isAuthenticated middleware to run first
+ */
+export const hasPaidAccessMiddleware: RequestHandler = async (req, res, next) => {
+  const sessionUser = req.user as any;
+
+  if (!sessionUser?.claims?.sub) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Get full user data from database
+  const user = await storage.getUser(sessionUser.claims.sub);
+
+  if (!user) {
+    return res.status(401).json({ message: "User not found" });
+  }
+
+  // Staff access via @lander.media email
+  if (user.email?.endsWith('@lander.media')) {
+    return next();
+  }
+
+  // Active subscription
+  if (user.subscriptionStatus === 'active') {
+    return next();
+  }
+
+  // Active trial (check expiration)
+  if (user.subscriptionStatus === 'trial') {
+    if (!user.trialEndsAt) {
+      return res.status(403).json({
+        message: "This feature requires an active subscription or trial",
+        reason: "trial_expired"
+      });
+    }
+    const trialEnd = new Date(user.trialEndsAt);
+    const now = new Date();
+    if (trialEnd > now) {
+      return next(); // Trial still active
+    }
+  }
+
+  // No paid access
+  return res.status(403).json({
+    message: "This feature requires an active subscription or trial",
+    reason: user.subscriptionStatus === 'trial' ? 'trial_expired' : 'no_active_subscription'
+  });
+};
+
+/**
+ * Middleware to check paid access for device-authenticated requests
+ * Requires device token verification to run first
+ * Expects req.user.id to be set by device token middleware
+ */
+export const hasPaidAccessDevice: RequestHandler = async (req, res, next) => {
+  const deviceUser = req.user as any;
+
+  if (!deviceUser?.id) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // Get full user data from database
+  const user = await storage.getUser(deviceUser.id);
+
+  if (!user) {
+    return res.status(401).json({ error: "User not found" });
+  }
+
+  // Staff access via @lander.media email
+  if (user.email?.endsWith('@lander.media')) {
+    return next();
+  }
+
+  // Active subscription
+  if (user.subscriptionStatus === 'active') {
+    return next();
+  }
+
+  // Active trial (check expiration)
+  if (user.subscriptionStatus === 'trial') {
+    if (!user.trialEndsAt) {
+      return res.status(403).json({
+        error: "This feature requires an active subscription or trial",
+        reason: "trial_expired"
+      });
+    }
+    const trialEnd = new Date(user.trialEndsAt);
+    const now = new Date();
+    if (trialEnd > now) {
+      return next(); // Trial still active
+    }
+  }
+
+  // No paid access
+  return res.status(403).json({
+    error: "This feature requires an active subscription or trial",
+    reason: user.subscriptionStatus === 'trial' ? 'trial_expired' : 'no_active_subscription'
+  });
+};

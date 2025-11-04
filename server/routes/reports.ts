@@ -3,16 +3,9 @@ import { db } from '../db';
 import { shootReports, sharedReportLinks, users, creditTransactions } from '@shared/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import crypto from 'crypto';
+import { isAuthenticated, hasPaidAccessMiddleware } from '../replitAuth';
 
 const router = Router();
-
-// Middleware to check authentication
-const isAuthenticated = (req: any, res: Response, next: Function) => {
-  if (!req.user || !req.user.claims?.sub) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-  next();
-};
 
 // Native app flow:
 // 1. User completes photo culling in app
@@ -27,8 +20,9 @@ const isAuthenticated = (req: any, res: Response, next: Function) => {
  * GET /api/reports
  * Get all reports for authenticated user
  * Query params: page (default 1), limit (default 20), shootName (filter)
+ * Requires paid access
  */
-router.get('/', isAuthenticated, async (req: any, res: Response) => {
+router.get('/', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const page = parseInt(req.query.page as string) || 1;
@@ -89,8 +83,9 @@ router.get('/', isAuthenticated, async (req: any, res: Response) => {
  * GET /api/reports/:id
  * Get full report details
  * Must be report owner
+ * Requires paid access
  */
-router.get('/:id', isAuthenticated, async (req: any, res: Response) => {
+router.get('/:id', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const reportId = req.params.id;
@@ -120,10 +115,10 @@ router.get('/:id', isAuthenticated, async (req: any, res: Response) => {
 /**
  * POST /api/reports
  * Create new report (called by native app)
- * Requires authentication (user JWT or device JWT)
+ * Requires authentication (user JWT or device JWT) and paid access
  * Deducts credits for report generation
  */
-router.post('/', isAuthenticated, async (req: any, res: Response) => {
+router.post('/', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const {
@@ -229,8 +224,9 @@ router.post('/', isAuthenticated, async (req: any, res: Response) => {
  * DELETE /api/reports/:id
  * Soft delete report (actually hard delete for now)
  * Must be report owner
+ * Requires paid access
  */
-router.delete('/:id', isAuthenticated, async (req: any, res: Response) => {
+router.delete('/:id', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const reportId = req.params.id;
@@ -265,8 +261,9 @@ router.delete('/:id', isAuthenticated, async (req: any, res: Response) => {
  * POST /api/reports/:id/share
  * Generate shareable link for report
  * Body: { expiresIn?: number } (seconds, default 7 days)
+ * Requires paid access
  */
-router.post('/:id/share', isAuthenticated, async (req: any, res: Response) => {
+router.post('/:id/share', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const reportId = req.params.id;

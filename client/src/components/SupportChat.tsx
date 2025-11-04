@@ -387,6 +387,17 @@ export function SupportChat() {
     return defaultId;
   });
 
+  // Track session start time for accurate session length calculation
+  const [sessionStartTime, setSessionStartTime] = useState<number>(() => {
+    const stored = localStorage.getItem('kull-session-start-time');
+    if (stored) {
+      return parseInt(stored, 10);
+    }
+    const now = Date.now();
+    localStorage.setItem('kull-session-start-time', now.toString());
+    return now;
+  });
+
   // Get current session
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const messages = currentSession?.messages || [];
@@ -732,9 +743,14 @@ export function SupportChat() {
     };
   }, []);
 
-  // Save current session ID to localStorage whenever it changes
+  // Save current session ID and reset session start time whenever session changes
   useEffect(() => {
     localStorage.setItem('kull-current-session-id', currentSessionId);
+
+    // Reset session start time when switching to a new session
+    const now = Date.now();
+    setSessionStartTime(now);
+    localStorage.setItem('kull-session-start-time', now.toString());
   }, [currentSessionId]);
 
   // Save chat open state to localStorage whenever it changes
@@ -1469,6 +1485,7 @@ export function SupportChat() {
           pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
           allSessions: sessions, // Send ALL previous sessions for this user
           sessionId: currentSessionId,
+          sessionStartTime, // For accurate session length calculation
         }),
       });
 

@@ -12,6 +12,7 @@ import {
   deviceSessions,
   shootReports,
   shootProgress,
+  globalSettings,
   type User,
   type UpsertUser,
   type Referral,
@@ -38,6 +39,8 @@ import {
   type InsertShootReport,
   type ShootProgress,
   type InsertShootProgress,
+  type GlobalSetting,
+  type InsertGlobalSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, lte, and, isNull, gte, sql, desc } from "drizzle-orm";
@@ -154,6 +157,11 @@ export interface IStorage {
   getShootProgress(shootId: string): Promise<ShootProgress | undefined>;
   updateShootProgress(shootId: string, updates: Partial<InsertShootProgress>): Promise<ShootProgress>;
   deleteShootProgress(shootId: string): Promise<void>;
+
+  // Global settings operations
+  getGlobalSetting(key: string): Promise<string | null>;
+  setGlobalSetting(key: string, value: string, userId: string): Promise<GlobalSetting>;
+  getAllGlobalSettings(): Promise<GlobalSetting[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1066,6 +1074,40 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShootProgress(shootId: string): Promise<void> {
     await db.delete(shootProgress).where(eq(shootProgress.shootId, shootId));
+  }
+
+  // Global settings operations
+  async getGlobalSetting(key: string): Promise<string | null> {
+    const [setting] = await db
+      .select()
+      .from(globalSettings)
+      .where(eq(globalSettings.key, key));
+    return setting?.value || null;
+  }
+
+  async setGlobalSetting(key: string, value: string, userId: string): Promise<GlobalSetting> {
+    const [setting] = await db
+      .insert(globalSettings)
+      .values({
+        key,
+        value,
+        updatedBy: userId,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: globalSettings.key,
+        set: {
+          value,
+          updatedBy: userId,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return setting;
+  }
+
+  async getAllGlobalSettings(): Promise<GlobalSetting[]> {
+    return db.select().from(globalSettings);
   }
 }
 

@@ -1,9 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { hasPaidAccess } from "@/lib/accessControl";
+import type { User } from "@shared/schema";
 
 export function Footer() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [location, setLocation] = useLocation();
+  const typedUser = user as User;
+  const hasAccess = hasPaidAccess(typedUser);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -36,13 +40,15 @@ export function Footer() {
     }
   };
 
-  const productLinks = [
+  const allProductLinks = [
     { name: "Features", href: "/#features", isSection: true, sectionId: "features" },
-    { name: "Marketplace", href: "/marketplace", isSection: false },
+    { name: "Marketplace", href: "/marketplace", isSection: false, requiresPaid: true },
     { name: "Pricing", href: "/#pricing", isSection: true, sectionId: "pricing" },
     { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
     { name: "Download Apps", href: "/download", isSection: false }
   ];
+
+  const productLinks = allProductLinks.filter(link => !link.requiresPaid || hasAccess);
 
   const companyLinks = [
     { name: "About", href: "/about" },
@@ -50,13 +56,15 @@ export function Footer() {
     { name: "Support", href: "/support" }
   ];
 
-  const accountLinks = [
+  const allAccountLinks = [
     { name: "Dashboard", href: "/dashboard", isSection: false },
     { name: "My Account", href: "/", isSection: false },
-    { name: "My Prompts", href: "/my-prompts", isSection: false },
+    { name: "My Prompts", href: "/my-prompts", isSection: false, requiresPaid: true },
     { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
     { name: "Download Apps", href: "/download", isSection: false }
   ];
+
+  const accountLinks = allAccountLinks.filter(link => !link.requiresPaid || hasAccess);
 
   const legalLinks = [
     { name: "Privacy Policy", href: "/privacy" },

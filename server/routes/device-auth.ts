@@ -14,6 +14,7 @@ import {
   verifyRefreshToken,
 } from '../auth/jwt';
 import type { DeviceAuthRequest, DeviceTokenResponse } from '@shared/types/device';
+import { isAuthenticated, hasPaidAccessMiddleware, hasPaidAccessDevice } from '../replitAuth';
 
 const router = Router();
 
@@ -231,9 +232,9 @@ router.get('/status/:code', async (req: Request, res: Response) => {
 /**
  * POST /api/device-auth/approve
  * Browser endpoint: User approves device after logging in
- * Requires authentication via session (not device token)
+ * Requires authentication via session (not device token) and paid access
  */
-router.post('/approve', async (req: any, res: Response) => {
+router.post('/approve', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     // Check if user is authenticated via session
     if (!req.user?.claims?.sub) {
@@ -360,7 +361,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
  * Revoke a device session (logout)
  * Can be called by the device itself or by the user from web
  */
-router.post('/revoke', verifyDeviceToken, async (req: any, res: Response) => {
+router.post('/revoke', verifyDeviceToken, hasPaidAccessDevice, async (req: any, res: Response) => {
   try {
     const deviceId = req.body.deviceId || req.user.deviceId;
 
@@ -388,9 +389,9 @@ router.post('/revoke', verifyDeviceToken, async (req: any, res: Response) => {
 /**
  * GET /api/device-auth/sessions
  * Get all active device sessions for the authenticated user
- * Requires device token authentication
+ * Requires device token authentication and paid access
  */
-router.get('/sessions', verifyDeviceToken, async (req: any, res: Response) => {
+router.get('/sessions', verifyDeviceToken, hasPaidAccessDevice, async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
     const currentDeviceId = req.user.deviceId;
@@ -418,7 +419,7 @@ router.get('/sessions', verifyDeviceToken, async (req: any, res: Response) => {
  * POST /api/device-auth/revoke-all
  * Revoke all device sessions except the current one
  */
-router.post('/revoke-all', verifyDeviceToken, async (req: any, res: Response) => {
+router.post('/revoke-all', verifyDeviceToken, hasPaidAccessDevice, async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
     const currentDeviceId = req.user.deviceId;
@@ -451,7 +452,7 @@ router.post('/revoke-all', verifyDeviceToken, async (req: any, res: Response) =>
  * POST /api/device-auth/update-push-token
  * Update push notification token for a device
  */
-router.post('/update-push-token', verifyDeviceToken, async (req: any, res: Response) => {
+router.post('/update-push-token', verifyDeviceToken, hasPaidAccessDevice, async (req: any, res: Response) => {
   try {
     const { pushToken } = req.body;
     const deviceId = req.user.deviceId;

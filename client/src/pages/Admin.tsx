@@ -14,6 +14,7 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 import { ChatUsersView } from "@/components/admin/ChatUsersView";
 import { UserSessionsView } from "@/components/admin/UserSessionsView";
 import { SessionDetailView } from "@/components/admin/SessionDetailView";
+import ModelSelectionCard from "@/components/admin/ModelSelectionCard";
 
 interface Analytics {
   totalUsers: number;
@@ -422,6 +423,9 @@ export default function Admin() {
             )}
           </CardContent>
         </Card>
+
+        {/* Model Selection Settings */}
+        <ModelSelectionCard />
 
         <Card data-testid="card-email-testing">
           <CardHeader>

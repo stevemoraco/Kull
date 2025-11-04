@@ -304,5 +304,16 @@ export const sharedReportLinks = pgTable("shared_report_links", {
 export type SharedReportLink = typeof sharedReportLinks.$inferSelect;
 export type InsertSharedReportLink = typeof sharedReportLinks.$inferInsert;
 
+// Global settings table for platform-wide configuration
+export const globalSettings = pgTable("global_settings", {
+  key: varchar("key").primaryKey(), // e.g., 'chat_model'
+  value: text("value").notNull(), // e.g., 'gpt-5-nano'
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: varchar("updated_by").references(() => users.id), // userId who made the change
+});
+
+export type GlobalSetting = typeof globalSettings.$inferSelect;
+export type InsertGlobalSetting = typeof globalSettings.$inferInsert;
+
 // Re-export email queue types
 export * from "./emailQueue";

@@ -525,19 +525,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message is required" });
       }
 
-      // Get user's preferred chat model (default: gpt-5-nano)
+      // Get chat model - priority: global setting > user preference > default
       const userId = req.user?.claims?.sub;
       let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
 
-      if (userId) {
-        try {
+      try {
+        // First check global admin setting (platform-wide)
+        const globalModel = await storage.getGlobalSetting('chat_model');
+        if (globalModel && ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'].includes(globalModel)) {
+          preferredModel = globalModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
+          console.log(`[Chat] Using global admin setting: ${preferredModel}`);
+        } else if (userId) {
+          // Fall back to user preference if no global setting
           const user = await storage.getUser(userId);
           if (user?.preferredChatModel) {
             preferredModel = user.preferredChatModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
+            console.log(`[Chat] Using user preference: ${preferredModel}`);
           }
-        } catch (err) {
-          console.error('[Chat] Error fetching user model preference:', err);
         }
+      } catch (err) {
+        console.error('[Chat] Error fetching model preference:', err);
       }
 
       console.log(`[Chat] Using model: ${preferredModel} for user: ${userId || 'anonymous'}`);
@@ -740,10 +747,10 @@ ${userActivity.map((event: any, idx: number) => {
             }
           }
           
-          // Calculate session length from request body if provided
-          const sessionLength = req.body.sessionStartTime 
-            ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000) 
-            : undefined;
+          // Calculate session length from request body if provided, default to 0
+          const sessionLength = req.body.sessionStartTime
+            ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000)
+            : 0;
 
           await storage.trackSupportQuery({
             sessionId,
@@ -1367,12 +1374,13 @@ ${contextMarkdown}`;
             tokensIn,
             tokensOut,
             cost: cost.toString(),
-            model: 'gpt-5-mini',
+            model: preferredModel,
             device,
             browser,
             city,
             state,
             country,
+            sessionLength: 0,
           });
 
           console.log(`[Welcome] Tracked greeting: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
@@ -1562,37 +1570,21 @@ ${contextMarkdown}`;
 
   // Helper function to generate consistent user keys
   // For registered users: returns userId
-  // For anonymous users: returns composite key from metadata + session length
+  // For anonymous users: returns composite key from metadata (device, browser, location)
+  // NOTE: Session length is NOT part of the key to ensure matching across queries and sessions
   const generateUserKey = (data: any): string => {
     if (data.userId) {
       return data.userId; // Registered users: use userId
     }
 
-    // Anonymous users: generate composite key from metadata
-    // Calculate session length bucket
-    let sessionLengthBucket: string;
-    if (data.sessionLength !== null && data.sessionLength !== undefined) {
-      // For queries: sessionLength is in seconds
-      const durationMinutes = data.sessionLength / 60;
-      sessionLengthBucket = getSessionLengthBucket(durationMinutes);
-    } else if (data.createdAt && data.updatedAt) {
-      // For sessions: calculate from timestamps
-      const sessionStart = new Date(data.createdAt).getTime();
-      const sessionEnd = new Date(data.updatedAt).getTime();
-      const durationMinutes = (sessionEnd - sessionStart) / 1000 / 60;
-      sessionLengthBucket = getSessionLengthBucket(durationMinutes);
-    } else {
-      sessionLengthBucket = '0-1min'; // Default
-    }
-
-    // Create composite key for anonymous users based on metadata + session length
+    // Anonymous users: generate composite key from metadata only
+    // Session length is excluded from key to prevent matching issues
     const parts = [
       data.device || 'Unknown Device',
       data.browser || 'Unknown Browser',
       data.city || '',
       data.state || '',
       data.country || 'Unknown Location',
-      sessionLengthBucket
     ].filter(Boolean);
 
     return `anon_${parts.join('_').replace(/\s+/g, '_')}`;
@@ -1622,6 +1614,45 @@ ${contextMarkdown}`;
     } catch (error: any) {
       console.error("Error in debug endpoint:", error);
       res.status(500).json({ message: "Failed: " + error.message });
+    }
+  });
+
+  // Admin endpoints for global settings
+  app.get('/api/admin/settings', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { key } = req.query;
+
+      if (key) {
+        // Get specific setting
+        const value = await storage.getGlobalSetting(key as string);
+        res.json({ key, value });
+      } else {
+        // Get all settings
+        const settings = await storage.getAllGlobalSettings();
+        res.json(settings);
+      }
+    } catch (error: any) {
+      console.error("Error getting settings:", error);
+      res.status(500).json({ message: "Failed to get settings: " + error.message });
+    }
+  });
+
+  app.post('/api/admin/settings', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { key, value } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!key || !value) {
+        return res.status(400).json({ message: "Key and value are required" });
+      }
+
+      const setting = await storage.setGlobalSetting(key, value, userId);
+      console.log(`[Admin] Setting updated by ${userId}: ${key} = ${value}`);
+
+      res.json(setting);
+    } catch (error: any) {
+      console.error("Error setting setting:", error);
+      res.status(500).json({ message: "Failed to save setting: " + error.message });
     }
   });
 
@@ -1662,13 +1693,20 @@ ${contextMarkdown}`;
           const userDetails = userMap.get(session.userId);
           displayName = userDetails?.email || `User ${session.userId}`;
         } else {
-          // For anonymous users, create display name from metadata
+          // For anonymous users, create display name from metadata + session length
+          // Calculate session length for display
+          const sessionStart = new Date(session.createdAt).getTime();
+          const sessionEnd = new Date(session.updatedAt).getTime();
+          const durationMinutes = (sessionEnd - sessionStart) / 1000 / 60;
+          const sessionLengthLabel = getSessionLengthBucket(durationMinutes);
+
           const parts = [
             session.device || 'Unknown Device',
             session.browser || 'Unknown Browser',
             session.city || '',
             session.state || '',
-            session.country || 'Unknown Location'
+            session.country || 'Unknown Location',
+            `(${sessionLengthLabel})`
           ].filter(Boolean);
           displayName = parts.join(' • ');
         }
@@ -1715,21 +1753,35 @@ ${contextMarkdown}`;
           };
           chatUser.device = session.device;
           chatUser.browser = session.browser;
+          chatUser.ipAddress = session.ipAddress; // Keep IP address updated for anonymous users
         }
+      });
+
+      // Create sessionId -> userKey mapping for direct lookup
+      const sessionIdToUserKey = new Map<string, string>();
+      allSessions.forEach(session => {
+        const userKey = generateUserKey(session);
+        sessionIdToUserKey.set(session.id, userKey);
       });
 
       // Aggregate costs and tokens per user from support queries
       console.log(`[Admin] Aggregating costs from ${allQueries.length} queries into ${chatUserMap.size} users`);
       allQueries.forEach(query => {
-        // Use helper to generate consistent user key
+        // Priority matching order:
+        // 1. Direct sessionId match (most accurate)
+        // 2. Email match for logged-in users without userId
+        // 3. Composite key match (fallback)
         let userKey: string;
 
-        // For queries with email but no userId, try to match to existing user
-        if (query.userEmail && !query.userId) {
+        if (query.sessionId && sessionIdToUserKey.has(query.sessionId)) {
+          // Direct sessionId match - highest priority
+          userKey = sessionIdToUserKey.get(query.sessionId)!;
+        } else if (query.userEmail && !query.userId) {
+          // Email match for logged-in users
           const matchedUser = Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail);
           userKey = matchedUser?.userKey || generateUserKey(query);
         } else {
-          // For all other cases (has userId, or anonymous), use helper
+          // Fallback to composite key
           userKey = generateUserKey(query);
         }
 
@@ -1741,20 +1793,22 @@ ${contextMarkdown}`;
           chatUser.queryCount = (chatUser.queryCount || 0) + 1;
         } else {
           console.log(`[Admin] WARNING: Query userKey "${userKey}" not found in chatUserMap (available keys: ${Array.from(chatUserMap.keys()).slice(0, 5).join(', ')}...)`);
-          console.log(`[Admin] Query details - userId:${query.userId}, email:${query.userEmail}, device:${query.device}, browser:${query.browser}, city:${query.city}, state:${query.state}, country:${query.country}, sessionLength:${query.sessionLength}`);
+          console.log(`[Admin] Query details - sessionId:${query.sessionId}, userId:${query.userId}, email:${query.userEmail}, device:${query.device}, browser:${query.browser}, city:${query.city}, state:${query.state}, country:${query.country}, sessionLength:${query.sessionLength}`);
         }
       });
 
       // Convert to array and sort by last activity
       const chatUsers = Array.from(chatUserMap.values()).map(user => {
-        const queryCount = user.queryCount || 1; // Avoid division by zero
+        const totalMessages = user.totalMessages || 1; // Avoid division by zero
         return {
           ...user,
           sessionCount: user.sessions.length,
           totalCost: user.totalCost.toFixed(4),
-          avgCostPerMessage: (user.totalCost / queryCount).toFixed(6),
-          avgTokensIn: Math.round((user.totalTokensIn || 0) / queryCount),
-          avgTokensOut: Math.round((user.totalTokensOut || 0) / queryCount),
+          avgCostPerMessage: (user.totalCost / totalMessages).toFixed(6),
+          avgTokensIn: Math.round((user.totalTokensIn || 0) / totalMessages),
+          avgTokensOut: Math.round((user.totalTokensOut || 0) / totalMessages),
+          totalTokensIn: user.totalTokensIn || 0,
+          totalTokensOut: user.totalTokensOut || 0,
         };
       }).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 

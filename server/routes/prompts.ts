@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
 import type { CullingProfile, CreatePromptData, PromptSearchFilters } from "@shared/types/marketplace";
+import { isAuthenticated, hasPaidAccessMiddleware } from "../replitAuth";
 
 const router = Router();
 
@@ -23,16 +24,8 @@ const voteSchema = z.object({
   value: z.union([z.literal(1), z.literal(-1)]),
 });
 
-// Middleware to check authentication
-const requireAuth = (req: any, res: Response, next: Function) => {
-  if (!req.user) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-  next();
-};
-
-// GET /api/prompts - List all prompts with filters
-router.get("/", async (req: Request, res: Response) => {
+// GET /api/prompts - List all prompts with filters (require paid access)
+router.get("/", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, res: Response) => {
   try {
     const { profile, tags, featured, authorId, query, sortBy } = req.query;
 
@@ -108,8 +101,8 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/prompts/:id - Get single prompt details
-router.get("/:id", async (req: Request, res: Response) => {
+// GET /api/prompts/:id - Get single prompt details (require paid access)
+router.get("/:id", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const prompt = await storage.getPrompt(id);
@@ -142,8 +135,8 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/prompts - Create new prompt (authenticated)
-router.post("/", requireAuth, async (req: any, res: Response) => {
+// POST /api/prompts - Create new prompt (require paid access)
+router.post("/", isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const validatedData = createPromptSchema.parse(req.body);
@@ -167,8 +160,8 @@ router.post("/", requireAuth, async (req: any, res: Response) => {
   }
 });
 
-// PATCH /api/prompts/:id - Update prompt (author only)
-router.patch("/:id", requireAuth, async (req: any, res: Response) => {
+// PATCH /api/prompts/:id - Update prompt (author only, require paid access)
+router.patch("/:id", isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const { id } = req.params;
@@ -195,8 +188,8 @@ router.patch("/:id", requireAuth, async (req: any, res: Response) => {
   }
 });
 
-// DELETE /api/prompts/:id - Delete prompt (author only)
-router.delete("/:id", requireAuth, async (req: any, res: Response) => {
+// DELETE /api/prompts/:id - Delete prompt (author only, require paid access)
+router.delete("/:id", isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const { id } = req.params;
@@ -219,8 +212,8 @@ router.delete("/:id", requireAuth, async (req: any, res: Response) => {
   }
 });
 
-// POST /api/prompts/:id/use - Increment usage count
-router.post("/:id/use", async (req: Request, res: Response) => {
+// POST /api/prompts/:id/use - Increment usage count (require paid access)
+router.post("/:id/use", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -238,8 +231,8 @@ router.post("/:id/use", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/prompts/:id/vote - Vote on prompt (authenticated)
-router.post("/:id/vote", requireAuth, async (req: any, res: Response) => {
+// POST /api/prompts/:id/vote - Vote on prompt (require paid access)
+router.post("/:id/vote", isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
   try {
     const userId = req.user.claims.sub;
     const { id } = req.params;
@@ -270,8 +263,8 @@ router.post("/:id/vote", requireAuth, async (req: any, res: Response) => {
   }
 });
 
-// GET /api/prompts/:id/votes - Get vote stats
-router.get("/:id/votes", async (req: Request, res: Response) => {
+// GET /api/prompts/:id/votes - Get vote stats (require paid access)
+router.get("/:id/votes", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

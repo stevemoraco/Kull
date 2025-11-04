@@ -18,6 +18,8 @@ interface ChatUser {
   avgCostPerMessage: string;
   avgTokensIn: number;
   avgTokensOut: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
   lastActivity: string;
   location: {
     city?: string;
@@ -45,14 +47,18 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
   const totalSessions = users?.reduce((sum, u) => sum + u.sessionCount, 0) || 0;
   const totalMessages = users?.reduce((sum, u) => sum + u.totalMessages, 0) || 0;
   const totalCost = users?.reduce((sum, u) => sum + parseFloat(u.totalCost), 0) || 0;
-  const avgCostPerMessage = users && users.length > 0
-    ? (totalCost / users.reduce((sum, u) => sum + u.totalMessages, 0)).toFixed(6)
+  const avgCostPerMessage = totalMessages > 0
+    ? (totalCost / totalMessages).toFixed(6)
     : '0.000000';
-  const avgTokensIn = users && users.length > 0
-    ? Math.round(users.reduce((sum, u) => sum + u.avgTokensIn, 0) / users.length)
+
+  // Calculate global token averages from totals (not average of averages)
+  const globalTotalTokensIn = users?.reduce((sum, u) => sum + u.totalTokensIn, 0) || 0;
+  const globalTotalTokensOut = users?.reduce((sum, u) => sum + u.totalTokensOut, 0) || 0;
+  const avgTokensIn = totalMessages > 0
+    ? Math.round(globalTotalTokensIn / totalMessages)
     : 0;
-  const avgTokensOut = users && users.length > 0
-    ? Math.round(users.reduce((sum, u) => sum + u.avgTokensOut, 0) / users.length)
+  const avgTokensOut = totalMessages > 0
+    ? Math.round(globalTotalTokensOut / totalMessages)
     : 0;
 
   return (
