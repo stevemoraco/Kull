@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, flushSync } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2, Play, Pause } from 'lucide-react';
 import {
@@ -397,12 +397,21 @@ export function SupportChat() {
         if (session.id === currentSessionId) {
           const updatedMessages = typeof newMessages === 'function' ? newMessages(session.messages) : newMessages;
 
-          // Generate title from first user message if still default
+          // ALWAYS generate title from most recent message (user or AI)
           let title = session.title;
-          if (title === 'New Chat' && updatedMessages.length > 1) {
-            const firstUserMsg = updatedMessages.find(m => m.role === 'user');
-            if (firstUserMsg) {
-              title = firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '');
+          if (updatedMessages.length > 0) {
+            // Get the most recent message (last in array) from user or assistant
+            const recentMessages = [...updatedMessages].reverse();
+            const lastMessage = recentMessages.find(m => m.role === 'user' || m.role === 'assistant');
+            if (lastMessage) {
+              // Clean the content - remove markdown links, format nicely
+              let content = lastMessage.content;
+              // Remove markdown links but keep the link text
+              content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+              // Remove other markdown
+              content = content.replace(/[*_~`#]/g, '');
+              // Take first 50 chars
+              title = content.slice(0, 50).trim() + (content.length > 50 ? '...' : '');
             }
           }
 
@@ -1037,9 +1046,13 @@ export function SupportChat() {
                   fullContent += data.content;
                   console.log('[Chat] Added delta, total length now:', fullContent.length);
 
-                  // STREAM TO UI - update greeting in real-time
-                  setLatestGreeting(fullContent);
+                  // STREAM TO UI - update greeting in real-time with immediate flush
+                  flushSync(() => {
+                    setLatestGreeting(fullContent);
+                  });
                 } else if (data.type === 'done') {
+                  // Track when AI last responded (welcome message)
+                  lastAiMessageTimeRef.current = Date.now();
                   console.log('[Chat] Received done event');
                 } else if (data.type === 'error') {
                   console.error('[Chat] Received error event:', data.message);
@@ -1269,19 +1282,33 @@ export function SupportChat() {
 
             // Check if we should send a proactive message
             const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
+            const timeSinceUserMessage = Date.now() - lastUserMessageTimeRef.current;
+            const timeSinceAiMessage = Date.now() - lastAiMessageTimeRef.current;
             const ONE_MINUTE = 60 * 1000;
+            const THIRTY_SECONDS = 30 * 1000;
 
             // Only send if:
             // 1. Tab is visible OR activity was within last minute
             // 2. Chat is open
             // 3. Not currently loading
-            const shouldSendProactive = (isTabVisible || timeSinceActivity < ONE_MINUTE) && isOpen && !isLoading;
+            // 4. Proactive messages are not paused
+            // 5. At least 30 seconds since last user message
+            // 6. At least 30 seconds since last AI message
+            const shouldSendProactive = (isTabVisible || timeSinceActivity < ONE_MINUTE)
+              && isOpen
+              && !isLoading
+              && !isProactiveMessagesPaused
+              && timeSinceUserMessage >= THIRTY_SECONDS
+              && timeSinceAiMessage >= THIRTY_SECONDS;
 
             console.log('[Chat] Countdown reached 0. Should send proactive?', shouldSendProactive, {
               isTabVisible,
               timeSinceActivity: Math.round(timeSinceActivity / 1000) + 's',
+              timeSinceUserMessage: Math.round(timeSinceUserMessage / 1000) + 's',
+              timeSinceAiMessage: Math.round(timeSinceAiMessage / 1000) + 's',
               isOpen,
-              isLoading
+              isLoading,
+              isPaused: isProactiveMessagesPaused
             });
 
             if (shouldSendProactive) {
@@ -1471,14 +1498,16 @@ export function SupportChat() {
                 fullContent += data.content;
                 console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
                 
-                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE
-                setMessages(prev =>
-                  prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: fullContent }
-                      : msg
-                  )
-                );
+                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
+                flushSync(() => {
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    )
+                  );
+                });
 
                 // Check for first link and navigate immediately
                 if (!hasNavigated) {
@@ -1491,20 +1520,27 @@ export function SupportChat() {
                   }
                 }
 
-                // Look for cutoff markers - check for special character first, then plain text
+                // Look for cutoff markers - check multiple patterns to ensure we catch metadata
                 let cutoffIndex = -1;
 
-                // Try to find the Unicode marker ␞
-                cutoffIndex = fullContent.indexOf('␞');
+                // Try multiple patterns to find where the metadata starts:
+                // 1. Unicode marker ␞ (U+241E)
+                const unicodeMarkerIdx = fullContent.indexOf('␞');
 
-                // Fallback: look for FOLLOW_UP_QUESTIONS text
-                if (cutoffIndex === -1) {
-                  // Look for patterns like "\n\nFOLLOW_UP_QUESTIONS" or just "FOLLOW_UP_QUESTIONS"
-                  const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
-                  const match = fullContent.match(followUpPattern);
-                  if (match) {
-                    cutoffIndex = match.index!;
-                  }
+                // 2. FOLLOW_UP_QUESTIONS with various formats (with or without newlines)
+                const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                const followUpMatch = fullContent.match(followUpPattern);
+                const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
+
+                // 3. NEXT_MESSAGE without FOLLOW_UP_QUESTIONS (in case AI skips that part)
+                const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
+                const nextMsgMatch = fullContent.match(nextMsgPattern);
+                const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
+
+                // Use the earliest occurrence of any marker
+                const indices = [unicodeMarkerIdx, followUpIdx, nextMsgIdx].filter(idx => idx !== -1);
+                if (indices.length > 0) {
+                  cutoffIndex = Math.min(...indices);
                 }
 
                 if (cutoffIndex !== -1) {
@@ -1567,32 +1603,46 @@ export function SupportChat() {
                   continue;
                 }
 
-                // No cutoff yet, show all content
+                // No cutoff yet, show all content - flush immediately for smooth streaming
                 console.log('[Chat] Updating message', assistantMessageId, 'with content length:', fullContent.length);
-                setMessages(prev => {
-                  const updated = prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: fullContent }
-                      : msg
-                  );
-                  console.log('[Chat] Messages after update:', updated.length, 'Updated msg found:', updated.some(m => m.id === assistantMessageId));
-                  return updated;
+                flushSync(() => {
+                  setMessages(prev => {
+                    const updated = prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    );
+                    console.log('[Chat] Messages after update:', updated.length, 'Updated msg found:', updated.some(m => m.id === assistantMessageId));
+                    return updated;
+                  });
                 });
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
+                // Track when AI last responded
+                lastAiMessageTimeRef.current = Date.now();
+
                 // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE
                 playCyberpunkDing();
-                
-                // Final cleanup - just in case
-                if (!cutoffDetected) {
-                  let cutoffIndex = fullContent.indexOf('␞');
-                  if (cutoffIndex === -1) {
-                    cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
-                  }
 
-                  if (cutoffIndex !== -1) {
+                // Final cleanup - check for metadata one last time
+                if (!cutoffDetected) {
+                  // Use the same robust detection as in the stream loop
+                  const unicodeMarkerIdx = fullContent.indexOf('␞');
+                  const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                  const followUpMatch = fullContent.match(followUpPattern);
+                  const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
+                  const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
+                  const nextMsgMatch = fullContent.match(nextMsgPattern);
+                  const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
+
+                  const indices = [unicodeMarkerIdx, followUpIdx, nextMsgIdx].filter(idx => idx !== -1);
+                  if (indices.length > 0) {
+                    const cutoffIndex = Math.min(...indices);
                     const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+
+                    console.log('[Chat] Final cleanup - cutoff detected at:', cutoffIndex);
+
                     setMessages(prev =>
                       prev.map(msg =>
                         msg.id === assistantMessageId
@@ -1842,7 +1892,7 @@ export function SupportChat() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-primary-foreground">
                   Kull Support
-                  {nextMessageIn !== null && nextMessageIn > 0 && (
+                  {nextMessageIn !== null && nextMessageIn > 0 && !isProactiveMessagesPaused && (
                     <span className="ml-2 text-xs font-normal text-primary-foreground/70">
                       • Next message in {nextMessageIn}s
                     </span>
@@ -2023,11 +2073,10 @@ export function SupportChat() {
                   <button
                     key={idx}
                     onClick={() => {
-                      console.log('[Chat] Quick question clicked:', question, 'isLoading:', isLoading);
+                      console.log('[Chat] Quick question clicked:', question);
                       sendMessage(question);
                     }}
-                    disabled={isLoading}
-                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground"
                     data-testid={`button-quick-question-${idx}`}
                   >
                     {question}
@@ -2046,13 +2095,12 @@ export function SupportChat() {
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Type your message..."
                 className="flex-1 bg-background border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={isLoading}
                 data-testid="input-chat-message"
               />
               <Button
                 type="submit"
                 size="icon"
-                disabled={!inputValue.trim() || isLoading}
+                disabled={!inputValue.trim()}
                 className="rounded-full"
                 data-testid="button-send-message"
               >

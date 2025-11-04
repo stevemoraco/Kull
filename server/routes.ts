@@ -493,13 +493,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-      res.setHeader('Transfer-Encoding', 'chunked');
-      res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
-      (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
-      
-      // Send initial comment to establish connection
-      res.write(': connected\n\n');
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
 
@@ -588,7 +581,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Signal completion
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-        res.end();
 
         // Track support query in database
         const userEmail = req.user?.claims?.email;
@@ -663,6 +655,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           console.log(`[Chat] Streamed response: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
         }
+        
+        // End response after all tracking is complete
+        res.end();
       } catch (streamError) {
         console.error('[Chat] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
@@ -1099,13 +1094,6 @@ ${contextMarkdown}`;
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-      res.setHeader('Transfer-Encoding', 'chunked');
-      res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
-      (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
-      
-      // Send initial comment to establish connection
-      res.write(': connected\n\n');
 
       // Track the full response for analytics
       let fullResponse = '';
@@ -1190,10 +1178,8 @@ ${contextMarkdown}`;
           console.log('[Welcome] ✅ Response format validated - metadata present');
         }
 
-        console.log('[Welcome] Sending done event to client and closing stream...');
+        console.log('[Welcome] Sending done event to client...');
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-        res.end();
-        console.log('[Welcome] Stream closed');
 
         // Track welcome greeting in database
         const storage = await import('./storage');
@@ -1261,6 +1247,10 @@ ${contextMarkdown}`;
 
           console.log(`[Welcome] Tracked greeting: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
         }
+        
+        // End response after all tracking is complete
+        res.end();
+        console.log('[Welcome] Stream closed');
       } catch (streamError) {
         console.error('[Welcome] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
@@ -1360,6 +1350,9 @@ ${contextMarkdown}`;
                        req.socket?.remoteAddress ||
                        null;
 
+      console.log(`[Chat] Received ${sessions.length} sessions to save`);
+      console.log(`[Chat] Session IDs: ${sessions.map((s: any) => `${s.id} (${s.title}, ${Array.isArray(s.messages) ? s.messages.length : 0} msgs)`).join(', ')}`);
+
       const savedSessions = [];
 
       for (const session of sessions) {
@@ -1426,15 +1419,44 @@ ${contextMarkdown}`;
     }
   });
 
+  // Debug endpoint to check database contents
+  app.get('/api/admin/debug/database', isAuthenticated, async (req: any, res) => {
+    try {
+      const allSessions = await storage.getChatSessions();
+      const allUsers = await db.select().from(storage.users);
+      const allQueries = await db.select().from(supportQueries);
+
+      res.json({
+        sessionsCount: allSessions.length,
+        sessions: allSessions.map(s => ({
+          id: s.id,
+          userId: s.userId,
+          ipAddress: s.ipAddress,
+          title: s.title,
+          messageCount: JSON.parse(s.messages).length,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
+        })),
+        usersCount: allUsers.length,
+        queriesCount: allQueries.length,
+      });
+    } catch (error: any) {
+      console.error("Error in debug endpoint:", error);
+      res.status(500).json({ message: "Failed: " + error.message });
+    }
+  });
+
   // Admin endpoint to get all unique chat users with aggregated stats
   app.get('/api/admin/chat-users', isAuthenticated, async (req: any, res) => {
     try {
       const allSessions = await storage.getChatSessions();
+      console.log(`[Admin] Found ${allSessions.length} total sessions in database`);
 
       // Get all users to map userId to email/name
       const allUsers = await db
         .select()
         .from(storage.users);
+      console.log(`[Admin] Found ${allUsers.length} registered users`);
 
       const userMap = new Map(allUsers.map(u => [u.id, u]));
 
@@ -1443,6 +1465,7 @@ ${contextMarkdown}`;
         .select()
         .from(supportQueries)
         .orderBy(desc(supportQueries.createdAt));
+      console.log(`[Admin] Found ${allQueries.length} support queries for cost tracking`);
 
       // Group sessions by user (userId or IP for anonymous)
       const chatUserMap = new Map<string, any>();
@@ -1451,6 +1474,8 @@ ${contextMarkdown}`;
         const messages = JSON.parse(session.messages);
         const userKey = session.userId || session.ipAddress || 'unknown';
         const isAnonymous = !session.userId;
+
+        console.log(`[Admin] Processing session ${session.id}: userKey=${userKey}, messages=${messages.length}, isAnonymous=${isAnonymous}`);
 
         // Get user details if logged in
         const userDetails = session.userId ? userMap.get(session.userId) : null;

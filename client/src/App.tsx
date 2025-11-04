@@ -25,6 +25,7 @@ function Router() {
     <Switch>
       {/* Public pages accessible to all */}
       <Route path="/landing" component={Landing} />
+      <Route path="/features" component={Landing} /> {/* Redirect /features to /landing */}
       <Route path="/about" component={About} />
       <Route path="/pricing" component={Dashboard} />
       <Route path="/privacy" component={Privacy} />
