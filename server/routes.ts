@@ -599,7 +599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         greetingPrompt += `\nPages visited: ${context.visitedPages.join(', ')}`;
       }
 
-      greetingPrompt += '\n\nMake the greeting:\n- Warm and helpful\n- Reference their current page context naturally\n- If they\'re on pricing, mention you can help with plan questions\n- If they\'re on dashboard, offer to help with getting started\n- If they\'re a returning user (multiple pages), acknowledge that\n- Keep it conversational and under 2-3 sentences\n- Start with a relevant navigation link using FULL https://kullai.com URLs (NOT relative paths, NOT GitHub)\n- Use hash anchors (#section) to link to specific sections when relevant\n- Analyze the repository to determine which pages and section IDs exist';
+      greetingPrompt += '\n\nMake the greeting:\n- Warm and helpful\n- Reference their current page context naturally\n- If they\'re on pricing, mention you can help with plan questions\n- If they\'re on dashboard, offer to help with getting started\n- If they\'re a returning user (multiple pages), acknowledge that\n- Keep it conversational and under 2-3 sentences\n- Include at least 1 markdown link naturally in the greeting to a relevant page using FULL https://kullai.com URLs (NOT relative paths, NOT GitHub)\n- Insert the link wherever it fits naturally in the conversation (don\'t force it at the start)\n- Use hash anchors (#section) to link to specific sections when relevant\n- Analyze the repository to determine which pages and section IDs exist';
 
       const { getChatResponseStream } = await import('./chatService');
       const stream = await getChatResponseStream(greetingPrompt, []);

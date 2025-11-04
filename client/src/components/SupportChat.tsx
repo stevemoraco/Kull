@@ -503,9 +503,9 @@ export function SupportChat() {
     setTranscriptSent(false);
   }, [currentSessionId]);
 
-  // Generate personalized welcome greeting for new sessions
+  // Use pre-generated greeting for new sessions
   useEffect(() => {
-    const generateWelcomeGreeting = async () => {
+    const applyWelcomeGreeting = async () => {
       const currentSession = sessions.find(s => s.id === currentSessionId);
       if (!currentSession) return;
 
@@ -517,6 +517,25 @@ export function SupportChat() {
 
       const welcomeMessageId = currentSession.messages[0].id;
 
+      // Use pre-generated greeting if available
+      if (latestGreeting) {
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === welcomeMessageId
+              ? { ...msg, content: latestGreeting }
+              : msg
+          )
+        );
+
+        // Navigate to first link in greeting
+        const linkMatch = latestGreeting.match(/\[([^\]]+)\]\(([^)]+)\)/);
+        if (linkMatch) {
+          handleLinkClick(linkMatch[2]);
+        }
+        return;
+      }
+
+      // Fallback: generate greeting if none available yet
       try {
         // Gather session context
         const sessionContext = {
@@ -659,8 +678,8 @@ export function SupportChat() {
       }
     };
 
-    generateWelcomeGreeting();
-  }, [currentSessionId, sessions, user]);
+    applyWelcomeGreeting();
+  }, [currentSessionId, sessions, user, latestGreeting]);
 
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
