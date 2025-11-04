@@ -159,6 +159,7 @@ export const chatSessions = pgTable("chat_sessions", {
   title: varchar("title").notNull(),
   messages: text("messages").notNull(), // JSON string of messages
   // Anonymous user metadata for tracking (when userId is null)
+  ipAddress: varchar("ip_address"), // For associating anonymous sessions with users on login
   device: varchar("device"),
   browser: varchar("browser"),
   city: varchar("city"),

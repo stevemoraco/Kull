@@ -602,6 +602,34 @@ export class DatabaseStorage implements IStorage {
   async deleteChatSession(sessionId: string): Promise<void> {
     await db.delete(chatSessions).where(eq(chatSessions.id, sessionId));
   }
+
+  // Associate anonymous sessions with a user based on IP address
+  async associateAnonymousSessionsWithUser(userId: string, ipAddress: string): Promise<number> {
+    // Find all sessions that match this IP and have no userId
+    const anonymousSessions = await db
+      .select()
+      .from(chatSessions)
+      .where(and(
+        eq(chatSessions.ipAddress, ipAddress),
+        isNull(chatSessions.userId)
+      ));
+
+    if (anonymousSessions.length === 0) {
+      return 0;
+    }
+
+    // Update all anonymous sessions to associate with this user
+    await db
+      .update(chatSessions)
+      .set({ userId })
+      .where(and(
+        eq(chatSessions.ipAddress, ipAddress),
+        isNull(chatSessions.userId)
+      ));
+
+    console.log(`[Storage] Associated ${anonymousSessions.length} anonymous sessions with user ${userId}`);
+    return anonymousSessions.length;
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -8,10 +8,12 @@ interface ChatUser {
   userKey: string;
   userId?: string;
   userEmail?: string;
+  userName?: string;
   ipAddress?: string;
   isAnonymous: boolean;
   sessionCount: number;
   totalMessages: number;
+  totalCost: string;
   lastActivity: string;
   location: {
     city?: string;
@@ -23,7 +25,7 @@ interface ChatUser {
 }
 
 interface ChatUsersViewProps {
-  onUserClick: (userKey: string) => void;
+  onUserClick: (userKey: string, userEmail?: string) => void;
 }
 
 export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
@@ -37,6 +39,7 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
 
   const totalSessions = users?.reduce((sum, u) => sum + u.sessionCount, 0) || 0;
   const totalMessages = users?.reduce((sum, u) => sum + u.totalMessages, 0) || 0;
+  const totalCost = users?.reduce((sum, u) => sum + parseFloat(u.totalCost), 0) || 0;
 
   return (
     <div className="space-y-6">
@@ -47,7 +50,7 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -73,6 +76,14 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
             <div className="text-2xl font-bold">{totalMessages}</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalCost.toFixed(4)}</div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -95,12 +106,15 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                     {user.isAnonymous ? (
                       <span className="text-muted-foreground">Anonymous User</span>
                     ) : (
-                      <span>{user.userEmail}</span>
+                      <div>
+                        {user.userName && <div className="font-semibold">{user.userName}</div>}
+                        <div className={user.userName ? 'text-sm text-muted-foreground' : ''}>{user.userEmail}</div>
+                      </div>
                     )}
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  {user.userId && <div>User ID: {user.userId}</div>}
+                  {user.userId && <div className="text-xs">ID: {user.userId.slice(0, 12)}...</div>}
                   {user.ipAddress && <div>IP: {user.ipAddress}</div>}
                   <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex items-center gap-1">
@@ -108,6 +122,9 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="font-medium">{user.totalMessages}</span> messages
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">${user.totalCost}</span> cost
                     </div>
                     <div className="flex items-center gap-1">
                       Last active {formatDistanceToNow(new Date(user.lastActivity), { addSuffix: true })}
@@ -134,7 +151,7 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onUserClick(user.userKey)}
+                onClick={() => onUserClick(user.userKey, user.userEmail)}
               >
                 View All Sessions →
               </Button>

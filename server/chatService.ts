@@ -150,7 +150,10 @@ export async function buildFullPromptMarkdown(
 
 export async function getChatResponseStream(
   userMessage: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  userActivity?: any[],
+  pageVisits?: any[],
+  allSessions?: any[]
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -164,12 +167,39 @@ export async function getChatResponseStream(
     // Fetch repo content (cached per session)
     const repoContent = await fetchRepoContent();
 
-    // Build full instructions with repo content
-    const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
+    // Build context sections
+    let contextSections = '';
 
-    // Build input array with conversation history (no system prompt in input)
+    if (userActivity && userActivity.length > 0) {
+      contextSections += `\n\n<USER_ACTIVITY>\nComplete user activity log (${userActivity.length} events):\n${JSON.stringify(userActivity, null, 2)}\n</USER_ACTIVITY>`;
+    }
+
+    if (pageVisits && pageVisits.length > 0) {
+      contextSections += `\n\n<PAGE_VISITS>\nUser's page visit history (${pageVisits.length} visits):\n${JSON.stringify(pageVisits, null, 2)}\n</PAGE_VISITS>`;
+    }
+
+    if (allSessions && allSessions.length > 0) {
+      contextSections += `\n\n<PREVIOUS_SESSIONS>\nUser's previous chat sessions (${allSessions.length} sessions):\n`;
+      allSessions.forEach((session, idx) => {
+        contextSections += `\n--- Session ${idx + 1}: ${session.title} ---\n`;
+        if (session.messages) {
+          const msgs = typeof session.messages === 'string' ? JSON.parse(session.messages) : session.messages;
+          msgs.forEach((msg: any) => {
+            contextSections += `${msg.role}: ${msg.content}\n`;
+          });
+        }
+      });
+      contextSections += `\n</PREVIOUS_SESSIONS>`;
+    }
+
+    // Build full instructions with repo content AND all context
+    const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${contextSections}\n\n${PROMPT_SUFFIX}`;
+
+    console.log(`[Chat] Instructions size: ${instructions.length} chars (repo: ${repoContent.length}, context: ${contextSections.length})`);
+
+    // Build input array with FULL conversation history (NO TRUNCATION)
     const input = [
-      ...history.slice(-10).map(msg => ({
+      ...history.map(msg => ({
         role: msg.role === 'system' || msg.role === 'developer' ? 'developer' : msg.role,
         content: msg.content,
       })),

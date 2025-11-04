@@ -14,6 +14,73 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 
+// 🔊 CYBERPUNK NOTIFICATION SOUND - Web Audio API
+function playCyberpunkDing() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const now = audioContext.currentTime;
+    
+    // Create oscillators for that futuristic layered sound
+    const osc1 = audioContext.createOscillator();
+    const osc2 = audioContext.createOscillator();
+    const osc3 = audioContext.createOscillator();
+    
+    // Gain nodes for volume control
+    const gain1 = audioContext.createGain();
+    const gain2 = audioContext.createGain();
+    const gain3 = audioContext.createGain();
+    const masterGain = audioContext.createGain();
+    
+    // Layer 1: High frequency ding (2000Hz -> 1500Hz)
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(2000, now);
+    osc1.frequency.exponentialRampToValueAtTime(1500, now + 0.1);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    
+    // Layer 2: Mid frequency (800Hz -> 600Hz)
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(800, now);
+    osc2.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+    gain2.gain.setValueAtTime(0.2, now);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    
+    // Layer 3: Bass punch (200Hz -> 100Hz)
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(200, now);
+    osc3.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+    gain3.gain.setValueAtTime(0.4, now);
+    gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    
+    // Master volume - LOUD ASS
+    masterGain.gain.setValueAtTime(0.8, now);
+    
+    // Connect the audio graph
+    osc1.connect(gain1);
+    osc2.connect(gain2);
+    osc3.connect(gain3);
+    
+    gain1.connect(masterGain);
+    gain2.connect(masterGain);
+    gain3.connect(masterGain);
+    masterGain.connect(audioContext.destination);
+    
+    // Play the sound
+    osc1.start(now);
+    osc2.start(now);
+    osc3.start(now);
+    
+    // Stop after sound completes
+    osc1.stop(now + 0.5);
+    osc2.stop(now + 0.5);
+    osc3.stop(now + 0.5);
+    
+    console.log('🔊 CYBERPUNK DING!');
+  } catch (error) {
+    console.error('Failed to play notification sound:', error);
+  }
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -466,6 +533,11 @@ export function SupportChat() {
   const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [greetingGenerated, setGreetingGenerated] = useState(false);
   const lastUserMessageTimeRef = useRef<number>(Date.now());
+
+  // User activity tracking for proactive messages
+  const lastActivityTimeRef = useRef<number>(Date.now());
+  const [isTabVisible, setIsTabVisible] = useState(true);
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
   // Greeting popover state (for showing when chat is closed)
   const [showGreetingPopover, setShowGreetingPopover] = useState(false);
@@ -929,6 +1001,7 @@ export function SupportChat() {
 
         let fullContent = '';
         let chunkCount = 0;
+        let buffer = ''; // Buffer for incomplete SSE lines
 
         console.log('[Chat] Starting stream read...');
 
@@ -946,7 +1019,12 @@ export function SupportChat() {
           chunkCount++;
           console.log(`[Chat] Chunk #${chunkCount}:`, chunk.substring(0, 100));
 
-          const lines = chunk.split('\n');
+          // Add to buffer and split by lines
+          buffer += chunk;
+          const lines = buffer.split('\n');
+
+          // Keep the last incomplete line in buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -957,6 +1035,9 @@ export function SupportChat() {
                 if (data.type === 'delta' && data.content) {
                   fullContent += data.content;
                   console.log('[Chat] Added delta, total length now:', fullContent.length);
+
+                  // STREAM TO UI - update greeting in real-time
+                  setLatestGreeting(fullContent);
                 } else if (data.type === 'done') {
                   console.log('[Chat] Received done event');
                 } else if (data.type === 'error') {
@@ -1040,6 +1121,9 @@ export function SupportChat() {
             setNextMessageIn(nextMsgSeconds);
 
             console.log('[Chat] First greeting - storing and showing countdown');
+            
+            // 🔊 PLAY CYBERPUNK DING FOR NEW GREETING
+            playCyberpunkDing();
 
             // Show popover if chat is closed
             if (!currentIsOpen) {
@@ -1126,7 +1210,46 @@ export function SupportChat() {
     scrollToBottom();
   }, [messages]);
 
-  // Countdown effect
+  // Initialize notification sound
+  useEffect(() => {
+    // Create notification sound (simple beep using data URI)
+    notificationSoundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTcIGmm98OyfTgwOUqjk77RgGgU7k9n0zH4yBSh+zPLaizsKFlm46+yrWBgMSKXh9L50LAU0gdDy2Ik3CBpqvfDtoVAMDlOo5O+0YBoFO5PZ9M1+MgUofszy2os7ChZZuOvsq1gYDEil4fS+dCwFNIHQ8tiJNwgaarz07aFQDA5TqOTvtGAaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RgGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarz07aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarzw7aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarzw7aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU=');
+  }, []);
+
+  // Track tab visibility
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+      console.log('[Chat] Tab visibility changed:', !document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  // Track user activity (scroll, click, mousemove, keypress)
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityTimeRef.current = Date.now();
+    };
+
+    // Add listeners for various user interactions
+    window.addEventListener('scroll', updateActivity);
+    window.addEventListener('click', updateActivity);
+    window.addEventListener('mousemove', updateActivity);
+    window.addEventListener('keypress', updateActivity);
+    window.addEventListener('touchstart', updateActivity);
+
+    return () => {
+      window.removeEventListener('scroll', updateActivity);
+      window.removeEventListener('click', updateActivity);
+      window.removeEventListener('mousemove', updateActivity);
+      window.removeEventListener('keypress', updateActivity);
+      window.removeEventListener('touchstart', updateActivity);
+    };
+  }, []);
+
+  // Countdown effect with proactive message sending
   useEffect(() => {
     if (nextMessageIn !== null && nextMessageIn > 0) {
       // Clear any existing countdown
@@ -1142,6 +1265,32 @@ export function SupportChat() {
               clearInterval(countdownIntervalRef.current);
               countdownIntervalRef.current = null;
             }
+
+            // Check if we should send a proactive message
+            const timeSinceActivity = Date.now() - lastActivityTimeRef.current;
+            const ONE_MINUTE = 60 * 1000;
+
+            // Only send if:
+            // 1. Tab is visible OR activity was within last minute
+            // 2. Chat is open
+            // 3. Not currently loading
+            const shouldSendProactive = (isTabVisible || timeSinceActivity < ONE_MINUTE) && isOpen && !isLoading;
+
+            console.log('[Chat] Countdown reached 0. Should send proactive?', shouldSendProactive, {
+              isTabVisible,
+              timeSinceActivity: Math.round(timeSinceActivity / 1000) + 's',
+              isOpen,
+              isLoading
+            });
+
+            if (shouldSendProactive) {
+              // Send proactive message - use empty string to trigger AI to continue conversation
+              sendMessage('[Continue conversation naturally based on context]').then(() => {
+                // 🔊 PLAY CYBERPUNK DING FOR PROACTIVE MESSAGE
+                playCyberpunkDing();
+              });
+            }
+
             return null;
           }
           return prev - 1;
@@ -1155,7 +1304,7 @@ export function SupportChat() {
         countdownIntervalRef.current = null;
       }
     };
-  }, [nextMessageIn]);
+  }, [nextMessageIn, isTabVisible, isOpen, isLoading]);
 
   // Reset inactivity timer on any message activity
   const resetInactivityTimer = () => {
@@ -1257,7 +1406,10 @@ export function SupportChat() {
         },
         body: JSON.stringify({
           message: messageText.trim(),
-          history: messages.slice(-5), // Send last 5 messages for context
+          history: messages, // Send FULL conversation history - no truncation
+          userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
+          pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
+          allSessions: sessions, // Send ALL previous sessions for this user
         }),
       });
 
@@ -1412,6 +1564,9 @@ export function SupportChat() {
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
+                // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE
+                playCyberpunkDing();
+                
                 // Final cleanup - just in case
                 if (!cutoffDetected) {
                   let cutoffIndex = fullContent.indexOf('␞');

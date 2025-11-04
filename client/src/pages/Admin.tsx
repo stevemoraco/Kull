@@ -11,6 +11,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign, X, FileCode } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { ChatUsersView } from "@/components/admin/ChatUsersView";
+import { UserSessionsView } from "@/components/admin/UserSessionsView";
+import { SessionDetailView } from "@/components/admin/SessionDetailView";
 
 interface Analytics {
   totalUsers: number;
@@ -79,6 +82,13 @@ export default function Admin() {
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+
+  // Chat history navigation state
+  type ChatView = 'users' | 'sessions' | 'detail';
+  const [chatView, setChatView] = useState<ChatView>('users');
+  const [selectedUserKey, setSelectedUserKey] = useState<string | null>(null);
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(null);
+  const [selectedChatSessionId, setSelectedChatSessionId] = useState<string | null>(null);
   
   const { data: selectedSession } = useQuery<any>({
     queryKey: [`/api/admin/chat-sessions/${selectedSessionId}`],
@@ -437,94 +447,42 @@ export default function Admin() {
           </CardContent>
         </Card>
 
-        {/* All Chat Histories Section */}
-        <Card data-testid="card-chat-histories">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              All Chat Histories ({chatSessions?.length || 0})
-            </CardTitle>
-            <CardDescription>Every conversation stored in the database</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingChatSessions ? (
-              <p className="text-muted-foreground">Loading chat histories...</p>
-            ) : chatSessions && chatSessions.length > 0 ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-5 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
-                  <div>Session / User</div>
-                  <div>Title</div>
-                  <div className="text-right">Messages</div>
-                  <div className="text-right">Last Activity</div>
-                  <div className="text-right">Location</div>
-                </div>
-                {chatSessions.map((session, idx) => {
-                  const getUserDisplay = () => {
-                    if (session.userId) {
-                      return `User ${session.userId.slice(0, 8)}...`;
-                    }
-                    const parts = [];
-                    if (session.device) parts.push(session.device);
-                    if (session.browser) parts.push(session.browser);
-                    return parts.length > 0 ? parts.join(' • ') : 'Anonymous';
-                  };
+        {/* All Chat Histories Section with Drill-Down Navigation */}
+        {chatView === 'users' && (
+          <ChatUsersView
+            onUserClick={(userKey, userEmail) => {
+              setSelectedUserKey(userKey);
+              setSelectedUserEmail(userEmail || null);
+              setChatView('sessions');
+            }}
+          />
+        )}
 
-                  const getLocationDisplay = () => {
-                    const parts = [];
-                    if (session.city) parts.push(session.city);
-                    if (session.state) parts.push(session.state);
-                    if (session.country) parts.push(session.country);
-                    return parts.length > 0 ? parts.join(', ') : '-';
-                  };
+        {chatView === 'sessions' && selectedUserKey && (
+          <UserSessionsView
+            userKey={selectedUserKey}
+            userEmail={selectedUserEmail || undefined}
+            onBack={() => {
+              setChatView('users');
+              setSelectedUserKey(null);
+              setSelectedUserEmail(null);
+            }}
+            onSessionClick={(sessionId) => {
+              setSelectedChatSessionId(sessionId);
+              setChatView('detail');
+            }}
+          />
+        )}
 
-                  const timeSinceUpdate = () => {
-                    const now = new Date();
-                    const updated = new Date(session.updatedAt);
-                    const diffMs = now.getTime() - updated.getTime();
-                    const diffMins = Math.floor(diffMs / 60000);
-                    const diffHours = Math.floor(diffMins / 60);
-                    const diffDays = Math.floor(diffHours / 24);
-                    
-                    if (diffDays > 0) return `${diffDays}d ago`;
-                    if (diffHours > 0) return `${diffHours}h ago`;
-                    if (diffMins > 0) return `${diffMins}m ago`;
-                    return 'Just now';
-                  };
-
-                  return (
-                    <div 
-                      key={session.id}
-                      className="grid grid-cols-5 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2"
-                      data-testid={`chat-history-row-${idx}`}
-                      onClick={() => {
-                        setSelectedSessionId(session.id);
-                        setSessionDialogOpen(true);
-                      }}
-                    >
-                      <div className="truncate text-primary" title={getUserDisplay()}>
-                        {getUserDisplay()}
-                      </div>
-                      <div className="truncate" title={session.title}>
-                        {session.title}
-                      </div>
-                      <div className="text-right font-medium">
-                        {session.messageCount} ({session.userMessageCount}↑ / {session.assistantMessageCount}↓)
-                      </div>
-                      <div className="text-right text-sm text-muted-foreground">
-                        {timeSinceUpdate()}
-                      </div>
-                      <div className="text-right text-sm text-muted-foreground truncate" title={getLocationDisplay()}>
-                        {getLocationDisplay()}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No chat histories yet</p>
-            )}
-          </CardContent>
-        </Card>
+        {chatView === 'detail' && selectedChatSessionId && (
+          <SessionDetailView
+            sessionId={selectedChatSessionId}
+            onBack={() => {
+              setChatView('sessions');
+              setSelectedChatSessionId(null);
+            }}
+          />
+        )}
 
         <Card data-testid="card-email-testing">
           <CardHeader>

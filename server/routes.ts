@@ -3,7 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
-import { insertRefundSurveySchema } from "@shared/schema";
+import { insertRefundSurveySchema, supportQueries } from "@shared/schema";
+import { db } from "./db";
+import { desc } from "drizzle-orm";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -39,6 +41,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+
+      // Associate any anonymous sessions with this user based on IP
+      const ipAddress = req.headers['cf-connecting-ip'] ||
+                       req.headers['x-real-ip'] ||
+                       req.headers['x-forwarded-for']?.split(',')[0] ||
+                       req.connection?.remoteAddress ||
+                       req.socket?.remoteAddress ||
+                       null;
+
+      if (ipAddress) {
+        const associatedCount = await storage.associateAnonymousSessionsWithUser(userId, ipAddress);
+        if (associatedCount > 0) {
+          console.log(`[Auth] Associated ${associatedCount} anonymous sessions with user ${userId}`);
+        }
+      }
+
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -463,11 +481,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     try {
-      const { message, history } = req.body;
+      const { message, history, userActivity, pageVisits, allSessions } = req.body;
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
       }
+
+      console.log(`[Chat] Received message with: ${history?.length || 0} history messages, ${userActivity?.length || 0} activity events, ${pageVisits?.length || 0} page visits, ${allSessions?.length || 0} previous sessions`);
 
       // Set up Server-Sent Events headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -477,11 +497,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
-      
+
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
-      
-      const stream = await getChatResponseStream(message, history || []);
+
+      const stream = await getChatResponseStream(message, history || [], userActivity, pageVisits, allSessions);
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -624,7 +644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000) 
             : undefined;
 
-          await storage.default.trackSupportQuery({
+          await storage.trackSupportQuery({
             userEmail,
             userId,
             userMessage: message,
@@ -1212,7 +1232,7 @@ ${contextMarkdown}`;
             }
           }
 
-          await storage.default.trackSupportQuery({
+          await storage.trackSupportQuery({
             userEmail,
             userId,
             userMessage: '[Welcome Greeting - No User Message]',
@@ -1314,12 +1334,21 @@ ${contextMarkdown}`;
   app.post('/api/chat/sessions', async (req: any, res) => {
     try {
       const { sessions, metadata } = req.body;
-      
+
       if (!sessions || !Array.isArray(sessions)) {
         return res.status(400).json({ message: "Sessions array required" });
       }
 
       const userId = req.user?.claims?.sub || null;
+
+      // Extract IP address for anonymous session association
+      const ipAddress = req.headers['cf-connecting-ip'] ||
+                       req.headers['x-real-ip'] ||
+                       req.headers['x-forwarded-for']?.split(',')[0] ||
+                       req.connection?.remoteAddress ||
+                       req.socket?.remoteAddress ||
+                       null;
+
       const savedSessions = [];
 
       for (const session of sessions) {
@@ -1328,6 +1357,7 @@ ${contextMarkdown}`;
           userId: userId,
           title: session.title,
           messages: JSON.stringify(session.messages),
+          ipAddress: ipAddress,
           device: metadata?.device || null,
           browser: metadata?.browser || null,
           city: metadata?.city || null,
@@ -1341,7 +1371,7 @@ ${contextMarkdown}`;
         savedSessions.push(saved);
       }
 
-      console.log(`[Chat] Saved ${savedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'}`);
+      console.log(`[Chat] Saved ${savedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'} from IP ${ipAddress}`);
       res.json({ success: true, count: savedSessions.length });
     } catch (error: any) {
       console.error("Error saving chat sessions:", error);
@@ -1390,23 +1420,41 @@ ${contextMarkdown}`;
     try {
       const allSessions = await storage.getChatSessions();
 
+      // Get all users to map userId to email/name
+      const allUsers = await db
+        .select()
+        .from(storage.users);
+
+      const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+      // Get all support queries for cost tracking
+      const allQueries = await db
+        .select()
+        .from(supportQueries)
+        .orderBy(desc(supportQueries.createdAt));
+
       // Group sessions by user (userId or IP for anonymous)
-      const userMap = new Map<string, any>();
+      const chatUserMap = new Map<string, any>();
 
       allSessions.forEach(session => {
         const messages = JSON.parse(session.messages);
         const userKey = session.userId || session.ipAddress || 'unknown';
         const isAnonymous = !session.userId;
 
-        if (!userMap.has(userKey)) {
-          userMap.set(userKey, {
+        // Get user details if logged in
+        const userDetails = session.userId ? userMap.get(session.userId) : null;
+
+        if (!chatUserMap.has(userKey)) {
+          chatUserMap.set(userKey, {
             userKey,
             userId: session.userId,
-            userEmail: session.userEmail,
+            userEmail: userDetails?.email || null,
+            userName: userDetails ? `${userDetails.firstName || ''} ${userDetails.lastName || ''}`.trim() || null : null,
             ipAddress: session.ipAddress,
             isAnonymous,
             sessions: [],
             totalMessages: 0,
+            totalCost: 0,
             lastActivity: session.updatedAt,
             location: {
               city: session.city,
@@ -1418,30 +1466,44 @@ ${contextMarkdown}`;
           });
         }
 
-        const user = userMap.get(userKey)!;
-        user.sessions.push(session.id);
-        user.totalMessages += messages.length;
+        const chatUser = chatUserMap.get(userKey)!;
+        chatUser.sessions.push(session.id);
+        chatUser.totalMessages += messages.length;
 
         // Update last activity if this session is more recent
-        if (new Date(session.updatedAt) > new Date(user.lastActivity)) {
-          user.lastActivity = session.updatedAt;
-          user.location = {
+        if (new Date(session.updatedAt) > new Date(chatUser.lastActivity)) {
+          chatUser.lastActivity = session.updatedAt;
+          chatUser.location = {
             city: session.city,
             state: session.state,
             country: session.country,
           };
-          user.device = session.device;
-          user.browser = session.browser;
+          chatUser.device = session.device;
+          chatUser.browser = session.browser;
+        }
+      });
+
+      // Aggregate costs per user from support queries
+      allQueries.forEach(query => {
+        // Match by userId first, then by email
+        const userKey = query.userId ||
+                        (query.userEmail ? Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail)?.userKey : null) ||
+                        'unknown';
+
+        if (chatUserMap.has(userKey)) {
+          const chatUser = chatUserMap.get(userKey)!;
+          chatUser.totalCost += parseFloat(query.cost as any) || 0;
         }
       });
 
       // Convert to array and sort by last activity
-      const users = Array.from(userMap.values()).map(user => ({
+      const users = Array.from(chatUserMap.values()).map(user => ({
         ...user,
         sessionCount: user.sessions.length,
+        totalCost: user.totalCost.toFixed(4),
       })).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
-      console.log(`[Admin] Retrieved ${users.length} unique chat users`);
+      console.log(`[Admin] Retrieved ${users.length} unique chat users with cost data`);
       res.json(users);
     } catch (error: any) {
       console.error("Error getting chat users:", error);
@@ -1455,13 +1517,19 @@ ${contextMarkdown}`;
       const { userKey } = req.params;
       const allSessions = await storage.getChatSessions();
 
+      // Get all support queries for cost tracking
+      const allQueries = await db
+        .select()
+        .from(supportQueries)
+        .orderBy(desc(supportQueries.createdAt));
+
       // Filter sessions for this user (match userId or IP)
       const userSessions = allSessions.filter(session => {
         const sessionKey = session.userId || session.ipAddress || 'unknown';
         return sessionKey === userKey;
       });
 
-      // Format with stats
+      // Format with stats and cost data
       const sessionsWithStats = userSessions.map(session => {
         const messages = JSON.parse(session.messages);
         const userMessages = messages.filter((m: any) => m.role === 'user');
@@ -1471,6 +1539,18 @@ ${contextMarkdown}`;
         const firstTimestamp = messages.length > 0 ? new Date(messages[0].timestamp) : new Date(session.createdAt);
         const lastTimestamp = messages.length > 0 ? new Date(messages[messages.length - 1].timestamp) : new Date(session.updatedAt);
         const durationMinutes = Math.round((lastTimestamp.getTime() - firstTimestamp.getTime()) / 60000);
+
+        // Calculate cost for this session by matching queries within time range
+        const sessionCost = allQueries
+          .filter(q => {
+            const queryTime = new Date(q.createdAt);
+            const matchesUser = q.userId === session.userId ||
+                               (session.userEmail && q.userEmail === session.userEmail);
+            const withinTimeRange = queryTime >= new Date(session.createdAt) &&
+                                   queryTime <= new Date(session.updatedAt);
+            return matchesUser && withinTimeRange;
+          })
+          .reduce((sum, q) => sum + (parseFloat(q.cost as any) || 0), 0);
 
         return {
           id: session.id,
@@ -1482,6 +1562,7 @@ ${contextMarkdown}`;
           userMessageCount: userMessages.length,
           assistantMessageCount: assistantMessages.length,
           durationMinutes,
+          totalCost: sessionCost.toFixed(4),
           device: session.device,
           browser: session.browser,
           city: session.city,
@@ -1539,20 +1620,70 @@ ${contextMarkdown}`;
     }
   });
 
-  // Admin endpoint to get full chat session details
+  // Admin endpoint to get full chat session details with prompts and costs
   app.get('/api/admin/chat-sessions/:id', isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const sessions = await storage.getChatSessions();
       const session = sessions.find(s => s.id === id);
-      
+
       if (!session) {
         return res.status(404).json({ message: "Session not found" });
       }
 
+      // Get all support queries for this session's time range
+      const allQueries = await db
+        .select()
+        .from(supportQueries)
+        .orderBy(desc(supportQueries.createdAt));
+
+      const messages = JSON.parse(session.messages);
+
+      // Enhance each message with full prompt and cost data
+      const enrichedMessages = messages.map((msg: any) => {
+        // For assistant messages, try to find matching query
+        if (msg.role === 'assistant') {
+          const msgTime = new Date(msg.timestamp);
+
+          // Find query that matches this assistant response
+          // Match by: user, time proximity (within 30 seconds), and response content
+          const matchingQuery = allQueries.find(q => {
+            const queryTime = new Date(q.createdAt);
+            const timeDiff = Math.abs(queryTime.getTime() - msgTime.getTime());
+            const matchesUser = q.userId === session.userId ||
+                               (session.userEmail && q.userEmail === session.userEmail);
+            const withinTimeWindow = timeDiff < 30000; // 30 seconds
+            const matchesResponse = q.aiResponse === msg.content ||
+                                   q.aiResponse.includes(msg.content.slice(0, 100));
+
+            return matchesUser && withinTimeWindow && matchesResponse;
+          });
+
+          if (matchingQuery) {
+            return {
+              ...msg,
+              tokensIn: matchingQuery.tokensIn,
+              tokensOut: matchingQuery.tokensOut,
+              cost: matchingQuery.cost,
+              model: matchingQuery.model,
+              fullPrompt: matchingQuery.fullPrompt,
+              userMessage: matchingQuery.userMessage,
+            };
+          }
+        }
+
+        return msg;
+      });
+
+      // Calculate total cost for session
+      const totalCost = enrichedMessages
+        .filter((m: any) => m.cost)
+        .reduce((sum: number, m: any) => sum + (parseFloat(m.cost as any) || 0), 0);
+
       res.json({
         ...session,
-        messages: JSON.parse(session.messages),
+        messages: enrichedMessages,
+        totalCost: totalCost.toFixed(4),
       });
     } catch (error: any) {
       console.error("Error getting chat session details:", error);
