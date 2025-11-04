@@ -482,19 +482,28 @@ export function SupportChat() {
                   const questionsSection = fullContent.substring(cutoffIndex);
 
                   // Extract follow-up questions
+                  console.log('[Chat] Questions section:', questionsSection);
                   const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|$)/is);
+                  console.log('[Chat] Follow-up match:', followUpMatch);
+
                   if (followUpMatch) {
                     const newQuestions = followUpMatch[1]
                       .split('|')
                       .map((q: string) => q.trim())
                       .filter((q: string) => q.length > 0 && q.length < 200); // Sanity check
 
+                    console.log('[Chat] Extracted questions:', newQuestions);
+
                     if (newQuestions.length > 0) {
                       setQuickQuestions(prev => {
                         const combined = [...prev, ...newQuestions];
-                        return combined.slice(-8);
+                        const result = combined.slice(-8);
+                        console.log('[Chat] Setting quick questions:', result);
+                        return result;
                       });
                     }
+                  } else {
+                    console.log('[Chat] No follow-up match found');
                   }
 
                   // Update message with clean content and stop
@@ -678,17 +687,20 @@ export function SupportChat() {
           style={{ position: 'fixed' }}
         >
           {/* Header */}
-          <div className="bg-primary px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
+          <div className="bg-primary px-4 py-3">
+            {/* Title Row */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0">
                 <MessageCircle className="w-5 h-5 text-primary-foreground" />
               </div>
-              <div>
+              <div className="flex-1">
                 <h3 className="font-bold text-primary-foreground">Kull Support</h3>
-                <p className="text-xs text-primary-foreground/80">Has access to entire github repo & website backend, can answer any sales, technical, or support question instantly.</p>
+                <p className="text-xs text-primary-foreground/80 leading-tight">Has access to entire github repo & website backend, can answer any sales, technical, or support question instantly.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* Action Buttons Row */}
+            <div className="flex items-center justify-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -791,15 +803,6 @@ export function SupportChat() {
                 </div>
               </div>
             ))}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-2xl px-4 py-3 flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Typing...</span>
-                </div>
-              </div>
-            )}
 
             <div ref={messagesEndRef} />
           </div>
