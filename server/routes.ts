@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -35,6 +35,14 @@ const STRIPE_PRICES = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Admin middleware (restricted to steve@lander.media)
+  const isAdmin = (req: any, res: Response, next: NextFunction) => {
+    if (!req.user || req.user.claims.email !== 'steve@lander.media') {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    next();
+  };
 
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
@@ -489,6 +497,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Chat] Received message with: ${history?.length || 0} history messages, ${userActivity?.length || 0} activity events, ${pageVisits?.length || 0} page visits, ${allSessions?.length || 0} previous sessions`);
 
+      // Build rich markdown context for user activity (same as welcome endpoint)
+      let userActivityMarkdown = '';
+      if (userActivity && userActivity.length > 0) {
+        userActivityMarkdown = `\n\n## 🖱️ User Activity History
+
+Recent interactions (last ${userActivity.length} events):
+
+${userActivity.map((event: any, idx: number) => {
+  const time = new Date(event.timestamp);
+  const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  if (event.type === 'click') {
+    const elementText = event.value ? ` - TEXT: "${event.value}"` : '';
+    return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\`${elementText} at ${timeStr}`;
+  } else if (event.type === 'hover') {
+    return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
+  } else if (event.type === 'input') {
+    const displayValue = event.value && event.value.length > 0
+      ? `"${event.value}"`
+      : '(empty)';
+    return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
+  } else if (event.type === 'select') {
+    return `${idx + 1}. **✏️ HIGHLIGHTED TEXT**: "${event.value}" at ${timeStr}`;
+  }
+  return '';
+}).join('\n')}
+
+**Activity Insights:**
+- **Total Clicks:** ${userActivity.filter((e: any) => e.type === 'click').length}
+- **Elements Hovered:** ${userActivity.filter((e: any) => e.type === 'hover').length}
+- **Input Events:** ${userActivity.filter((e: any) => e.type === 'input').length}
+- **Text Selections:** ${userActivity.filter((e: any) => e.type === 'select').length}
+`;
+      }
+
       // Set up Server-Sent Events headers
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -499,7 +542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
 
-      const stream = await getChatResponseStream(message, history || [], userActivity, pageVisits, allSessions);
+      const stream = await getChatResponseStream(message, history || [], userActivityMarkdown, pageVisits, allSessions);
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -918,9 +961,6 @@ Use the exact text they clicked/highlighted in your response to prove you're pay
 
 **Your Task:**
 You're Kull AI support - act like a smart, playful consultant who helps photographers discover how much time and money they're wasting. DON'T hard sell. Build rapport, tease them about their behavior, and help them calculate their own ROI.
-
-**NAVIGATION SUPERPOWER:**
-When you include a link to https://kullai.com, the page will AUTOMATICALLY navigate there. Use this to guide them! Think of yourself as a tour guide who can instantly teleport them to the right page while you explain.
 
 **Consultative Approach (NOT Hard Selling):**
 - Tease them playfully about what they're doing on the site ("caught you looking at pricing for the 3rd time 👀")
@@ -1447,7 +1487,7 @@ ${contextMarkdown}`;
   });
 
   // Admin endpoint to get all unique chat users with aggregated stats
-  app.get('/api/admin/chat-users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/chat-users', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const allSessions = await storage.getChatSessions();
       console.log(`[Admin] Found ${allSessions.length} total sessions in database`);
@@ -1557,7 +1597,7 @@ ${contextMarkdown}`;
   });
 
   // Admin endpoint to get all sessions for a specific user
-  app.get('/api/admin/chat-users/:userKey/sessions', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/chat-users/:userKey/sessions', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { userKey } = req.params;
       const allSessions = await storage.getChatSessions();
@@ -1628,7 +1668,7 @@ ${contextMarkdown}`;
   });
 
   // Admin endpoint to get all chat sessions with stats
-  app.get('/api/admin/chat-sessions', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/chat-sessions', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       // Get all chat sessions from database
       const allSessions = await storage.getChatSessions();
@@ -1666,7 +1706,7 @@ ${contextMarkdown}`;
   });
 
   // Admin endpoint to get full chat session details with prompts and costs
-  app.get('/api/admin/chat-sessions/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/chat-sessions/:id', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;
       const sessions = await storage.getChatSessions();
@@ -1885,13 +1925,6 @@ ${contextMarkdown}`;
   });
 
   // Admin endpoints (restricted to steve@lander.media)
-  const isAdmin = (req: any, res: Response, next: NextFunction) => {
-    if (!req.user || req.user.claims.email !== 'steve@lander.media') {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-    next();
-  };
-
   app.get('/api/admin/analytics', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { timerange = 'all' } = req.query;

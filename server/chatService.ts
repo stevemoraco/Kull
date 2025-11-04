@@ -168,7 +168,7 @@ export async function buildFullPromptMarkdown(
 export async function getChatResponseStream(
   userMessage: string,
   history: ChatMessage[],
-  userActivity?: any[],
+  userActivityMarkdown?: string,
   pageVisits?: any[],
   allSessions?: any[]
 ): Promise<ReadableStream> {
@@ -184,29 +184,29 @@ export async function getChatResponseStream(
     // Fetch repo content (cached per session)
     const repoContent = await fetchRepoContent();
 
-    // Build context sections
+    // Build context sections using formatted markdown
     let contextSections = '';
 
-    if (userActivity && userActivity.length > 0) {
-      contextSections += `\n\n<USER_ACTIVITY>\nComplete user activity log (${userActivity.length} events):\n${JSON.stringify(userActivity, null, 2)}\n</USER_ACTIVITY>`;
+    // Add user activity if provided (already formatted as markdown)
+    if (userActivityMarkdown) {
+      contextSections += userActivityMarkdown;
     }
 
     if (pageVisits && pageVisits.length > 0) {
-      contextSections += `\n\n<PAGE_VISITS>\nUser's page visit history (${pageVisits.length} visits):\n${JSON.stringify(pageVisits, null, 2)}\n</PAGE_VISITS>`;
+      contextSections += `\n\n## 🧭 Page Visit History\n\nUser has visited ${pageVisits.length} pages:\n${JSON.stringify(pageVisits, null, 2)}`;
     }
 
     if (allSessions && allSessions.length > 0) {
-      contextSections += `\n\n<PREVIOUS_SESSIONS>\nUser's previous chat sessions (${allSessions.length} sessions):\n`;
+      contextSections += `\n\n## 💬 Previous Chat Sessions\n\nUser's previous chat sessions (${allSessions.length} total):\n`;
       allSessions.forEach((session, idx) => {
-        contextSections += `\n--- Session ${idx + 1}: ${session.title} ---\n`;
+        contextSections += `\n### Session ${idx + 1}: ${session.title}\n`;
         if (session.messages) {
           const msgs = typeof session.messages === 'string' ? JSON.parse(session.messages) : session.messages;
           msgs.forEach((msg: any) => {
-            contextSections += `${msg.role}: ${msg.content}\n`;
+            contextSections += `- **${msg.role}**: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n`;
           });
         }
       });
-      contextSections += `\n</PREVIOUS_SESSIONS>`;
     }
 
     // Build full instructions with repo content AND all context
