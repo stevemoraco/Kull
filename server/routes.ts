@@ -766,6 +766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get visit count for the timerange
       const totalVisits = await storage.getVisitCount(startDate, endDate);
+      const bounceRate = await storage.getBounceRate(startDate, endDate);
 
       // Calculate conversion rates
       const trialConversionRate = usersWithTrial > 0 ? (usersWithSubscription / usersWithTrial * 100) : 0;
@@ -781,6 +782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalReferralsSent,
         totalReferralsCompleted,
         totalVisits,
+        bounceRate: Math.round(bounceRate * 10) / 10,
         trialConversionRate: Math.round(trialConversionRate * 10) / 10,
         signupToTrialRate: Math.round(signupToTrialRate * 10) / 10,
         visitToSignupRate: Math.round(visitToSignupRate * 10) / 10,

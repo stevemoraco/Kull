@@ -58,6 +58,7 @@ export interface IStorage {
   // Visit tracking operations
   trackVisit(visit: InsertPageVisit): Promise<PageVisit>;
   getVisitCount(startDate?: Date, endDate?: Date): Promise<number>;
+  getBounceRate(startDate?: Date, endDate?: Date): Promise<number>;
 
   // Support query tracking operations
   trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery>;
@@ -362,6 +363,41 @@ export class DatabaseStorage implements IStorage {
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     return result[0]?.count || 0;
+  }
+
+  async getBounceRate(startDate?: Date, endDate?: Date): Promise<number> {
+    const conditions = [];
+    if (startDate) {
+      conditions.push(gte(pageVisits.createdAt, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(pageVisits.createdAt, endDate));
+    }
+
+    // Get total unique sessions
+    const totalSessionsResult = await db
+      .select({ count: sql<number>`count(DISTINCT ${pageVisits.sessionId})::int` })
+      .from(pageVisits)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+    
+    const totalSessions = totalSessionsResult[0]?.count || 0;
+    
+    if (totalSessions === 0) return 0;
+
+    // Get sessions with only 1 page view (bounces)
+    const bouncedSessionsResult = await db
+      .select({ 
+        sessionId: pageVisits.sessionId,
+        count: sql<number>`count(*)::int` 
+      })
+      .from(pageVisits)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .groupBy(pageVisits.sessionId)
+      .having(sql`count(*) = 1`);
+    
+    const bouncedSessions = bouncedSessionsResult.length;
+
+    return (bouncedSessions / totalSessions) * 100;
   }
 
   async trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery> {

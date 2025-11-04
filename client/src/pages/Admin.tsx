@@ -20,6 +20,7 @@ interface Analytics {
   totalReferralsSent: number;
   totalReferralsCompleted: number;
   totalVisits: number;
+  bounceRate: number;
   trialConversionRate: number;
   signupToTrialRate: number;
   visitToSignupRate: number;
@@ -199,6 +200,45 @@ export default function Admin() {
               <div className="text-2xl font-bold" data-testid="text-referrers">{analytics?.totalReferrers || 0}</div>
               <p className="text-xs text-muted-foreground">
                 {analytics?.totalReferralsSent || 0} invites sent
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-bounce-rate">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-bounce-rate">{analytics?.bounceRate || 0}%</div>
+              <p className="text-xs text-muted-foreground">
+                Visitors viewing only one page
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-visit-to-signup">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Visit → Signup</CardTitle>
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-visit-to-signup">{analytics?.visitToSignupRate || 0}%</div>
+              <p className="text-xs text-muted-foreground">
+                Landing page conversion rate
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-signup-to-trial">
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Signup → Trial</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-signup-to-trial">{analytics?.signupToTrialRate || 0}%</div>
+              <p className="text-xs text-muted-foreground">
+                Users who started trial after signup
               </p>
             </CardContent>
           </Card>
