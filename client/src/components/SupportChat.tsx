@@ -305,6 +305,10 @@ export function SupportChat() {
   const [greetingGenerated, setGreetingGenerated] = useState(false);
   const lastUserMessageTimeRef = useRef<number>(Date.now());
 
+  // Greeting popover state (for showing when chat is closed)
+  const [showGreetingPopover, setShowGreetingPopover] = useState(false);
+  const [popoverGreeting, setPopoverGreeting] = useState<string>('');
+
   // Track page visits in sessionStorage for context
   useEffect(() => {
     const currentPath = window.location.pathname;
@@ -326,6 +330,32 @@ export function SupportChat() {
   useEffect(() => {
     localStorage.setItem('kull-chat-open', isOpen.toString());
   }, [isOpen]);
+
+  // Define handleLinkClick early so it can be used in effects
+  const handleLinkClick = (url: string) => {
+    // Check if it's an internal link (starts with /)
+    if (url.startsWith('/')) {
+      // Check if it has a hash for scrolling
+      if (url.includes('#')) {
+        const [path, hash] = url.split('#');
+        setLocation(path || '/');
+
+        // Scroll to element after navigation
+        setTimeout(() => {
+          const element = document.getElementById(hash);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      } else {
+        setLocation(url);
+      }
+      // Keep chat open for internal navigation
+    } else {
+      // External link - open in new tab
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   // Background greeting generation - runs every 30 seconds
   useEffect(() => {
@@ -396,13 +426,23 @@ export function SupportChat() {
             // First generation: store for initial greeting
             setLatestGreeting(fullContent);
             setGreetingGenerated(true);
+
+            // Show popover if chat is closed
+            if (!isOpen) {
+              setPopoverGreeting(fullContent);
+              setShowGreetingPopover(true);
+
+              // Auto-hide after 10 seconds
+              setTimeout(() => {
+                setShowGreetingPopover(false);
+              }, 10000);
+            }
           } else {
-            // Subsequent generations: add as new message to conversation
+            // Subsequent generations
             const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
 
-            // Only add if it's been at least 20 seconds since last user message
-            // This prevents interrupting active conversations
-            if (timeSinceLastUserMessage > 20000 && messages.length > 0) {
+            if (isOpen && timeSinceLastUserMessage > 20000 && messages.length > 0) {
+              // Chat is open: add as new message to conversation
               const newMessage: Message = {
                 id: 'context-' + Date.now(),
                 role: 'assistant',
@@ -425,6 +465,15 @@ export function SupportChat() {
               if (linkMatch) {
                 handleLinkClick(linkMatch[2]);
               }
+            } else if (!isOpen) {
+              // Chat is closed: show popover instead
+              setPopoverGreeting(fullContent);
+              setShowGreetingPopover(true);
+
+              // Auto-hide after 10 seconds
+              setTimeout(() => {
+                setShowGreetingPopover(false);
+              }, 10000);
             }
           }
         }
@@ -444,32 +493,7 @@ export function SupportChat() {
         clearInterval(greetingTimerRef.current);
       }
     };
-  }, [user, toast, greetingGenerated, messages, handleLinkClick, setMessages]);
-
-  const handleLinkClick = (url: string) => {
-    // Check if it's an internal link (starts with /)
-    if (url.startsWith('/')) {
-      // Check if it has a hash for scrolling
-      if (url.includes('#')) {
-        const [path, hash] = url.split('#');
-        setLocation(path || '/');
-
-        // Scroll to element after navigation
-        setTimeout(() => {
-          const element = document.getElementById(hash);
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
-      } else {
-        setLocation(url);
-      }
-      // Keep chat open for internal navigation
-    } else {
-      // External link - open in new tab
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  };
+  }, [user, toast, greetingGenerated, messages, handleLinkClick, setMessages, isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1017,15 +1041,59 @@ export function SupportChat() {
     <>
       {/* Chat Button */}
       {!isOpen && (
-        <Button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 left-4 md:bottom-6 md:left-6 h-14 w-14 rounded-full shadow-lg hover-elevate z-[9999]"
-          size="icon"
-          data-testid="button-open-chat"
-          style={{ position: 'fixed' }}
-        >
-          <MessageCircle className="w-6 h-6" />
-        </Button>
+        <>
+          <Button
+            onClick={() => {
+              setIsOpen(true);
+              setShowGreetingPopover(false); // Hide popover when opening chat
+            }}
+            className="fixed bottom-4 left-4 md:bottom-6 md:left-6 h-14 w-14 rounded-full shadow-lg hover-elevate z-[9999]"
+            size="icon"
+            data-testid="button-open-chat"
+            style={{ position: 'fixed' }}
+          >
+            <MessageCircle className="w-6 h-6" />
+          </Button>
+
+          {/* Greeting Popover */}
+          {showGreetingPopover && popoverGreeting && (
+            <div
+              className="fixed bottom-4 left-20 md:left-24 md:bottom-6 max-w-xs md:max-w-sm bg-card border border-border rounded-lg shadow-2xl p-4 z-[9999] animate-in slide-in-from-left-2 fade-in duration-300"
+              style={{ position: 'fixed' }}
+            >
+              <button
+                onClick={() => setShowGreetingPopover(false)}
+                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="pr-6">
+                <div className="flex items-start gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <MessageCircle className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">Kull Support</p>
+                    <p className="text-xs text-muted-foreground">Just now</p>
+                  </div>
+                </div>
+                <div className="text-sm text-foreground leading-relaxed">
+                  {renderMarkdown(popoverGreeting, handleLinkClick)}
+                </div>
+                <button
+                  onClick={() => {
+                    setIsOpen(true);
+                    setShowGreetingPopover(false);
+                  }}
+                  className="mt-3 text-xs text-purple-600 hover:text-purple-700 font-medium"
+                >
+                  Open chat →
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Chat Window */}

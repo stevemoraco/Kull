@@ -1,8 +1,9 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 
 export function Footer() {
   const { isAuthenticated } = useAuth();
+  const [location, setLocation] = useLocation();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -19,6 +20,17 @@ export function Footer() {
       const elementPosition = element.getBoundingClientRect().top;
       const offsetPosition = elementPosition + window.pageYOffset - offset;
       window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+  };
+
+  const handleSectionClick = (sectionId: string) => {
+    if (location === '/' || location === '') {
+      // Already on landing page, just scroll
+      scrollToSection(sectionId);
+    } else {
+      // Navigate to landing page then scroll
+      setLocation('/');
+      setTimeout(() => scrollToSection(sectionId), 100);
     }
   };
 
@@ -58,27 +70,13 @@ export function Footer() {
             <ul className="space-y-2">
               {productLinks.map((link) => (
                 <li key={link.name}>
-                  {link.isSection ? (
-                    <button
-                      onClick={() => {
-                        window.location.href = '/';
-                        setTimeout(() => scrollToSection(link.sectionId!), 100);
-                      }}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
-                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      {link.name}
-                    </button>
-                  ) : (
-                    <Link
-                      href={link.href}
-                      onClick={handleClick}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      {link.name}
-                    </Link>
-                  )}
+                  <button
+                    onClick={() => link.isSection ? handleSectionClick(link.sectionId!) : window.location.href = link.href}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {link.name}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -112,10 +110,7 @@ export function Footer() {
                   <li key={link.name}>
                     {link.isSection ? (
                       <button
-                        onClick={() => {
-                          window.location.href = '/';
-                          setTimeout(() => scrollToSection(link.sectionId!), 100);
-                        }}
+                        onClick={() => handleSectionClick(link.sectionId!)}
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
                         data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
                       >

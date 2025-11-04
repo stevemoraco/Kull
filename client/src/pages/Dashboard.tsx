@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Zap, Crown, Download, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { Footer } from "@/components/Footer";
 
 export default function Dashboard() {
   usePageTracking('dashboard');
@@ -175,6 +176,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
