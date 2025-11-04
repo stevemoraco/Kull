@@ -25,6 +25,7 @@ export function Footer() {
   const productLinks = [
     { name: "Features", href: "/#features", isSection: true, sectionId: "features" },
     { name: "Pricing", href: "/#pricing", isSection: true, sectionId: "pricing" },
+    { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
     { name: "Download", href: "/#download", isSection: true, sectionId: "download" }
   ];
 
@@ -37,6 +38,7 @@ export function Footer() {
   const accountLinks = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "My Account", href: "/" },
+    { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
     { name: "Downloads", href: "/#download", isSection: true, sectionId: "download" }
   ];
 

@@ -53,6 +53,9 @@ export default function Landing() {
             <button onClick={() => scrollToSection('pricing')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-pricing">
               Pricing
             </button>
+            <button onClick={() => scrollToSection('referrals')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-referrals">
+              Referrals
+            </button>
             <button onClick={() => scrollToSection('download')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-download">
               Download
             </button>
@@ -90,8 +93,10 @@ export default function Landing() {
         <div id="pricing">
           <PricingSection />
         </div>
-        <div id="download">
+        <div id="referrals">
           <ReferralSection />
+        </div>
+        <div id="download">
           <FinalCTA />
         </div>
         <FAQSection />
