@@ -11,6 +11,7 @@ import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
 import { getProviderConfig } from "@shared/culling/providers";
 import Stripe from "stripe";
+import { GenerateReportSchema, generateNarrative, summarize } from "./report";
 import { runBatches } from "./orchestrator";
 import { submitOpenAIBatch } from "./providers/openai";
 
@@ -832,6 +833,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error('OpenAI run error', error);
       res.status(500).json({ message: 'Failed to run OpenAI batch' });
+    }
+  });
+
+  // Generate shoot report narrative
+  app.post('/api/kull/report/generate', isAuthenticated, async (req: any, res) => {
+    try {
+      const { shootName, ratings } = GenerateReportSchema.parse(req.body);
+      const apiKey = process.env.OPENAI_API_KEY;
+      const narrative = await generateNarrative({ shootName, ratings }, apiKey);
+      const stats = summarize(ratings);
+      res.json({
+        shootName,
+        narrative,
+        stats,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid report payload', issues: error.flatten() });
+      }
+      console.error('report generate error', error);
+      res.status(500).json({ message: 'Failed to generate report' });
     }
   });
 
