@@ -24,13 +24,15 @@ export function Footer() {
   };
 
   const handleSectionClick = (sectionId: string) => {
-    if (location === '/' || location === '') {
+    const isOnLandingPage = location === '/landing' || (location === '/' && !isAuthenticated);
+    
+    if (isOnLandingPage) {
       // Already on landing page, just scroll
       scrollToSection(sectionId);
     } else {
       // Navigate to landing page then scroll
-      setLocation('/');
-      setTimeout(() => scrollToSection(sectionId), 100);
+      setLocation('/landing');
+      setTimeout(() => scrollToSection(sectionId), 200);
     }
   };
 
