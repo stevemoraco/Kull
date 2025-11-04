@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
-import { insertRefundSurveySchema, supportQueries } from "@shared/schema";
+import { insertRefundSurveySchema, supportQueries, users } from "@shared/schema";
 import { db } from "./db";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
@@ -584,15 +584,15 @@ ${userActivity.map((event: any, idx: number) => {
                   fullResponse += data.delta;
                   // Forward to client immediately (no buffering due to flushHeaders)
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                } else if (data.type === 'response.done') {
-                  // Extract usage data from done event
+                } else if (data.type === 'response.done' || data.type === 'response.completed') {
+                  // Extract usage data from done/completed event
                   if (data.response?.usage) {
                     tokensIn = data.response.usage.input_tokens || 0;
                     tokensOut = data.response.usage.output_tokens || 0;
                     // Calculate cost for gpt-5-mini: Input $0.100/1M, Output $0.400/1M
                     cost = (tokensIn / 1_000_000) * 0.100 + (tokensOut / 1_000_000) * 0.400;
                   }
-                  console.log('[Chat] Response done, usage:', data.response?.usage);
+                  console.log(`[Chat] Response ${data.type}, usage:`, data.response?.usage);
                 } else if (data.type === 'error') {
                   const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
@@ -1181,8 +1181,8 @@ ${contextMarkdown}`;
                 if (data.type === 'response.output_text.delta' && data.delta) {
                   fullResponse += data.delta;
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                } else if (data.type === 'response.done') {
-                  console.log('[Welcome] OpenAI sent response.done event');
+                } else if (data.type === 'response.done' || data.type === 'response.completed') {
+                  console.log(`[Welcome] OpenAI sent ${data.type} event`);
                   // Track token usage
                   if (data.response?.usage) {
                     tokensIn = data.response.usage.input_tokens || 0;
@@ -1222,7 +1222,6 @@ ${contextMarkdown}`;
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
 
         // Track welcome greeting in database
-        const storage = await import('./storage');
         const userEmail = req.user?.claims?.email;
         const userId = req.user?.claims?.sub;
 
@@ -1274,6 +1273,7 @@ ${contextMarkdown}`;
             userId,
             userMessage: '[Welcome Greeting - No User Message]',
             aiResponse: fullResponse,
+            fullPrompt: fullContextMarkdown,
             tokensIn,
             tokensOut,
             cost: cost.toString(),
@@ -1463,7 +1463,7 @@ ${contextMarkdown}`;
   app.get('/api/admin/debug/database', isAuthenticated, async (req: any, res) => {
     try {
       const allSessions = await storage.getChatSessions();
-      const allUsers = await db.select().from(storage.users);
+      const allUsers = await db.select().from(users);
       const allQueries = await db.select().from(supportQueries);
 
       res.json({
@@ -1495,7 +1495,7 @@ ${contextMarkdown}`;
       // Get all users to map userId to email/name
       const allUsers = await db
         .select()
-        .from(storage.users);
+        .from(users);
       console.log(`[Admin] Found ${allUsers.length} registered users`);
 
       const userMap = new Map(allUsers.map(u => [u.id, u]));
