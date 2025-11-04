@@ -536,6 +536,7 @@ export function SupportChat() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isProactiveMessagesPaused, setIsProactiveMessagesPaused] = useState(false);
+  const isProactiveMessagesPausedRef = useRef(false); // Ref to access current pause state
   const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
   // Store pre-generated greeting for initial use
@@ -547,6 +548,7 @@ export function SupportChat() {
   // User activity tracking for proactive messages
   const lastActivityTimeRef = useRef<number>(Date.now());
   const [isTabVisible, setIsTabVisible] = useState(true);
+  const isTabVisibleRef = useRef(true); // Ref to access current visibility state
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
   // Greeting popover state (for showing when chat is closed)
@@ -797,6 +799,18 @@ export function SupportChat() {
 
     const generateBackgroundGreeting = async () => {
       if (!isActive) return; // Don't run if component unmounted
+
+      // Check if proactive messages are paused (use ref to get current value)
+      if (isProactiveMessagesPausedRef.current) {
+        console.log('[Chat] Greeting generation skipped - proactive messages paused');
+        return;
+      }
+
+      // Check if tab is visible (use ref to get current value)
+      if (!isTabVisibleRef.current) {
+        console.log('[Chat] Greeting generation skipped - tab not visible');
+        return;
+      }
 
       try {
         // Detect device type
@@ -1135,9 +1149,11 @@ export function SupportChat() {
             setNextMessageIn(nextMsgSeconds);
 
             console.log('[Chat] First greeting - storing and showing countdown');
-            
-            // 🔊 PLAY CYBERPUNK DING FOR NEW GREETING
-            playCyberpunkDing();
+
+            // 🔊 PLAY CYBERPUNK DING FOR NEW GREETING (only if tab is visible)
+            if (isTabVisibleRef.current) {
+              playCyberpunkDing();
+            }
 
             // Show popover if chat is closed
             if (!currentIsOpen) {
@@ -1230,11 +1246,22 @@ export function SupportChat() {
     notificationSoundRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTcIGmm98OyfTgwOUqjk77RgGgU7k9n0zH4yBSh+zPLaizsKFlm46+yrWBgMSKXh9L50LAU0gdDy2Ik3CBpqvfDtoVAMDlOo5O+0YBoFO5PZ9M1+MgUofszy2os7ChZZuOvsq1gYDEil4fS+dCwFNIHQ8tiJNwgaarz07aFQDA5TqOTvtGAaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RgGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarz07aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarzw7aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU0gdDy2Ik3CBpqvPDtoVAMDlOo5O+0YRoFO5PZ9M1+MgUofczy2os7ChZZuOvsq1gYDEim4fS+dCwFNIHQ8tiJNwgaarzw7aFQDA5TqOTvtGEaBTuT2fTNfjIFKH3M8tqLOwoWWbjr7KtYGAxIpuH0vnQsBTSB0PLYiTcIGmq88O2hUAwOU6jk77RhGgU7k9n0zX4yBSh9zPLaizsKFlm46+yrWBgMSKbh9L50LAU=');
   }, []);
 
+  // Keep refs in sync with state
+  useEffect(() => {
+    isProactiveMessagesPausedRef.current = isProactiveMessagesPaused;
+  }, [isProactiveMessagesPaused]);
+
+  useEffect(() => {
+    isTabVisibleRef.current = isTabVisible;
+  }, [isTabVisible]);
+
   // Track tab visibility
   useEffect(() => {
     const handleVisibilityChange = () => {
-      setIsTabVisible(!document.hidden);
-      console.log('[Chat] Tab visibility changed:', !document.hidden);
+      const visible = !document.hidden;
+      setIsTabVisible(visible);
+      isTabVisibleRef.current = visible;
+      console.log('[Chat] Tab visibility changed:', visible);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -1314,8 +1341,10 @@ export function SupportChat() {
             if (shouldSendProactive) {
               // Send proactive message - use empty string to trigger AI to continue conversation
               sendMessage('[Continue conversation naturally based on context]').then(() => {
-                // 🔊 PLAY CYBERPUNK DING FOR PROACTIVE MESSAGE
-                playCyberpunkDing();
+                // 🔊 PLAY CYBERPUNK DING FOR PROACTIVE MESSAGE (only if tab is visible)
+                if (isTabVisibleRef.current) {
+                  playCyberpunkDing();
+                }
               });
             }
 
@@ -1332,7 +1361,7 @@ export function SupportChat() {
         countdownIntervalRef.current = null;
       }
     };
-  }, [nextMessageIn, isTabVisible, isOpen, isLoading]);
+  }, [nextMessageIn, isTabVisible, isOpen, isLoading, isProactiveMessagesPaused]);
 
   // Reset inactivity timer on any message activity
   const resetInactivityTimer = () => {
@@ -1622,8 +1651,10 @@ export function SupportChat() {
                 // Track when AI last responded
                 lastAiMessageTimeRef.current = Date.now();
 
-                // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE
-                playCyberpunkDing();
+                // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE (only if tab is visible)
+                if (isTabVisibleRef.current) {
+                  playCyberpunkDing();
+                }
 
                 // Final cleanup - check for metadata one last time
                 if (!cutoffDetected) {

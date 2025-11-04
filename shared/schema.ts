@@ -115,6 +115,7 @@ export type InsertPageVisit = typeof pageVisits.$inferInsert;
 // Support chat queries tracking table
 export const supportQueries = pgTable("support_queries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id"), // Link to chat session for accurate cost tracking
   userEmail: varchar("user_email"), // Email of user who asked
   userId: varchar("user_id").references(() => users.id), // Optional, for logged-in users
   userMessage: text("user_message").notNull(),
@@ -156,6 +157,7 @@ export type InsertRepoContentCache = typeof repoContentCache.$inferInsert;
 export const chatSessions = pgTable("chat_sessions", {
   id: varchar("id").primaryKey(), // Client-generated ID for consistency
   userId: varchar("user_id").references(() => users.id), // Optional, for logged-in users
+  userEmail: varchar("user_email"), // Email for quick lookups
   title: varchar("title").notNull(),
   messages: text("messages").notNull(), // JSON string of messages
   // Anonymous user metadata for tracking (when userId is null)
