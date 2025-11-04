@@ -1617,7 +1617,7 @@ ${contextMarkdown}`;
       });
 
       // Convert to array and sort by last activity
-      const users = Array.from(chatUserMap.values()).map(user => {
+      const chatUsers = Array.from(chatUserMap.values()).map(user => {
         const queryCount = user.queryCount || 1; // Avoid division by zero
         return {
           ...user,
@@ -1629,8 +1629,8 @@ ${contextMarkdown}`;
         };
       }).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
-      console.log(`[Admin] Retrieved ${users.length} unique chat users with cost data`);
-      res.json(users);
+      console.log(`[Admin] Retrieved ${chatUsers.length} unique chat users with cost data`);
+      res.json(chatUsers);
     } catch (error: any) {
       console.error("Error getting chat users:", error);
       res.status(500).json({ message: "Failed to get chat users: " + error.message });
