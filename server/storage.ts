@@ -66,6 +66,9 @@ export interface IStorage {
   ): Promise<User>;
   convertTrialToSubscription(userId: string, subscriptionId: string): Promise<User>;
   markAppInstalled(userId: string): Promise<User>;
+  // Folder catalog
+  updateFolderCatalog(userId: string, catalog: { deviceName?: string; folders: { id: string; name: string; bookmark?: string }[]; updatedAt: string }): Promise<User>;
+  getFolderCatalog(userId: string): Promise<User | undefined>;
 
   // Referral operations
   createReferral(referral: InsertReferral & { referrerId: string }): Promise<Referral>;
@@ -224,6 +227,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
 
+    return user;
+  }
+
+  async updateFolderCatalog(userId: string, catalog: { deviceName?: string; folders: { id: string; name: string; bookmark?: string }[]; updatedAt: string }): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ folderCatalog: catalog as any, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async getFolderCatalog(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     return user;
   }
   // #endregion

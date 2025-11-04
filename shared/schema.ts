@@ -47,6 +47,12 @@ export const users = pgTable("users", {
   specialOfferExpiresAt: timestamp("special_offer_expires_at"), // 24 hours after sign-in
   // App installation tracking
   appInstalledAt: timestamp("app_installed_at"),
+  // Synced folder catalog for mobile selection
+  folderCatalog: jsonb("folder_catalog").$type<{
+    deviceName?: string;
+    folders: { id: string; name: string; bookmark?: string }[];
+    updatedAt: string;
+  }>(),
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

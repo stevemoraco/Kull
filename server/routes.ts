@@ -11,6 +11,8 @@ import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
 import { getProviderConfig } from "@shared/culling/providers";
 import Stripe from "stripe";
+import { runBatches } from "./orchestrator";
+import { submitOpenAIBatch } from "./providers/openai";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -767,6 +769,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error('seed prompts error', err);
       res.status(500).json({ message: 'Failed to seed prompts' });
+    }
+  });
+
+  // Sync folder catalog from desktop app
+  app.post('/api/kull/folders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { deviceName, folders } = req.body;
+      const updatedAt = new Date().toISOString();
+      const user = await storage.updateFolderCatalog(userId, { deviceName, folders, updatedAt });
+      res.json({ ok: true, folderCatalog: user.folderCatalog });
+    } catch (err: any) {
+      console.error('folders sync error', err);
+      res.status(500).json({ message: 'Failed to sync folders' });
+    }
+  });
+
+  // Get folder catalog for mobile
+  app.get('/api/kull/folders', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getFolderCatalog(userId);
+      res.json({ folderCatalog: user?.folderCatalog ?? { folders: [], updatedAt: new Date().toISOString() } });
+    } catch (err: any) {
+      console.error('folders fetch error', err);
+      res.status(500).json({ message: 'Failed to fetch folders' });
+    }
+  });
+
+  // Run OpenAI batch (server-side) with image URLs
+  app.post('/api/kull/run/openai', isAuthenticated, async (req: any, res) => {
+    try {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) return res.status(500).json({ message: 'Missing OPENAI_API_KEY' });
+      const bodySchema = z.object({
+        model: z.string().min(1),
+        images: z.array(z.object({ id: z.string().min(1), url: z.string().url() })),
+        prompt: z.string().min(1),
+      });
+      const { model, images, prompt } = bodySchema.parse(req.body);
+
+      await runBatches({
+        providerId: 'openai-gpt-5',
+        imageIds: images.map((i: any) => i.id),
+        toPayload: async (id) => {
+          const match = images.find((x: any) => x.id === id);
+          return { id, url: match?.url };
+        },
+        prompt,
+        submit: async ({ images }) => {
+          const resp = await submitOpenAIBatch({ apiKey, model, images, prompt });
+          return resp;
+        },
+        concurrency: 3,
+        maxRetries: 5,
+      });
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid run payload', issues: error.flatten() });
+      }
+      console.error('OpenAI run error', error);
+      res.status(500).json({ message: 'Failed to run OpenAI batch' });
     }
   });
 
