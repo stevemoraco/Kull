@@ -1,9 +1,6 @@
 import { useEffect } from 'react';
-import { useAuth } from './useAuth';
 
 export function usePageTracking(pageName: string) {
-  const { user } = useAuth();
-
   useEffect(() => {
     const trackVisit = async () => {
       try {
@@ -32,5 +29,5 @@ export function usePageTracking(pageName: string) {
     };
 
     trackVisit();
-  }, [pageName, user]);
+  }, [pageName]);
 }
