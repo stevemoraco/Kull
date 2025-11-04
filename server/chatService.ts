@@ -2,6 +2,7 @@
 // Uses GPT-4o-mini for cost-effective, high-quality responses
 
 import { getRepoContent } from './fetchRepo';
+import { chatResponseJsonSchema } from './chatSchema';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
@@ -13,17 +14,17 @@ const PROMPT_PREFIX = `You are customer support for this website.
 
 Below is the complete codebase from github.com/stevemoraco/kull - use this as your source of truth.`;
 
-// Instructions after repo content
+// Instructions after repo content - now formatted for structured output
 const PROMPT_SUFFIX = `
 
 INSTRUCTIONS:
 
-1. EVERY response MUST start with a markdown link [text](url) - the page will auto-navigate to the first link
-2. EVERY response MUST end with: FOLLOW_UP_QUESTIONS: followed by 4 natural, relevant follow-up questions separated by | (pipe character). Make these actual questions the user might want to ask next, NOT placeholders. Example format: "FOLLOW_UP_QUESTIONS: How do I install the app? | What plans are available? | Can I get a refund? | Where's the download link?"
-3. Keep responses 2-4 paragraphs
-4. Use markdown formatting (bold, italic, lists, etc)
+You must respond with a structured JSON object containing:
+1. navigationUrl: A valid URL from the Kull AI website/docs that's relevant to the user's question (e.g., "https://kull.ai/pricing", "https://kull.ai/download", etc.)
+2. responseText: Your answer in markdown format (2-4 paragraphs, use bold, italic, lists, etc.)
+3. followUpQuestions: Exactly 4 natural follow-up questions the user might ask next (actual questions, not placeholders)
 
-Answer based on the codebase above.`;
+Base your answer on the codebase provided above.`;
 
 
 export async function getChatResponseStream(
@@ -59,7 +60,7 @@ export async function getChatResponseStream(
 
     console.log(`[Chat] Sending request with ${instructions.length} chars of instructions (includes repo), ${input.length} messages in history`);
 
-    // Call OpenAI Responses API with streaming
+    // Call OpenAI Responses API with structured outputs and streaming
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -70,8 +71,16 @@ export async function getChatResponseStream(
         model: 'gpt-4o-mini',
         instructions, // High-priority instructions with full repo content
         input, // Conversation history
-        max_output_tokens: 500,
+        max_output_tokens: 1000, // Increased for structured output
         stream: true,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'chat_response',
+            schema: chatResponseJsonSchema,
+            strict: true,
+          },
+        },
       }),
     });
 
