@@ -34,6 +34,12 @@ interface SupportAnalytics {
     email: string;
     count: number;
     totalCost: number;
+    device?: string;
+    browser?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    sessionLength?: number;
   }>;
   overTime: Array<{
     date: string;
@@ -313,25 +319,51 @@ export default function Admin() {
             ) : supportAnalytics?.queriesByEmail && supportAnalytics.queriesByEmail.length > 0 ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-3 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
-                  <div>Email</div>
+                  <div>User / Session</div>
                   <div className="text-right">Queries</div>
                   <div className="text-right">Cost</div>
                 </div>
-                {supportAnalytics.queriesByEmail.map((row, idx) => (
-                  <div 
-                    key={idx} 
-                    className="grid grid-cols-3 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
-                    data-testid={`leaderboard-row-${idx}`}
-                    onClick={() => {
-                      setSelectedEmail(row.email);
-                      setDialogOpen(true);
-                    }}
-                  >
-                    <div className="truncate text-primary" title={row.email}>{row.email}</div>
-                    <div className="text-right font-medium">{row.count}</div>
-                    <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
-                  </div>
-                ))}
+                {supportAnalytics.queriesByEmail.map((row, idx) => {
+                  const isAnonymous = row.email === 'Anonymous' || !row.email || row.email.includes('@');
+                  
+                  const getUserDisplay = () => {
+                    if (!isAnonymous && row.email && !row.email.includes('@')) {
+                      return row.email;
+                    }
+                    
+                    if (row.email && row.email.includes('@')) {
+                      return row.email;
+                    }
+                    
+                    const parts = [];
+                    if (row.device) parts.push(row.device);
+                    if (row.browser) parts.push(row.browser);
+                    if (row.city) parts.push(row.city);
+                    if (row.state) parts.push(row.state);
+                    if (row.country) parts.push(row.country);
+                    if (row.sessionLength) parts.push(`${Math.floor(row.sessionLength / 60)}m`);
+                    
+                    return parts.length > 0 ? parts.join(' • ') : 'Anonymous User';
+                  };
+                  
+                  const displayText = getUserDisplay();
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      className="grid grid-cols-3 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
+                      data-testid={`leaderboard-row-${idx}`}
+                      onClick={() => {
+                        setSelectedEmail(row.email);
+                        setDialogOpen(true);
+                      }}
+                    >
+                      <div className="truncate text-primary" title={displayText}>{displayText}</div>
+                      <div className="text-right font-medium">{row.count}</div>
+                      <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-muted-foreground">No support queries yet</p>

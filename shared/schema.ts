@@ -123,6 +123,13 @@ export const supportQueries = pgTable("support_queries", {
   tokensOut: integer("tokens_out").notNull().default(0),
   cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default("0"), // Cost in USD
   model: varchar("model").notNull().default("gpt-4o-mini"),
+  // Anonymous user metadata for tracking
+  device: varchar("device"), // Device type (e.g., "Desktop", "Mobile", "Tablet")
+  browser: varchar("browser"), // Browser name (e.g., "Chrome", "Safari", "Firefox")
+  city: varchar("city"), // User's city
+  state: varchar("state"), // User's state/province
+  country: varchar("country"), // User's country
+  sessionLength: integer("session_length"), // Session length in seconds
   createdAt: timestamp("created_at").defaultNow(),
 });
 

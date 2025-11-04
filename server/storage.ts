@@ -65,7 +65,17 @@ export interface IStorage {
   getSupportQueryStats(startDate?: Date, endDate?: Date): Promise<{
     totalQueries: number;
     totalCost: number;
-    queriesByEmail: Array<{ email: string; count: number; totalCost: number }>;
+    queriesByEmail: Array<{ 
+      email: string; 
+      count: number; 
+      totalCost: number;
+      device?: string;
+      browser?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+      sessionLength?: number;
+    }>;
   }>;
   getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>>;
   getSupportQueriesByEmail(email: string): Promise<SupportQuery[]>;
@@ -430,16 +440,30 @@ export class DatabaseStorage implements IStorage {
       .from(supportQueries)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
-    // Get queries grouped by email
+    // Get queries grouped by email with metadata
     const byEmail = await db
       .select({
         email: supportQueries.userEmail,
+        device: supportQueries.device,
+        browser: supportQueries.browser,
+        city: supportQueries.city,
+        state: supportQueries.state,
+        country: supportQueries.country,
+        sessionLength: supportQueries.sessionLength,
         count: sql<number>`count(*)::int`,
         totalCost: sql<number>`COALESCE(sum(${supportQueries.cost}::numeric), 0)::numeric`,
       })
       .from(supportQueries)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(supportQueries.userEmail)
+      .groupBy(
+        supportQueries.userEmail,
+        supportQueries.device,
+        supportQueries.browser,
+        supportQueries.city,
+        supportQueries.state,
+        supportQueries.country,
+        supportQueries.sessionLength
+      )
       .orderBy(desc(sql`count(*)`));
 
     return {
@@ -447,6 +471,12 @@ export class DatabaseStorage implements IStorage {
       totalCost: Number(totals[0]?.totalCost || 0),
       queriesByEmail: byEmail.map(row => ({
         email: row.email || 'Anonymous',
+        device: row.device || undefined,
+        browser: row.browser || undefined,
+        city: row.city || undefined,
+        state: row.state || undefined,
+        country: row.country || undefined,
+        sessionLength: row.sessionLength || undefined,
         count: row.count,
         totalCost: Number(row.totalCost),
       })),

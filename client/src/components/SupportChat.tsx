@@ -449,11 +449,34 @@ export function SupportChat() {
   // Define handleLinkClick early so it can be used in effects
   // Memoize to prevent recreation on every render
   const handleLinkClick = useCallback((url: string) => {
-    // Check if it's an internal link (starts with /)
+    // Determine if URL is internal or external
+    let isInternal = false;
+    let pathToNavigate = url;
+
     if (url.startsWith('/')) {
-      // Check if it has a hash for scrolling
-      if (url.includes('#')) {
-        const [path, hash] = url.split('#');
+      // Relative path - definitely internal
+      isInternal = true;
+      pathToNavigate = url;
+    } else if (url.startsWith('http://') || url.startsWith('https://')) {
+      // Full URL - check if it's same domain
+      try {
+        const urlObj = new URL(url);
+        const currentHost = window.location.host; // e.g., "kullai.com" or "localhost:5000"
+
+        if (urlObj.host === currentHost || urlObj.hostname === 'kullai.com' || urlObj.hostname === 'www.kullai.com') {
+          isInternal = true;
+          pathToNavigate = urlObj.pathname + urlObj.search + urlObj.hash;
+        }
+      } catch (e) {
+        // Invalid URL, treat as external
+        isInternal = false;
+      }
+    }
+
+    if (isInternal) {
+      // Internal navigation - same tab
+      if (pathToNavigate.includes('#')) {
+        const [path, hash] = pathToNavigate.split('#');
         setLocation(path || '/');
 
         // Scroll to element after navigation
@@ -464,7 +487,7 @@ export function SupportChat() {
           }
         }, 100);
       } else {
-        setLocation(url);
+        setLocation(pathToNavigate);
       }
       // Keep chat open for internal navigation
     } else {

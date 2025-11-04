@@ -538,6 +538,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const userId = req.user?.claims?.sub;
 
         if (fullResponse) {
+          // Extract metadata for anonymous users
+          const userAgent = req.headers['user-agent'] || '';
+          
+          // Parse device type from user agent
+          let device = 'Desktop';
+          if (/mobile/i.test(userAgent)) device = 'Mobile';
+          else if (/tablet|ipad/i.test(userAgent)) device = 'Tablet';
+          
+          // Parse browser from user agent
+          let browser = 'Unknown';
+          if (/chrome/i.test(userAgent) && !/edg/i.test(userAgent)) browser = 'Chrome';
+          else if (/safari/i.test(userAgent) && !/chrome/i.test(userAgent)) browser = 'Safari';
+          else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+          else if (/edg/i.test(userAgent)) browser = 'Edge';
+          
+          // Get IP for geolocation (only for anonymous users)
+          let city, state, country;
+          if (!userId) {
+            const ip = req.headers['cf-connecting-ip'] ||
+                       req.headers['x-real-ip'] ||
+                       req.headers['x-forwarded-for']?.split(',')[0] ||
+                       'unknown';
+            
+            try {
+              // Use ipapi.co for geolocation
+              const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, { 
+                timeout: 2000,
+                headers: { 'User-Agent': 'Kull Support Chat' }
+              });
+              if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                city = geoData.city;
+                state = geoData.region;
+                country = geoData.country_name;
+              }
+            } catch (e) {
+              // Silently fail geolocation
+            }
+          }
+          
+          // Calculate session length from request body if provided
+          const sessionLength = req.body.sessionStartTime 
+            ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000) 
+            : undefined;
+
           await storage.trackSupportQuery({
             userEmail,
             userId,
@@ -547,6 +592,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tokensOut,
             cost: cost.toString(),
             model: 'gpt-5-mini',
+            device,
+            browser,
+            city,
+            state,
+            country,
+            sessionLength,
           });
 
           console.log(`[Chat] Streamed response: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
@@ -757,7 +808,7 @@ You're Kull AI support - your job is to CLOSE the sale. You have complete visibi
 - "You're on mobile checking us out at 11pm - serious about this workflow upgrade or just browsing?"
 - "See you came from Reddit - if you're still manually culling, you're burning 10+ hours a week you'll never get back."
 
-Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.
+Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.`;
 
       const { getChatResponseStream } = await import('./chatService');
       const stream = await getChatResponseStream(contextMarkdown, []);
