@@ -1338,6 +1338,104 @@ Founder, Kull AI
 Follow me: https://x.com/steveMoraco`
 });
 
+// Chat transcript email
+const chatTranscriptEmail = (userEmail: string, messages: Array<{role: string, content: string, timestamp: string}>) => {
+  const baseUrl = process.env.VITE_REPLIT_DOMAINS ? `https://${process.env.VITE_REPLIT_DOMAINS.split(',')[0]}` : 'https://kull-ai.replit.app';
+  
+  const messagesHtml = messages
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => {
+      const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const role = m.role === 'user' ? 'You' : 'Kull Support';
+      const bgColor = m.role === 'user' ? '#8B5CF6' : '#F3F4F6';
+      const textColor = m.role === 'user' ? '#FFFFFF' : '#1F2937';
+      
+      return `
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+            <strong style="color: #374151;">${role}</strong>
+            <span style="color: #9CA3AF; font-size: 12px;">${time}</span>
+          </div>
+          <div style="background: ${bgColor}; color: ${textColor}; padding: 12px 16px; border-radius: 12px; max-width: 80%;">
+            ${m.content.replace(/\n/g, '<br>')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  return {
+    subject: 'Your Kull AI Support Chat Transcript',
+    html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>${emailStyles}</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💬 Your Support Chat Transcript</h1>
+    </div>
+    <div class="content">
+      <p>Hi there!</p>
+      
+      <p>Here's a copy of your recent support chat conversation with our AI support assistant. This transcript has been automatically sent after 5 minutes of inactivity.</p>
+
+      <div style="background: #F9FAFB; padding: 20px; border-radius: 8px; margin: 24px 0;">
+        ${messagesHtml}
+      </div>
+
+      <div class="alert alert-success">
+        <strong>Need more help?</strong><br>
+        You can always start a new chat by clicking the purple support button on any page at ${baseUrl}
+      </div>
+
+      <p>Our AI support has access to our entire GitHub repository and website backend, so it can answer any sales, technical, or support questions instantly!</p>
+
+      <p style="margin-top: 32px;">Best regards,<br>
+      <strong>Steve Moraco</strong><br>
+      Founder, Kull AI</p>
+    </div>
+    <div class="footer">
+      <div class="footer-links">
+        <a href="${baseUrl}/support">Support</a>
+        <a href="${baseUrl}/refunds">Refunds</a>
+        <a href="${baseUrl}/terms">Terms</a>
+        <a href="${baseUrl}/contact">Contact</a>
+      </div>
+      <p>Follow me on X: <a href="https://x.com/steveMoraco" style="color: #8B5CF6;">@steveMoraco</a></p>
+      <p>© 2025 Lander Media, 31 N Tejon St, Colorado Springs, CO 80903</p>
+      <p><a href="https://heydata.org" style="color: #8B5CF6;">Powered by heydata.org</a></p>
+    </div>
+  </div>
+</body>
+</html>
+    `,
+    text: `💬 YOUR SUPPORT CHAT TRANSCRIPT
+
+Hi there!
+
+Here's a copy of your recent support chat conversation with our AI support assistant. This transcript has been automatically sent after 5 minutes of inactivity.
+
+CONVERSATION:
+${messages.map(m => {
+  const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const role = m.role === 'user' ? 'YOU' : 'KULL SUPPORT';
+  return `[${time}] ${role}:\n${m.content}\n`;
+}).join('\n')}
+
+NEED MORE HELP?
+You can always start a new chat by clicking the purple support button on any page at ${baseUrl}
+
+Our AI support has access to our entire GitHub repository and website backend, so it can answer any sales, technical, or support questions instantly!
+
+Best regards,
+Steve Moraco
+Founder, Kull AI
+Follow me: https://x.com/steveMoraco`
+  };
+};
+
 export const emailTemplates = {
   // First login
   firstLoginWelcome: firstLoginWelcomeEmail,
@@ -1360,4 +1458,7 @@ export const emailTemplates = {
   // Referral emails
   referralInvitation: referralInvitationEmail,
   referralConfirmation: referralConfirmationEmail,
+  
+  // Chat transcript
+  chatTranscript: chatTranscriptEmail,
 };

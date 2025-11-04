@@ -563,6 +563,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send chat transcript via email after inactivity
+  app.post('/api/chat/send-transcript', async (req: any, res) => {
+    try {
+      const { messages, userEmail } = req.body;
+
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ message: "Messages are required" });
+      }
+
+      if (!userEmail || typeof userEmail !== 'string') {
+        return res.status(400).json({ message: "User email is required" });
+      }
+
+      const { emailTemplates } = await import('./emailTemplates');
+      const transcriptEmail = emailTemplates.chatTranscript(userEmail, messages);
+      
+      // Send email to user with BCC to steve@lander.media using SendGrid directly
+      const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+      if (!SENDGRID_API_KEY) {
+        throw new Error('SENDGRID_API_KEY is not configured');
+      }
+
+      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [
+            {
+              to: [{ email: userEmail }],
+              bcc: [{ email: 'steve@lander.media' }],
+            },
+          ],
+          from: {
+            email: 'steve@kullai.com',
+            name: 'Steve Moraco, Founder',
+          },
+          subject: transcriptEmail.subject,
+          content: [
+            {
+              type: 'text/plain',
+              value: transcriptEmail.text,
+            },
+            {
+              type: 'text/html',
+              value: transcriptEmail.html,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`SendGrid error: ${errorText}`);
+      }
+
+      console.log(`[Chat] Sent transcript email to ${userEmail} with BCC to steve@lander.media`);
+
+      res.json({ success: true, message: 'Transcript sent successfully' });
+    } catch (error: any) {
+      console.error("Error sending chat transcript:", error);
+      res.status(500).json({ message: "Failed to send transcript: " + error.message });
+    }
+  });
+
   // Referral endpoints
   app.post('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {

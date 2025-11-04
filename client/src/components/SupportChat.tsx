@@ -296,6 +296,8 @@ export function SupportChat() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [transcriptSent, setTranscriptSent] = useState(false);
 
   // Save current session ID to localStorage whenever it changes
   useEffect(() => {
@@ -340,6 +342,53 @@ export function SupportChat() {
     scrollToBottom();
   }, [messages]);
 
+  // Reset inactivity timer on any message activity
+  const resetInactivityTimer = () => {
+    // Clear existing timer
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+
+    // Only set timer if chat is open, user is logged in, and has messages
+    if (isOpen && user && typeof user === 'object' && user !== null && 'email' in user && user.email && messages.length > 1 && !transcriptSent) {
+      const userEmail = user.email as string;
+      inactivityTimerRef.current = setTimeout(async () => {
+        // Send transcript after 5 minutes of inactivity
+        try {
+          await apiRequest('POST', '/api/chat/send-transcript', {
+            messages: messages.map(m => ({
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp.toISOString(),
+            })),
+            userEmail: userEmail,
+          });
+          setTranscriptSent(true);
+          console.log('Chat transcript sent after 5 minutes of inactivity');
+        } catch (error) {
+          console.error('Failed to send chat transcript:', error);
+        }
+      }, 5 * 60 * 1000); // 5 minutes
+    }
+  };
+
+  // Reset timer when messages change or chat opens
+  useEffect(() => {
+    resetInactivityTimer();
+    
+    // Cleanup on unmount
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [messages, isOpen, user]);
+
+  // Reset transcript sent flag when starting new session
+  useEffect(() => {
+    setTranscriptSent(false);
+  }, [currentSessionId]);
+
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
 
@@ -354,12 +403,12 @@ export function SupportChat() {
     setInputValue('');
     setIsLoading(true);
 
-    // Create placeholder assistant message for streaming
+    // Create placeholder assistant message with "Thinking..." indicator
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
-      content: '',
+      content: '_Thinking..._',
       timestamp: new Date(),
     };
 
@@ -389,6 +438,7 @@ export function SupportChat() {
       }
 
       let fullContent = '';
+      let firstTokenReceived = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -406,15 +456,24 @@ export function SupportChat() {
               if (data.type === 'delta' && data.content) {
                 fullContent += data.content;
 
-                // Check for the special marker ␞ (U+241E) immediately
-                const markerIndex = fullContent.indexOf('␞');
-                if (markerIndex !== -1) {
-                  // Found the marker! Extract everything after it
-                  const beforeMarker = fullContent.substring(0, markerIndex).trim();
-                  const afterMarker = fullContent.substring(markerIndex);
+                // Look for cutoff: prefer ␞ marker, fallback to plain text
+                let cutoffIndex = fullContent.indexOf('␞');
 
-                  // Try to extract follow-up questions
-                  const followUpMatch = afterMarker.match(/␞FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+                // Fallback: look for FOLLOW_UP_QUESTIONS without marker
+                if (cutoffIndex === -1) {
+                  const plainMatch = fullContent.match(/\n\s*FOLLOW_UP_QUESTIONS:/i);
+                  if (plainMatch && plainMatch.index !== undefined) {
+                    cutoffIndex = plainMatch.index;
+                  }
+                }
+
+                if (cutoffIndex !== -1) {
+                  // Found cutoff! Hide everything after it
+                  const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+                  const questionsSection = fullContent.substring(cutoffIndex);
+
+                  // Extract follow-up questions (handle both formats)
+                  const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
                   if (followUpMatch) {
                     const newQuestions = followUpMatch[1]
                       .split('|')
@@ -422,25 +481,24 @@ export function SupportChat() {
                       .filter((q: string) => q.length > 0);
 
                     if (newQuestions.length > 0) {
-                      // Update quick questions
                       setQuickQuestions(prev => {
                         const combined = [...prev, ...newQuestions];
-                        return combined.slice(-8); // Keep only the last 8
+                        return combined.slice(-8);
                       });
                     }
                   }
 
-                  // Only show content before the marker
+                  // Only show clean content
                   setMessages(prev =>
                     prev.map(msg =>
                       msg.id === assistantMessageId
-                        ? { ...msg, content: beforeMarker }
+                        ? { ...msg, content: cleanContent }
                         : msg
                     )
                   );
-                  fullContent = beforeMarker;
+                  fullContent = cleanContent;
                 } else {
-                  // No marker yet, show all content
+                  // No cutoff yet, show all content
                   setMessages(prev =>
                     prev.map(msg =>
                       msg.id === assistantMessageId
@@ -452,10 +510,17 @@ export function SupportChat() {
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
-                // Stream complete - do final cleanup
-                const markerIndex = fullContent.indexOf('␞');
-                if (markerIndex !== -1) {
-                  const cleanContent = fullContent.substring(0, markerIndex).trim();
+                // Final cleanup
+                let cutoffIndex = fullContent.indexOf('␞');
+                if (cutoffIndex === -1) {
+                  const plainMatch = fullContent.match(/\n\s*FOLLOW_UP_QUESTIONS:/i);
+                  if (plainMatch && plainMatch.index !== undefined) {
+                    cutoffIndex = plainMatch.index;
+                  }
+                }
+
+                if (cutoffIndex !== -1) {
+                  const cleanContent = fullContent.substring(0, cutoffIndex).trim();
                   setMessages(prev =>
                     prev.map(msg =>
                       msg.id === assistantMessageId
@@ -612,8 +677,8 @@ export function SupportChat() {
                 <MessageCircle className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="font-bold text-primary-foreground">Kull AI Support</h3>
-                <p className="text-xs text-primary-foreground/80">Usually responds instantly</p>
+                <h3 className="font-bold text-primary-foreground">Kull Support</h3>
+                <p className="text-xs text-primary-foreground/80">Has access to entire github repo & website backend, can answer any sales, technical, or support question instantly.</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
