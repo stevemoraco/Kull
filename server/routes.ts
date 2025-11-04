@@ -576,28 +576,48 @@ ${userActivity.map((event: any, idx: number) => {
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
+              const content = line.slice(6);
+              
+              // Handle [DONE] signal
+              if (content.trim() === '[DONE]') {
+                console.log('[Chat] Received [DONE] signal from OpenAI');
+                continue;
+              }
 
-                // Handle different event types from Responses API
-                if (data.type === 'response.output_text.delta' && data.delta) {
-                  fullResponse += data.delta;
-                  // Forward to client immediately (no buffering due to flushHeaders)
-                  res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                } else if (data.type === 'response.done' || data.type === 'response.completed') {
-                  // Extract usage data from done/completed event
-                  if (data.response?.usage) {
-                    tokensIn = data.response.usage.input_tokens || 0;
-                    tokensOut = data.response.usage.output_tokens || 0;
-                    // Calculate cost for gpt-5-mini: Input $0.100/1M, Output $0.400/1M
-                    cost = (tokensIn / 1_000_000) * 0.100 + (tokensOut / 1_000_000) * 0.400;
+              try {
+                const data = JSON.parse(content);
+
+                // Handle Chat Completions API streaming format
+                if (data.choices && data.choices[0]) {
+                  const choice = data.choices[0];
+                  
+                  // Extract content delta
+                  if (choice.delta?.content) {
+                    fullResponse += choice.delta.content;
+                    // Forward to client immediately
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
                   }
-                  console.log(`[Chat] Response ${data.type}, usage:`, data.response?.usage);
-                } else if (data.type === 'error') {
-                  const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
+                  
+                  // Check for finish_reason and usage data
+                  if (choice.finish_reason) {
+                    console.log(`[Chat] Stream finished with reason: ${choice.finish_reason}`);
+                  }
+                }
+                
+                // Extract usage data (sent in final chunk with stream_options)
+                if (data.usage) {
+                  tokensIn = data.usage.prompt_tokens || 0;
+                  tokensOut = data.usage.completion_tokens || 0;
+                  // Calculate cost for gpt-5-mini: Input $0.25/1M, Output $2.00/1M
+                  cost = (tokensIn / 1_000_000) * 0.25 + (tokensOut / 1_000_000) * 2.00;
+                  console.log(`[Chat] ✅ USAGE RECEIVED: tokensIn=${tokensIn}, tokensOut=${tokensOut}, cost=$${cost.toFixed(6)}`);
+                }
+                
+                // Handle error
+                if (data.error) {
+                  const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
                 }
-                // Silently ignore other event types (response.in_progress, etc.)
               } catch (e) {
                 // Skip invalid JSON lines - likely incomplete data between chunks
                 console.log('[Chat] Skipped line (parse error):', line.substring(0, 50));
@@ -1169,28 +1189,49 @@ ${contextMarkdown}`;
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
+              const content = line.slice(6);
+              
+              // Handle [DONE] signal
+              if (content.trim() === '[DONE]') {
+                console.log('[Welcome] Received [DONE] signal from OpenAI');
+                continue;
+              }
+
               try {
-                const data = JSON.parse(line.slice(6));
+                const data = JSON.parse(content);
 
                 // Log first few events
                 if (serverChunkCount <= 3) {
-                  console.log('[Welcome] OpenAI event:', data.type, Object.keys(data));
+                  console.log('[Welcome] OpenAI chunk:', Object.keys(data));
                 }
 
-                // Transform OpenAI format to our client format
-                if (data.type === 'response.output_text.delta' && data.delta) {
-                  fullResponse += data.delta;
-                  res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                } else if (data.type === 'response.done' || data.type === 'response.completed') {
-                  console.log(`[Welcome] OpenAI sent ${data.type} event`);
-                  // Track token usage
-                  if (data.response?.usage) {
-                    tokensIn = data.response.usage.input_tokens || 0;
-                    tokensOut = data.response.usage.output_tokens || 0;
+                // Handle Chat Completions API streaming format
+                if (data.choices && data.choices[0]) {
+                  const choice = data.choices[0];
+                  
+                  // Extract content delta
+                  if (choice.delta?.content) {
+                    fullResponse += choice.delta.content;
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
                   }
-                } else if (data.type === 'error') {
-                  console.error('[Welcome] OpenAI error:', data);
-                  const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
+                  
+                  // Check for finish_reason
+                  if (choice.finish_reason) {
+                    console.log(`[Welcome] Stream finished with reason: ${choice.finish_reason}`);
+                  }
+                }
+                
+                // Extract usage data (sent in final chunk with stream_options)
+                if (data.usage) {
+                  tokensIn = data.usage.prompt_tokens || 0;
+                  tokensOut = data.usage.completion_tokens || 0;
+                  console.log(`[Welcome] ✅ USAGE RECEIVED: tokensIn=${tokensIn}, tokensOut=${tokensOut}`);
+                }
+                
+                // Handle error
+                if (data.error) {
+                  console.error('[Welcome] OpenAI error:', data.error);
+                  const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
                 }
               } catch (e) {
@@ -1226,8 +1267,8 @@ ${contextMarkdown}`;
         const userId = req.user?.claims?.sub;
 
         if (fullResponse) {
-          // Calculate cost for gpt-5-mini: Input $0.100/1M, Output $0.400/1M
-          const cost = (tokensIn / 1_000_000) * 0.100 + (tokensOut / 1_000_000) * 0.400;
+          // Calculate cost for gpt-5-mini: Input $0.25/1M, Output $2.00/1M
+          const cost = (tokensIn / 1_000_000) * 0.25 + (tokensOut / 1_000_000) * 2.00;
 
           // Extract metadata
           const userAgent = req.headers['user-agent'] || '';

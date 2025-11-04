@@ -12,6 +12,7 @@ declare module 'http' {
   }
 }
 app.use(express.json({
+  limit: '10mb', // Increase limit for large prompts (50k+ chars)
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }

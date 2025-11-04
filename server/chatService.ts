@@ -209,15 +209,19 @@ export async function getChatResponseStream(
       });
     }
 
-    // Build full instructions with repo content AND all context
-    const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${contextSections}\n\n${PROMPT_SUFFIX}`;
+    // Build full system message with instructions, repo content, and context
+    const systemMessage = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${contextSections}\n\n${PROMPT_SUFFIX}`;
 
-    console.log(`[Chat] Instructions size: ${instructions.length} chars (repo: ${repoContent.length}, context: ${contextSections.length})`);
+    console.log(`[Chat] System message size: ${systemMessage.length} chars (repo: ${repoContent.length}, context: ${contextSections.length})`);
 
-    // Build input array with FULL conversation history (NO TRUNCATION)
-    const input = [
+    // Build messages array for Chat Completions API
+    const messages = [
+      {
+        role: 'system',
+        content: systemMessage,
+      },
       ...history.map(msg => ({
-        role: msg.role === 'system' || msg.role === 'developer' ? 'developer' : msg.role,
+        role: msg.role === 'system' ? 'user' : msg.role, // Convert system to user for context
         content: msg.content,
       })),
       {
@@ -226,10 +230,10 @@ export async function getChatResponseStream(
       },
     ];
 
-    console.log(`[Chat] Sending request with ${instructions.length} chars of instructions (includes repo), ${input.length} messages in history`);
+    console.log(`[Chat] Sending request with ${systemMessage.length} chars system message, ${messages.length} total messages`);
 
-    // Call OpenAI Responses API with streaming
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    // Call OpenAI Chat Completions API with streaming (supports stream_options)
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiApiKey}`,
@@ -237,10 +241,12 @@ export async function getChatResponseStream(
       },
       body: JSON.stringify({
         model: 'gpt-5-mini',
-        instructions, // High-priority instructions with full repo content
-        input, // Conversation history
-        max_output_tokens: 8000, // Generous limit for detailed responses
+        messages,
+        max_completion_tokens: 8000, // Generous limit for detailed responses (GPT-5 uses max_completion_tokens)
         stream: true,
+        stream_options: {
+          include_usage: true, // Send usage data in final chunk
+        },
       }),
     });
 
