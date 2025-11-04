@@ -16,6 +16,7 @@ import Terms from "@/pages/Terms";
 import Refunds from "@/pages/Refunds";
 import Support from "@/pages/Support";
 import Contact from "@/pages/Contact";
+import About from "@/pages/About";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -24,12 +25,15 @@ function Router() {
     <Switch>
       {/* Public pages accessible to all */}
       <Route path="/landing" component={Landing} />
+      <Route path="/about" component={About} />
       <Route path="/pricing" component={Dashboard} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/refunds" component={Refunds} />
       <Route path="/support" component={Support} />
       <Route path="/contact" component={Contact} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/checkout" component={Checkout} />
 
       {/* Auth-conditional pages */}
       {isLoading || !isAuthenticated ? (
@@ -37,8 +41,6 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
-          <Route path="/checkout" component={Checkout} />
-          <Route path="/dashboard" component={Dashboard} />
           <Route path="/admin" component={Admin} />
         </>
       )}

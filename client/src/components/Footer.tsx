@@ -1,17 +1,43 @@
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Footer() {
+  const { isAuthenticated } = useAuth();
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    scrollToTop();
+  };
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+  };
+
   const productLinks = [
-    { name: "Features", href: "/landing#features" },
-    { name: "Pricing", href: "/landing#pricing" },
-    { name: "Download", href: "/landing#download" },
-    { name: "iOS App", href: "/landing#ios-app" }
+    { name: "Features", href: "/#features", isSection: true, sectionId: "features" },
+    { name: "Pricing", href: "/#pricing", isSection: true, sectionId: "pricing" },
+    { name: "Download", href: "/#download", isSection: true, sectionId: "download" }
   ];
 
   const companyLinks = [
-    { name: "About", href: "/landing#about" },
+    { name: "About", href: "/about" },
     { name: "Contact", href: "/contact" },
     { name: "Support", href: "/support" }
+  ];
+
+  const accountLinks = [
+    { name: "Dashboard", href: "/dashboard" },
+    { name: "My Account", href: "/" },
+    { name: "Downloads", href: "/#download", isSection: true, sectionId: "download" }
   ];
 
   const legalLinks = [
@@ -23,42 +49,28 @@ export function Footer() {
   return (
     <footer className="bg-card border-t border-card-border" data-testid="footer">
       <div className="max-w-7xl mx-auto px-4 py-12 md:py-16">
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 mb-12">
+        <div className={`grid sm:grid-cols-2 gap-8 mb-12 ${isAuthenticated ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           {/* Product */}
           <div>
             <h3 className="font-bold text-card-foreground mb-4">Product</h3>
             <ul className="space-y-2">
               {productLinks.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    {link.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Company */}
-          <div>
-            <h3 className="font-bold text-card-foreground mb-4">Company</h3>
-            <ul className="space-y-2">
-              {companyLinks.map((link) => (
-                <li key={link.name}>
-                  {link.href.startsWith('/landing#') || link.href.startsWith('#') ? (
-                    <a
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  {link.isSection ? (
+                    <button
+                      onClick={() => {
+                        window.location.href = '/';
+                        setTimeout(() => scrollToSection(link.sectionId!), 100);
+                      }}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
                       data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
                     >
                       {link.name}
-                    </a>
+                    </button>
                   ) : (
                     <Link
                       href={link.href}
+                      onClick={handleClick}
                       className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                       data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
                     >
@@ -70,6 +82,59 @@ export function Footer() {
             </ul>
           </div>
 
+          {/* Company */}
+          <div>
+            <h3 className="font-bold text-card-foreground mb-4">Company</h3>
+            <ul className="space-y-2">
+              {companyLinks.map((link) => (
+                <li key={link.name}>
+                  <Link
+                    href={link.href}
+                    onClick={handleClick}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          {/* My Account (only when authenticated) */}
+          {isAuthenticated && (
+            <div>
+              <h3 className="font-bold text-card-foreground mb-4">My Account</h3>
+              <ul className="space-y-2">
+                {accountLinks.map((link) => (
+                  <li key={link.name}>
+                    {link.isSection ? (
+                      <button
+                        onClick={() => {
+                          window.location.href = '/';
+                          setTimeout(() => scrollToSection(link.sectionId!), 100);
+                        }}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+                        data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {link.name}
+                      </button>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        onClick={handleClick}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {link.name}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Legal */}
           <div>
             <h3 className="font-bold text-card-foreground mb-4">Legal</h3>
@@ -78,6 +143,7 @@ export function Footer() {
                 <li key={link.name}>
                   <Link
                     href={link.href}
+                    onClick={handleClick}
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                     data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
                   >

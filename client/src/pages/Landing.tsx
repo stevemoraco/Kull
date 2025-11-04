@@ -15,6 +15,16 @@ export default function Landing() {
     window.location.href = "/api/login";
   };
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80; // Account for fixed nav
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    }
+  };
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -34,10 +44,34 @@ export default function Landing() {
             </div>
             <span className="text-xl font-black text-foreground" data-testid="text-logo">Kull</span>
           </button>
+          
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-6">
+            <button onClick={() => scrollToSection('features')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-features">
+              Features
+            </button>
+            <button onClick={() => scrollToSection('pricing')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-pricing">
+              Pricing
+            </button>
+            <button onClick={() => scrollToSection('download')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-download">
+              Download
+            </button>
+            <Button
+              variant="outline"
+              onClick={handleLogin}
+              data-testid="button-login-nav"
+            >
+              <LogIn className="w-4 h-4 mr-2" />
+              Sign In
+            </Button>
+          </div>
+          
+          {/* Mobile Sign In */}
           <Button
             variant="outline"
             onClick={handleLogin}
-            data-testid="button-login-nav"
+            className="md:hidden"
+            data-testid="button-login-nav-mobile"
           >
             <LogIn className="w-4 h-4 mr-2" />
             Sign In
@@ -49,12 +83,18 @@ export default function Landing() {
       <div className="pt-16">
         <Hero />
         <ProblemSection />
-        <SolutionSection />
+        <div id="features">
+          <SolutionSection />
+        </div>
         <ValueStack />
-        <PricingSection />
-        <ReferralSection />
+        <div id="pricing">
+          <PricingSection />
+        </div>
+        <div id="download">
+          <ReferralSection />
+          <FinalCTA />
+        </div>
         <FAQSection />
-        <FinalCTA />
         <Footer />
       </div>
     </div>
