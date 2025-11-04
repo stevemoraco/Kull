@@ -119,6 +119,7 @@ export const supportQueries = pgTable("support_queries", {
   userId: varchar("user_id").references(() => users.id), // Optional, for logged-in users
   userMessage: text("user_message").notNull(),
   aiResponse: text("ai_response").notNull(),
+  fullPrompt: text("full_prompt"), // Complete prompt sent to model for debugging
   tokensIn: integer("tokens_in").notNull().default(0),
   tokensOut: integer("tokens_out").notNull().default(0),
   cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default("0"), // Cost in USD

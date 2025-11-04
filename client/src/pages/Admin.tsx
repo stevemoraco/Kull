@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign, X } from "lucide-react";
+import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign, X, FileCode } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { usePageTracking } from "@/hooks/usePageTracking";
 
@@ -56,6 +56,8 @@ export default function Admin() {
   const [timerange, setTimerange] = useState("all");
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [promptDialogOpen, setPromptDialogOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
 
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: [`/api/admin/analytics?timerange=${timerange}`],
@@ -518,14 +520,31 @@ export default function Admin() {
                           <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{query.aiResponse}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{new Date(query.createdAt).toLocaleString()}</span>
-                        <span>•</span>
-                        <span>Tokens In: {query.tokensIn}</span>
-                        <span>•</span>
-                        <span>Tokens Out: {query.tokensOut}</span>
-                        <span>•</span>
-                        <span>Cost: ${query.cost ? parseFloat(query.cost).toFixed(6) : '0.000000'}</span>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>{new Date(query.createdAt).toLocaleString()}</span>
+                          <span>•</span>
+                          <span>Tokens In: {query.tokensIn}</span>
+                          <span>•</span>
+                          <span>Tokens Out: {query.tokensOut}</span>
+                          <span>•</span>
+                          <span>Cost: ${query.cost ? parseFloat(query.cost).toFixed(6) : '0.000000'}</span>
+                        </div>
+                        {query.fullPrompt && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPrompt(query.fullPrompt);
+                              setPromptDialogOpen(true);
+                            }}
+                            className="gap-2"
+                            data-testid="button-view-prompt"
+                          >
+                            <FileCode className="h-3 w-3" />
+                            View Full Prompt
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -535,6 +554,53 @@ export default function Admin() {
               <div className="text-center py-8 text-muted-foreground">No chat history found</div>
             )}
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full Prompt Viewer Dialog */}
+      <Dialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCode className="h-5 w-5" />
+              Full Prompt Debug Log
+            </DialogTitle>
+            <DialogDescription>
+              Complete prompt and conversation history sent to the AI model
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[70vh] pr-4">
+            {selectedPrompt ? (
+              <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
+                {selectedPrompt}
+              </pre>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">No prompt data available</div>
+            )}
+          </ScrollArea>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (selectedPrompt) {
+                  navigator.clipboard.writeText(selectedPrompt);
+                  toast({
+                    title: "Copied to clipboard",
+                    description: "Full prompt copied successfully",
+                  });
+                }
+              }}
+              data-testid="button-copy-prompt"
+            >
+              Copy to Clipboard
+            </Button>
+            <Button
+              onClick={() => setPromptDialogOpen(false)}
+              data-testid="button-close-prompt"
+            >
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

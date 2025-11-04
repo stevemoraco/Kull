@@ -474,7 +474,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
 
-      const { getChatResponseStream } = await import('./chatService');
+      const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
+      
+      // Build full prompt markdown for debugging
+      const fullPrompt = await buildFullPromptMarkdown(message, history || []);
+      
       const stream = await getChatResponseStream(message, history || []);
 
       const reader = stream.getReader();
@@ -563,10 +567,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             try {
               // Use ipapi.co for geolocation
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2000);
               const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, { 
-                timeout: 2000,
+                signal: controller.signal,
                 headers: { 'User-Agent': 'Kull Support Chat' }
               });
+              clearTimeout(timeoutId);
               if (geoRes.ok) {
                 const geoData = await geoRes.json();
                 city = geoData.city;
@@ -588,6 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId,
             userMessage: message,
             aiResponse: fullResponse,
+            fullPrompt,
             tokensIn,
             tokensOut,
             cost: cost.toString(),
@@ -792,21 +800,25 @@ ${context.userActivity.map((event: any, idx: number) => {
 **Your Task:**
 You're Kull AI support - your job is to CLOSE the sale. You have complete visibility into their session (location, device, behavior, scroll depth, clicks, time on site, etc.) but NEVER reveal this data directly.
 
+**NAVIGATION SUPERPOWER:**
+When you include a link to https://kullai.com, the page will AUTOMATICALLY navigate there. Use this to guide them! Think of yourself as a tour guide who can instantly teleport them to the right page while you explain.
+
 **Sales Strategy (Alex Hormozi Style):**
 - Use the data to make educated guesses about what they need or what's holding them back
 - Pattern interrupt - catch their attention with something unexpected or specific
 - Create urgency or point out what they're missing
 - Make it conversational, not salesy
 - Be direct and confident
-- Always include 1 link to move them forward (use hash anchors like #pricing, #features when relevant)
+- Include 1 strategic link to move them forward (use hash anchors like #pricing, #features when relevant)
+- Remember: the link will navigate them there automatically, so use it to guide their journey
 
 **Format:**
 1-2 sentences MAX. Make every word count. Focus on the outcome they want, not features.
 
 **Examples of good openers:**
-- "Noticed you've been scrolling the pricing page for a while - most pros who hesitate end up regretting not starting sooner. Want to see what the trial includes?"
-- "You're on mobile checking us out at 11pm - serious about this workflow upgrade or just browsing?"
-- "See you came from Reddit - if you're still manually culling, you're burning 10+ hours a week you'll never get back."
+- "Noticed you've been on pricing for a while - let me show you [what the trial includes](https://kullai.com/pricing#professional), most pros who hesitate regret waiting."
+- "Still manually culling at 11pm? You're burning 10+ hours a week - [see how AI handles it](https://kullai.com/features#ai-culling)."
+- "Came from Reddit and scrolled 80% down - ready to [start your trial](https://kullai.com/checkout) or still browsing?"
 
 Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.`;
 

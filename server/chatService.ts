@@ -33,19 +33,30 @@ Below is the complete codebase from github.com/stevemoraco/kull which is deploye
 // Instructions after repo content
 const PROMPT_SUFFIX = `
 
-RESPONSE FORMAT (FOLLOW EXACTLY):
+NAVIGATION SUPERPOWER:
+**When you include a link to https://kullai.com in your response, the page will AUTOMATICALLY navigate there.**
+- This is a FEATURE you can use to guide users around the site while you explain
+- Think of it like a tour guide - you can show them the pricing page while explaining costs, features page while listing capabilities, etc.
+- The first link in your response triggers navigation to that page
+- Use hash anchors (#section-id) to jump directly to relevant sections
+- The user stays in the SAME TAB - don't worry about disrupting their flow
+- This makes your explanations interactive and visual
+
+RESPONSE FORMAT:
 
 1. **YOUR ANSWER (2-4 paragraphs):**
    - Answer the user's question thoroughly and naturally
    - Use markdown formatting (bold, italic, lists)
-   - **CRITICAL: Include at least 1 markdown link to a relevant kullai.com page**
-   - Insert links naturally in your response where they make sense
-   - Links should point directly to what you're discussing on the LIVE WEBSITE
-   - Use FULL URLs with https://kullai.com domain
-   - **USE HASH FRAGMENTS (#) when linking to specific page sections**
-   - Search the HTML/JSX for id attributes and section markers to find exact anchor points
-   - The page will auto-navigate to the first link it finds
+   - **Include relevant links to show them around** - remember, they'll navigate automatically!
+   - Insert links naturally where they add value (e.g., "Let me show you [our pricing options](https://kullai.com/pricing#professional)")
+   - Use FULL URLs with https://kullai.com domain (NOT relative paths like /pricing)
+   - **USE HASH FRAGMENTS (#) to jump to specific sections** (analyze the HTML/JSX for id attributes)
    - Reference specific features, code, or documentation from the repository
+
+   Examples of good link usage:
+   - "Here's [how the AI culling works](https://kullai.com/features#ai-culling)" ← Takes them to features page, scrolls to AI section
+   - "Check out [our Professional tier](https://kullai.com/pricing#professional)" ← Shows pricing, highlights that tier
+   - "The [installation guide](https://kullai.com/docs#installation) walks through setup" ← Opens docs at exact section
 
 2. **END - FOLLOW-UP QUESTIONS (REQUIRED):**
    - You MUST end with: ␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
@@ -54,12 +65,56 @@ RESPONSE FORMAT (FOLLOW EXACTLY):
    - Make these actual natural questions, NOT placeholders
 
 REMEMBER:
-- Every response must have at least 1 link to https://kullai.com (NOT GitHub) unless the user asks a technical question about code
+- Links are your superpower - use them strategically to enhance your explanation
+- Every response should include relevant links when they add value (don't force them if unnecessary)
+- Avoid linking to GitHub unless the user asks a technical/code question
 - Determine the correct URL by analyzing the repository structure and frontend routes
-- Use full https://kullai.com URLs with hash anchors when relevant
 
 Answer based on the codebase provided above.`;
 
+
+// Helper to build full prompt markdown for debugging
+export async function buildFullPromptMarkdown(
+  userMessage: string,
+  history: ChatMessage[]
+): Promise<string> {
+  const repoContent = await getRepoContent();
+  const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
+  
+  const input = [
+    ...history.slice(-10).map(msg => ({
+      role: msg.role === 'system' || msg.role === 'developer' ? 'developer' : msg.role,
+      content: msg.content,
+    })),
+    {
+      role: 'user',
+      content: userMessage,
+    },
+  ];
+
+  // Format as markdown document
+  let markdown = '# OpenAI API Call - Full Prompt Debug Log\n\n';
+  markdown += '## API Configuration\n\n';
+  markdown += '```json\n';
+  markdown += JSON.stringify({
+    model: 'gpt-5-mini',
+    max_output_tokens: 8000,
+    stream: true,
+    api_endpoint: 'https://api.openai.com/v1/responses'
+  }, null, 2);
+  markdown += '\n```\n\n';
+  
+  markdown += '## Instructions (System Prompt)\n\n';
+  markdown += '```\n' + instructions + '\n```\n\n';
+  
+  markdown += '## Conversation History + Current Message\n\n';
+  input.forEach((msg, idx) => {
+    markdown += `### Message ${idx + 1} - Role: ${msg.role}\n\n`;
+    markdown += '```\n' + msg.content + '\n```\n\n';
+  });
+  
+  return markdown;
+}
 
 export async function getChatResponseStream(
   userMessage: string,
