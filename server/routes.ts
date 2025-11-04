@@ -1422,6 +1422,7 @@ ${contextMarkdown}`;
       }
 
       const userId = req.user?.claims?.sub || null;
+      const userEmail = req.user?.claims?.email || null;
 
       // Extract IP address for anonymous session association
       const ipAddress = req.headers['cf-connecting-ip'] ||
@@ -1440,6 +1441,7 @@ ${contextMarkdown}`;
         const chatSession = {
           id: session.id,
           userId: userId,
+          userEmail: userEmail,
           title: session.title,
           messages: JSON.stringify(session.messages),
           ipAddress: ipAddress,
@@ -1601,6 +1603,7 @@ ${contextMarkdown}`;
       });
 
       // Aggregate costs and tokens per user from support queries
+      console.log(`[Admin] Aggregating costs from ${allQueries.length} queries into ${chatUserMap.size} users`);
       allQueries.forEach(query => {
         // Match by userId first, then by email
         const userKey = query.userId ||
@@ -1613,6 +1616,8 @@ ${contextMarkdown}`;
           chatUser.totalTokensIn = (chatUser.totalTokensIn || 0) + (query.tokensIn || 0);
           chatUser.totalTokensOut = (chatUser.totalTokensOut || 0) + (query.tokensOut || 0);
           chatUser.queryCount = (chatUser.queryCount || 0) + 1;
+        } else {
+          console.log(`[Admin] WARNING: Query userKey "${userKey}" not found in chatUserMap (keys: ${Array.from(chatUserMap.keys()).join(', ')})`);
         }
       });
 
