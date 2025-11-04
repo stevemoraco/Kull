@@ -299,10 +299,11 @@ export function SupportChat() {
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [transcriptSent, setTranscriptSent] = useState(false);
 
-  // Store pre-generated greeting
+  // Store pre-generated greeting for initial use
   const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
   const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [greetingGenerated, setGreetingGenerated] = useState(false);
+  const lastUserMessageTimeRef = useRef<number>(Date.now());
 
   // Track page visits in sessionStorage for context
   useEffect(() => {
@@ -391,18 +392,40 @@ export function SupportChat() {
         }
 
         if (fullContent) {
-          setLatestGreeting(fullContent);
-          setGreetingGenerated(true);
+          if (!greetingGenerated) {
+            // First generation: store for initial greeting
+            setLatestGreeting(fullContent);
+            setGreetingGenerated(true);
+          } else {
+            // Subsequent generations: add as new message to conversation
+            const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
 
-          // Show toast notification with preview
-          if (greetingGenerated) {
-            // Only show toast on subsequent generations, not the first one
-            const preview = fullContent.substring(0, 100) + (fullContent.length > 100 ? '...' : '');
-            toast({
-              title: 'Chat greeting updated',
-              description: preview,
-              duration: 4000,
-            });
+            // Only add if it's been at least 20 seconds since last user message
+            // This prevents interrupting active conversations
+            if (timeSinceLastUserMessage > 20000 && messages.length > 0) {
+              const newMessage: Message = {
+                id: 'context-' + Date.now(),
+                role: 'assistant',
+                content: fullContent,
+                timestamp: new Date(),
+              };
+
+              setMessages(prev => [...prev, newMessage]);
+
+              // Show toast notification
+              const preview = fullContent.substring(0, 80) + (fullContent.length > 80 ? '...' : '');
+              toast({
+                title: 'New update from Kull',
+                description: preview,
+                duration: 5000,
+              });
+
+              // Navigate to first link in the update
+              const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+              if (linkMatch) {
+                handleLinkClick(linkMatch[2]);
+              }
+            }
           }
         }
       } catch (error) {
@@ -421,7 +444,7 @@ export function SupportChat() {
         clearInterval(greetingTimerRef.current);
       }
     };
-  }, [user, toast, greetingGenerated]);
+  }, [user, toast, greetingGenerated, messages, handleLinkClick, setMessages]);
 
   const handleLinkClick = (url: string) => {
     // Check if it's an internal link (starts with /)
@@ -683,6 +706,9 @@ export function SupportChat() {
 
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
+
+    // Track when user last sent a message
+    lastUserMessageTimeRef.current = Date.now();
 
     const userMessage: Message = {
       id: Date.now().toString(),
