@@ -242,13 +242,22 @@ export function SupportChat() {
     return loadedSessions;
   });
 
-  // Track current session ID
+  // Track current session ID - load from localStorage on mount
   const [currentSessionId, setCurrentSessionId] = useState<string>(() => {
+    const loadedSessions = loadSessions();
     const stored = localStorage.getItem('kull-current-session-id');
-    if (stored && sessions.find(s => s.id === stored)) {
+
+    // Validate stored session ID exists in sessions
+    if (stored && loadedSessions.find(s => s.id === stored)) {
+      console.log('[Chat] Resuming session:', stored);
       return stored;
     }
-    return sessions[0]?.id || '';
+
+    // Default to first session (or main-session-persistent)
+    const defaultId = loadedSessions[0]?.id || 'main-session-persistent';
+    console.log('[Chat] Starting new session:', defaultId);
+    localStorage.setItem('kull-current-session-id', defaultId);
+    return defaultId;
   });
 
   // Get current session
@@ -318,10 +327,10 @@ export function SupportChat() {
     }
   }, []);
 
-  // Track user interactions (clicks, hovers, typing)
+  // Track user interactions (clicks, hovers, typing, text selection)
   useEffect(() => {
     interface ActivityEvent {
-      type: 'click' | 'hover' | 'input';
+      type: 'click' | 'hover' | 'input' | 'select';
       target: string;
       value?: string;
       timestamp: string;
@@ -347,7 +356,7 @@ export function SupportChat() {
       }
     };
 
-    // Track clicks
+    // Track clicks with full element text content
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       let targetDesc = target.tagName.toLowerCase();
@@ -358,18 +367,34 @@ export function SupportChat() {
         const classes = target.className.toString().split(' ').slice(0, 3).join('.');
         if (classes) targetDesc += `.${classes}`;
       }
-      if (target.textContent) {
-        const text = target.textContent.trim().substring(0, 50);
-        if (text) targetDesc += ` "${text}"`;
-      }
 
       const href = target.closest('a')?.getAttribute('href');
       if (href) targetDesc += ` [href="${href}"]`;
+
+      // Get the FULL text content of the clicked element (or innermost text)
+      let elementText = target.textContent?.trim() || '';
+
+      // If element is too large (like a whole section), try to get the most specific text
+      if (elementText.length > 200) {
+        // Try to find the most specific child with text
+        const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+        let node;
+        let closestText = '';
+        while (node = walker.nextNode()) {
+          const text = node.textContent?.trim();
+          if (text && text.length > 0 && text.length < elementText.length) {
+            closestText = text;
+            break;
+          }
+        }
+        elementText = closestText || elementText.substring(0, 200);
+      }
 
       const activity = getActivity();
       activity.push({
         type: 'click',
         target: targetDesc,
+        value: elementText.substring(0, 200), // Store the actual text content
         timestamp: new Date().toISOString(),
       });
       saveActivity(activity);
@@ -425,16 +450,44 @@ export function SupportChat() {
       saveActivity(activity);
     };
 
+    // Track text selection/highlighting
+    const handleTextSelect = () => {
+      const selection = window.getSelection();
+      const selectedText = selection?.toString().trim();
+
+      if (selectedText && selectedText.length > 3) { // Only track if meaningful selection
+        const activity = getActivity();
+
+        // Don't duplicate consecutive selections of same text
+        const lastEvent = activity[activity.length - 1];
+        if (lastEvent?.type === 'select' && lastEvent.value === selectedText) {
+          return;
+        }
+
+        activity.push({
+          type: 'select',
+          target: 'text-selection',
+          value: selectedText.substring(0, 300), // Store up to 300 chars
+          timestamp: new Date().toISOString(),
+        });
+        saveActivity(activity);
+      }
+    };
+
     // Add event listeners
     document.addEventListener('click', handleClick, true);
     document.addEventListener('mouseover', handleMouseOver, true);
     document.addEventListener('input', handleInput, true);
+    document.addEventListener('mouseup', handleTextSelect, true); // Track text selection
+    document.addEventListener('keyup', handleTextSelect, true); // Track keyboard selection
 
     // Cleanup
     return () => {
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('mouseover', handleMouseOver, true);
       document.removeEventListener('input', handleInput, true);
+      document.removeEventListener('mouseup', handleTextSelect, true);
+      document.removeEventListener('keyup', handleTextSelect, true);
       clearTimeout(hoverTimeout);
     };
   }, []);
@@ -554,7 +607,6 @@ export function SupportChat() {
 
         const currentUser = user; // Capture user state at time of execution
         const currentIsOpen = isOpen;
-        const currentMessages = messages;
         const currentGreetingGenerated = greetingGenerated;
 
         const sessionContext = {
@@ -681,21 +733,26 @@ export function SupportChat() {
           })(),
         };
 
-        // Get recent assistant messages (last 5 welcome messages) for context
-        const recentWelcomeMessages = currentMessages
-          .filter(m => m.role === 'assistant' && m.id.startsWith('context-'))
-          .slice(-5)
-          .map(m => ({
-            role: m.role,
-            content: m.content,
-          }));
+        // Get latest messages from state (not stale closure)
+        let latestMessages: Message[] = [];
+        setMessages(prev => {
+          latestMessages = prev;
+          return prev; // Don't modify
+        });
+
+        // Send ENTIRE chat history - all user and assistant messages
+        const fullChatHistory = latestMessages.map(m => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+        }));
 
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             context: sessionContext,
-            history: recentWelcomeMessages,
+            history: fullChatHistory,
           }),
         });
 
@@ -775,7 +832,7 @@ export function SupportChat() {
             // Subsequent generations
             const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
 
-            if (currentIsOpen && timeSinceLastUserMessage > 20000 && currentMessages.length > 0) {
+            if (currentIsOpen && timeSinceLastUserMessage > 20000) {
               // Chat is open: add as new message to conversation
               const newMessage: Message = {
                 id: 'context-' + Date.now(),
@@ -784,7 +841,10 @@ export function SupportChat() {
                 timestamp: new Date(),
               };
 
-              setMessages(prev => [...prev, newMessage]);
+              setMessages(prev => {
+                console.log('[Chat] Adding greeting to messages, current count:', prev.length);
+                return [...prev, newMessage];
+              });
               setNextMessageIn(nextMsgSeconds);
 
               // Note: Welcome messages don't auto-navigate, only user chat responses do

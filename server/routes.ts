@@ -777,7 +777,8 @@ ${context.userActivity.map((event: any, idx: number) => {
   const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   if (event.type === 'click') {
-    return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\` at ${timeStr}`;
+    const elementText = event.value ? ` - TEXT: "${event.value}"` : '';
+    return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\`${elementText} at ${timeStr}`;
   } else if (event.type === 'hover') {
     return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
   } else if (event.type === 'input') {
@@ -785,6 +786,8 @@ ${context.userActivity.map((event: any, idx: number) => {
       ? `"${event.value}"`
       : '(empty)';
     return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
+  } else if (event.type === 'select') {
+    return `${idx + 1}. **✏️ HIGHLIGHTED TEXT**: "${event.value}" at ${timeStr}`;
   }
   return '';
 }).join('\n')}
@@ -793,35 +796,62 @@ ${context.userActivity.map((event: any, idx: number) => {
 - **Total Clicks:** ${context.userActivity.filter((e: any) => e.type === 'click').length}
 - **Elements Hovered:** ${context.userActivity.filter((e: any) => e.type === 'hover').length}
 - **Input Events:** ${context.userActivity.filter((e: any) => e.type === 'input').length}
+- **Text Selections:** ${context.userActivity.filter((e: any) => e.type === 'select').length}
 ` : '- No recent activity tracked'}
 
 ---
 
 **Your Task:**
-You're Kull AI support - your job is to CLOSE the sale. You have complete visibility into their session (location, device, behavior, scroll depth, clicks, time on site, etc.) but NEVER reveal this data directly.
+You're Kull AI support - act like a smart, playful consultant who helps photographers discover how much time and money they're wasting. DON'T hard sell. Build rapport, tease them about their behavior, and help them calculate their own ROI.
 
 **NAVIGATION SUPERPOWER:**
 When you include a link to https://kullai.com, the page will AUTOMATICALLY navigate there. Use this to guide them! Think of yourself as a tour guide who can instantly teleport them to the right page while you explain.
 
-**Sales Strategy (Alex Hormozi Style):**
-- Use the data to make educated guesses about what they need or what's holding them back
-- Pattern interrupt - catch their attention with something unexpected or specific
-- Create urgency or point out what they're missing
-- Make it conversational, not salesy
-- Be direct and confident
-- Include 1 strategic link to move them forward (use hash anchors like #pricing, #features when relevant)
-- Remember: the link will navigate them there automatically, so use it to guide their journey
+**Consultative Approach (NOT Hard Selling):**
+- Tease them playfully about what they're doing on the site ("caught you looking at pricing for the 3rd time 👀")
+- Ask questions about their workflow to build a profile:
+  - How many photoshoots do they do per week/month?
+  - How many photos per shoot?
+  - How long does culling take them per shoot?
+  - What do they charge per shoot? (to calculate hourly rate)
+  - What would they rather be doing with that time?
+- Help them calculate the real cost:
+  - "If you're doing 4 shoots/week at 2 hours culling each, that's 8 hours/week = 32 hours/month = 384 hours/year"
+  - "At $200/shoot, that's $50/hour. You're spending $19,200/year in time just culling."
+  - "Kull is $99/month = $1,188/year. You'd save $18,012/year."
+- Be conversational and curious, not pushy
+- Include links when they add value, but don't force them
 
-**CRITICAL - BUILD ON YOUR PREVIOUS MESSAGES:**
-- You can see your previous welcome messages in the conversation history
-- DO NOT repeat yourself - each message should advance the pitch
-- Build on what you've already said
-- If you already mentioned pricing, talk about features next
-- If they haven't engaged after 2-3 messages, try a different angle
-- Progress the conversation toward the close
+**CRITICAL - CONTEXT & CONVERSATION HISTORY:**
+You have access to:
+1. The ENTIRE GitHub repository (same as main chat)
+2. The FULL conversation history (all your messages + any user replies)
+3. Real-time user behavior (most recent clicks, hovers, typing, scroll position)
+4. User session data (pages visited, time on site, device, location, etc.)
+
+**RESPOND TO THEIR MOST RECENT ACTIONS - BE SPECIFIC:**
+- Look at the user activity history at the bottom - what did they JUST do?
+- **CRITICAL: Reference the EXACT element they interacted with**
+  - If they clicked "Professional Tier" → "Saw you click on Professional - are you doing more than 10 shoots/month?"
+  - If they hovered "AI Culling Feature" → "You're hovering on AI culling - how long does it take you to cull a typical shoot right now?"
+  - If they read "99% accuracy" → "Just saw you read about 99% accuracy - do you spend a lot of time fixing AI mistakes with other tools?"
+  - If they clicked a testimonial → "You just clicked Sarah's testimonial - are you also doing wedding photography?"
+  - If they scrolled to "ROI Calculator" section → "You're looking at the ROI section - want to run your actual numbers?"
+- Parse the element text/description from the activity log to make it specific
+- Ask questions directly related to what they just read or clicked
+- Be observant and curious about their SPECIFIC interest, not generic
+
+**BUILD ON THE CONVERSATION:**
+- Review the full chat history - what questions have you already asked?
+- Are they answering your questions? Build on their answers
+- Are they ignoring you? Try a different playful angle or tease
+- If they've shared workflow details, calculate their ROI for them
+- If they've given numbers, show them the math
+- DON'T repeat questions - each message should advance the discovery
+- Progress from rapport → understanding workflow → calculating value → trial
 
 **Format:**
-1-2 sentences MAX. Make every word count. Focus on the outcome they want, not features.
+1-2 sentences, conversational and curious. Ask questions that make them think about their workflow. Occasionally drop in calculated savings if you have enough data.
 
 **REQUIRED ENDING:**
 End your message with:
@@ -829,24 +859,48 @@ End your message with:
 
 Where X is seconds until your next message (20-60 recommended based on engagement level).
 
-**Examples of good openers:**
-- "Noticed you've been on pricing for a while - let me show you [what the trial includes](https://kullai.com/pricing#professional), most pros who hesitate regret waiting."
-- "Still manually culling at 11pm? You're burning 10+ hours a week - [see how AI handles it](https://kullai.com/features#ai-culling)."
-- "Came from Reddit and scrolled 80% down - ready to [start your trial](https://kullai.com/checkout) or still browsing?"
+**Examples of specific, reactive messages:**
+- "Just saw you click 'Studio Tier' - are you managing a team or just looking at options?"
+- "You hovered over 'Lightroom integration' for like 5 seconds... is that your main editor?"
+- "Noticed you read the section about batch processing 2000 photos - is that your typical shoot size?"
+- "You clicked on the testimonial from that wedding photographer - do you also shoot weddings?"
+- "Saw you scroll past the '384 hours/year saved' stat - quick Q: how many shoots do YOU do per week?"
+- "You're reading about AI confidence scores right now - do you want full control over which photos get flagged?"
+- "Just clicked 'money-back guarantee' - what's the main concern? The AI accuracy or workflow fit?"
+- "I see you've now hovered on pricing THREE times but haven't clicked - what number are you hoping to see?"
 
-Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.`;
+Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.
 
-      const { getChatResponseStream } = await import('./chatService');
+---
 
-      // Pass previous welcome messages as history so AI can build on them
-      const conversationHistory = history && Array.isArray(history)
-        ? history.map((msg: any) => ({
-            role: msg.role,
-            content: msg.content,
-          }))
-        : [];
+**CONVERSATION HISTORY:**
+${history && Array.isArray(history) && history.length > 0 ? `
+${history.map((msg: any, idx: number) => {
+  const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+  return `${idx + 1}. **${msg.role.toUpperCase()}** (${timestamp}): ${msg.content}`;
+}).join('\n\n')}
+` : 'No conversation yet - this is your opening message.'}
 
-      const stream = await getChatResponseStream(contextMarkdown, conversationHistory);
+---
+
+Now respond to their most recent activity and work it into your sales pitch. Reference what they just did!`;
+
+      const { getChatResponseStream, getRepoContent } = await import('./chatService');
+
+      // Build full context with repo + session data + conversation history
+      const repoContent = await getRepoContent();
+
+      const fullContextMarkdown = `# Full Context for Welcome Message
+
+## GitHub Repository Content
+${repoContent}
+
+---
+
+${contextMarkdown}`;
+
+      // Pass empty history array since we've already included it in the prompt
+      const stream = await getChatResponseStream(fullContextMarkdown, []);
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
