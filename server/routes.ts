@@ -1012,19 +1012,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { emailTemplates } = await import('./emailTemplates');
 
       // Create a test user object
+      const now = new Date();
       const testUser = {
         id: 'test-user-id',
         email: testEmail,
         firstName: 'Test',
         lastName: 'User',
         profileImageUrl: null,
-        offerExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        trialStartedAt: new Date(),
+        createdAt: now,
+        updatedAt: now,
+        offerExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        specialOfferExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        trialStartedAt: now,
+        trialEndsAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        trialConvertedAt: null,
         stripeCustomerId: null,
         stripeSubscriptionId: null,
+        stripePaymentMethodId: null,
         stripeSetupIntentId: null,
         subscriptionTier: 'professional' as const,
         subscriptionBilling: 'annual' as const,
+        subscriptionStatus: 'trial' as const,
+        appInstalledAt: null,
         referralRewardsEarned: [],
       };
 
