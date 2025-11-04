@@ -34,6 +34,7 @@ interface ChatUsersViewProps {
 export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
   const { data: users, isLoading } = useQuery<ChatUser[]>({
     queryKey: ['/api/admin/chat-users'],
+    staleTime: 0, // Always fetch fresh data
   });
 
   if (isLoading) {
