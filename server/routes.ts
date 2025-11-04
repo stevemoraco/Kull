@@ -524,7 +524,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                   console.log('[Chat] Response done, usage:', data.response?.usage);
                 } else if (data.type === 'error') {
-                  res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
+                  const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
+                  res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
                 }
               } catch (e) {
                 // Skip invalid JSON lines
@@ -1084,7 +1085,8 @@ ${contextMarkdown}`;
                   }
                 } else if (data.type === 'error') {
                   console.error('[Welcome] OpenAI error:', data);
-                  res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
+                  const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
+                  res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
                 }
               } catch (e) {
                 console.error('[Welcome] JSON parse error:', e, 'Line:', line);
@@ -1122,10 +1124,8 @@ ${contextMarkdown}`;
         const userId = req.user?.claims?.sub;
 
         if (fullResponse) {
-          // Calculate cost (same model as main chat)
-          const inputCostPer1M = 0.075;
-          const outputCostPer1M = 0.30;
-          const cost = (tokensIn * inputCostPer1M + tokensOut * outputCostPer1M) / 1_000_000;
+          // Calculate cost for gpt-5-mini: Input $0.100/1M, Output $0.400/1M
+          const cost = (tokensIn / 1_000_000) * 0.100 + (tokensOut / 1_000_000) * 0.400;
 
           // Extract metadata
           const userAgent = req.headers['user-agent'] || '';

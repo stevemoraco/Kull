@@ -1241,10 +1241,15 @@ export function SupportChat() {
       let cutoffDetected = false; // Flag to stop processing after cutoff
       let hasNavigated = false; // Flag to track if we've already navigated
 
+      console.log('[Chat] Starting to read response stream for message:', assistantMessageId);
+
       while (true) {
         const { done, value } = await reader.read();
 
-        if (done) break;
+        if (done) {
+          console.log('[Chat] Stream done. Total content length:', fullContent.length);
+          break;
+        }
 
         const chunk = decoder.decode(value, { stream: true });
         const lines = chunk.split('\n');
@@ -1253,6 +1258,7 @@ export function SupportChat() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              console.log('[Chat] Received event type:', data.type);
 
               if (data.type === 'delta' && data.content) {
                 // Mark that we've received the first token
