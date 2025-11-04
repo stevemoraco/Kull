@@ -1428,6 +1428,7 @@ export function SupportChat() {
       let firstTokenReceived = false;
       let cutoffDetected = false; // Flag to stop processing after cutoff
       let hasNavigated = false; // Flag to track if we've already navigated
+      let buffer = ''; // Buffer for incomplete SSE lines
 
       console.log('[Chat] Starting to read response stream for message:', assistantMessageId);
 
@@ -1440,7 +1441,13 @@ export function SupportChat() {
         }
 
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+
+        // Add to buffer and split by lines
+        buffer += chunk;
+        const lines = buffer.split('\n');
+
+        // Keep the last incomplete line in buffer
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
