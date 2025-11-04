@@ -1483,7 +1483,7 @@ ${contextMarkdown}`;
         }
       });
 
-      // Aggregate costs per user from support queries
+      // Aggregate costs and tokens per user from support queries
       allQueries.forEach(query => {
         // Match by userId first, then by email
         const userKey = query.userId ||
@@ -1493,15 +1493,24 @@ ${contextMarkdown}`;
         if (chatUserMap.has(userKey)) {
           const chatUser = chatUserMap.get(userKey)!;
           chatUser.totalCost += parseFloat(query.cost as any) || 0;
+          chatUser.totalTokensIn = (chatUser.totalTokensIn || 0) + (query.tokensIn || 0);
+          chatUser.totalTokensOut = (chatUser.totalTokensOut || 0) + (query.tokensOut || 0);
+          chatUser.queryCount = (chatUser.queryCount || 0) + 1;
         }
       });
 
       // Convert to array and sort by last activity
-      const users = Array.from(chatUserMap.values()).map(user => ({
-        ...user,
-        sessionCount: user.sessions.length,
-        totalCost: user.totalCost.toFixed(4),
-      })).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+      const users = Array.from(chatUserMap.values()).map(user => {
+        const queryCount = user.queryCount || 1; // Avoid division by zero
+        return {
+          ...user,
+          sessionCount: user.sessions.length,
+          totalCost: user.totalCost.toFixed(4),
+          avgCostPerMessage: (user.totalCost / queryCount).toFixed(6),
+          avgTokensIn: Math.round((user.totalTokensIn || 0) / queryCount),
+          avgTokensOut: Math.round((user.totalTokensOut || 0) / queryCount),
+        };
+      }).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
       console.log(`[Admin] Retrieved ${users.length} unique chat users with cost data`);
       res.json(users);

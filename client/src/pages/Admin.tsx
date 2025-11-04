@@ -330,66 +330,42 @@ export default function Admin() {
           </Card>
         </div>
 
-        <Card data-testid="card-support-leaderboard">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              User Activity Leaderboard
-            </CardTitle>
-            <CardDescription>All users with conversations, messages, and costs</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSupportAnalytics ? (
-              <p className="text-muted-foreground">Loading support data...</p>
-            ) : supportAnalytics?.queriesByEmail && supportAnalytics.queriesByEmail.length > 0 ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
-                  <div>User / Email</div>
-                  <div className="text-right">Conversations</div>
-                  <div className="text-right">Total Messages</div>
-                  <div className="text-right">Total Cost</div>
-                </div>
-                {supportAnalytics.queriesByEmail.map((row, idx) => {
-                  const getUserDisplay = () => {
-                    if (row.email && row.email.includes('@')) {
-                      return row.email;
-                    }
-                    
-                    const parts = [];
-                    if (row.device) parts.push(row.device);
-                    if (row.browser) parts.push(row.browser);
-                    if (row.city) parts.push(row.city);
-                    if (row.state) parts.push(row.state);
-                    if (row.country) parts.push(row.country);
-                    
-                    return parts.length > 0 ? parts.join(' • ') : 'Anonymous User';
-                  };
-                  
-                  const displayText = getUserDisplay();
-                  
-                  return (
-                    <div 
-                      key={idx} 
-                      className="grid grid-cols-4 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
-                      data-testid={`leaderboard-row-${idx}`}
-                      onClick={() => {
-                        setSelectedEmail(row.email);
-                        setDialogOpen(true);
-                      }}
-                    >
-                      <div className="truncate text-primary" title={displayText}>{displayText}</div>
-                      <div className="text-right font-medium">{row.conversationCount}</div>
-                      <div className="text-right font-medium">{row.totalMessages}</div>
-                      <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No user activity yet</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Unified User Activity & Chat History View */}
+        {chatView === 'users' && (
+          <ChatUsersView
+            onUserClick={(userKey, userEmail) => {
+              setSelectedUserKey(userKey);
+              setSelectedUserEmail(userEmail || null);
+              setChatView('sessions');
+            }}
+          />
+        )}
+
+        {chatView === 'sessions' && selectedUserKey && (
+          <UserSessionsView
+            userKey={selectedUserKey}
+            userEmail={selectedUserEmail || undefined}
+            onBack={() => {
+              setChatView('users');
+              setSelectedUserKey(null);
+              setSelectedUserEmail(null);
+            }}
+            onSessionClick={(sessionId) => {
+              setSelectedChatSessionId(sessionId);
+              setChatView('detail');
+            }}
+          />
+        )}
+
+        {chatView === 'detail' && selectedChatSessionId && (
+          <SessionDetailView
+            sessionId={selectedChatSessionId}
+            onBack={() => {
+              setChatView('sessions');
+              setSelectedChatSessionId(null);
+            }}
+          />
+        )}
 
         <Card data-testid="card-support-chart">
           <CardHeader>
@@ -446,43 +422,6 @@ export default function Admin() {
             )}
           </CardContent>
         </Card>
-
-        {/* All Chat Histories Section with Drill-Down Navigation */}
-        {chatView === 'users' && (
-          <ChatUsersView
-            onUserClick={(userKey, userEmail) => {
-              setSelectedUserKey(userKey);
-              setSelectedUserEmail(userEmail || null);
-              setChatView('sessions');
-            }}
-          />
-        )}
-
-        {chatView === 'sessions' && selectedUserKey && (
-          <UserSessionsView
-            userKey={selectedUserKey}
-            userEmail={selectedUserEmail || undefined}
-            onBack={() => {
-              setChatView('users');
-              setSelectedUserKey(null);
-              setSelectedUserEmail(null);
-            }}
-            onSessionClick={(sessionId) => {
-              setSelectedChatSessionId(sessionId);
-              setChatView('detail');
-            }}
-          />
-        )}
-
-        {chatView === 'detail' && selectedChatSessionId && (
-          <SessionDetailView
-            sessionId={selectedChatSessionId}
-            onBack={() => {
-              setChatView('sessions');
-              setSelectedChatSessionId(null);
-            }}
-          />
-        )}
 
         <Card data-testid="card-email-testing">
           <CardHeader>

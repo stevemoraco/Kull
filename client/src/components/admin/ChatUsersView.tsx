@@ -14,6 +14,9 @@ interface ChatUser {
   sessionCount: number;
   totalMessages: number;
   totalCost: string;
+  avgCostPerMessage: string;
+  avgTokensIn: number;
+  avgTokensOut: number;
   lastActivity: string;
   location: {
     city?: string;
@@ -40,17 +43,26 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
   const totalSessions = users?.reduce((sum, u) => sum + u.sessionCount, 0) || 0;
   const totalMessages = users?.reduce((sum, u) => sum + u.totalMessages, 0) || 0;
   const totalCost = users?.reduce((sum, u) => sum + parseFloat(u.totalCost), 0) || 0;
+  const avgCostPerMessage = users && users.length > 0
+    ? (totalCost / users.reduce((sum, u) => sum + u.totalMessages, 0)).toFixed(6)
+    : '0.000000';
+  const avgTokensIn = users && users.length > 0
+    ? Math.round(users.reduce((sum, u) => sum + u.avgTokensIn, 0) / users.length)
+    : 0;
+  const avgTokensOut = users && users.length > 0
+    ? Math.round(users.reduce((sum, u) => sum + u.avgTokensOut, 0) / users.length)
+    : 0;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">All Chat Histories</h2>
+        <h2 className="text-3xl font-bold tracking-tight">User Activity Leaderboard</h2>
         <p className="text-muted-foreground">
-          View every user who has chatted with the support AI
+          All users with conversations, messages, and costs - click to view full chat history
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -82,6 +94,16 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalCost.toFixed(4)}</div>
+            <p className="text-xs text-muted-foreground">${avgCostPerMessage}/msg avg</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Tokens</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{avgTokensIn}↓ {avgTokensOut}↑</div>
+            <p className="text-xs text-muted-foreground">in / out per message</p>
           </CardContent>
         </Card>
       </div>
@@ -124,7 +146,10 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                       <span className="font-medium">{user.totalMessages}</span> messages
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="font-medium">${user.totalCost}</span> cost
+                      <span className="font-medium">${user.totalCost}</span> (${user.avgCostPerMessage}/msg)
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">{user.avgTokensIn}↓ {user.avgTokensOut}↑</span> tokens avg
                     </div>
                     <div className="flex items-center gap-1">
                       Last active {formatDistanceToNow(new Date(user.lastActivity), { addSuffix: true })}

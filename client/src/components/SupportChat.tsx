@@ -1469,6 +1469,15 @@ export function SupportChat() {
 
                 fullContent += data.content;
                 console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
+                
+                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: fullContent }
+                      : msg
+                  )
+                );
 
                 // Check for first link and navigate immediately
                 if (!hasNavigated) {
