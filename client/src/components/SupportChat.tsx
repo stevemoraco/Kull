@@ -1399,7 +1399,7 @@ export function SupportChat() {
 
 
   const sendMessage = async (messageText: string) => {
-    if (!messageText.trim() || isLoading) return;
+    if (!messageText.trim()) return;
 
     // Track when user last sent a message
     lastUserMessageTimeRef.current = Date.now();
