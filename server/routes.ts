@@ -1640,10 +1640,42 @@ ${contextMarkdown}`;
       // Aggregate costs and tokens per user from support queries
       console.log(`[Admin] Aggregating costs from ${allQueries.length} queries into ${chatUserMap.size} users`);
       allQueries.forEach(query => {
-        // Match by userId first, then by email
-        const userKey = query.userId ||
-                        (query.userEmail ? Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail)?.userKey : null) ||
-                        'unknown';
+        let userKey: string;
+        
+        // Match by userId first
+        if (query.userId) {
+          userKey = query.userId;
+        } 
+        // Then try by email
+        else if (query.userEmail) {
+          const matchedUser = Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail);
+          userKey = matchedUser?.userKey || query.userEmail;
+        }
+        // For anonymous queries, create composite key from metadata
+        else {
+          // Calculate session length bucket from query's session_length
+          let sessionLengthBucket = '0-1min'; // default
+          if (query.sessionLength !== null && query.sessionLength !== undefined) {
+            const durationMinutes = query.sessionLength / 60; // sessionLength is in seconds
+            if (durationMinutes < 1) sessionLengthBucket = '0-1min';
+            else if (durationMinutes < 5) sessionLengthBucket = '1-5min';
+            else if (durationMinutes < 15) sessionLengthBucket = '5-15min';
+            else if (durationMinutes < 30) sessionLengthBucket = '15-30min';
+            else sessionLengthBucket = '30min+';
+          }
+          
+          // Create composite key matching session grouping logic
+          const parts = [
+            query.device || 'Unknown Device',
+            query.browser || 'Unknown Browser',
+            query.city || '',
+            query.state || '',
+            query.country || 'Unknown Location',
+            sessionLengthBucket
+          ].filter(Boolean);
+          
+          userKey = `anon_${parts.join('_').replace(/\s+/g, '_')}`;
+        }
 
         if (chatUserMap.has(userKey)) {
           const chatUser = chatUserMap.get(userKey)!;
@@ -1652,7 +1684,8 @@ ${contextMarkdown}`;
           chatUser.totalTokensOut = (chatUser.totalTokensOut || 0) + (query.tokensOut || 0);
           chatUser.queryCount = (chatUser.queryCount || 0) + 1;
         } else {
-          console.log(`[Admin] WARNING: Query userKey "${userKey}" not found in chatUserMap (keys: ${Array.from(chatUserMap.keys()).join(', ')})`);
+          console.log(`[Admin] WARNING: Query userKey "${userKey}" not found in chatUserMap (available keys: ${Array.from(chatUserMap.keys()).slice(0, 5).join(', ')}...)`);
+          console.log(`[Admin] Query details - userId:${query.userId}, email:${query.userEmail}, device:${query.device}, browser:${query.browser}, city:${query.city}, state:${query.state}, country:${query.country}, sessionLength:${query.sessionLength}`);
         }
       });
 
