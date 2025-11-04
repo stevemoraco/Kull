@@ -812,6 +812,62 @@ ${context.userActivity.map((event: any, idx: number) => {
 
 ---
 
+## 🎯 MOST RECENT ACTIVITY (Since Your Last Message)
+
+**⏰ CURRENT TIME FOR USER:** ${new Date(currentTime || Date.now()).toLocaleString('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  timeZoneName: 'short'
+})}
+
+**📍 CURRENT PAGE:** ${context.currentPath} (${context.currentUrl})
+
+**🆕 NEW ACTIONS IN THE LAST ${Math.round((currentTime - (lastAiMessageTime || currentTime - 30000)) / 1000)} SECONDS:**
+
+${context.userActivity.filter((e: any) => {
+  const eventTime = new Date(e.timestamp).getTime();
+  return eventTime > (lastAiMessageTime || 0);
+}).length > 0 ?
+  context.userActivity.filter((e: any) => {
+    const eventTime = new Date(e.timestamp).getTime();
+    return eventTime > (lastAiMessageTime || 0);
+  }).map((event: any, idx: number) => {
+    const time = new Date(event.timestamp);
+    const secondsAgo = Math.round((currentTime - time.getTime()) / 1000);
+
+    if (event.type === 'click') {
+      const elementText = event.value ? ` - TEXT: **"${event.value}"**` : '';
+      return `🔥 **JUST CLICKED** (${secondsAgo}s ago): \`${event.target}\`${elementText}`;
+    } else if (event.type === 'hover') {
+      return `👁️ **JUST HOVERED** (${secondsAgo}s ago): \`${event.target}\``;
+    } else if (event.type === 'input') {
+      const displayValue = event.value && event.value.length > 0 ? `"${event.value}"` : '(empty)';
+      return `⌨️ **JUST TYPED** (${secondsAgo}s ago) in \`${event.target}\`: ${displayValue}`;
+    } else if (event.type === 'select') {
+      return `✏️ **JUST HIGHLIGHTED** (${secondsAgo}s ago): **"${event.value}"**`;
+    }
+    return '';
+  }).join('\n')
+  : '- No new activity since your last message (they might be reading or thinking)'
+}
+
+**🎯 YOUR MISSION:**
+Look at the NEW ACTIONS above. What did they JUST do? React to it DIRECTLY.
+- Did they click something? Ask why that interested them
+- Did they highlight text? Reference that exact text
+- Did they hover over something? They're curious - dig into it
+- Are they reading? Ask about what they're seeing on ${context.currentPath}
+
+Make your message feel SPOOKY and personalized - like you're watching them in real-time (because you are 👀).
+Use the exact text they clicked/highlighted in your response to prove you're paying attention!
+
+---
+
 **Your Task:**
 You're Kull AI support - act like a smart, playful consultant who helps photographers discover how much time and money they're wasting. DON'T hard sell. Build rapport, tease them about their behavior, and help them calculate their own ROI.
 
@@ -1218,6 +1274,65 @@ ${contextMarkdown}`;
     } catch (error: any) {
       console.error("Error deleting chat session:", error);
       res.status(500).json({ message: "Failed to delete session: " + error.message });
+    }
+  });
+
+  // Admin endpoint to get all chat sessions with stats
+  app.get('/api/admin/chat-sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      // Get all chat sessions from database
+      const allSessions = await storage.getChatSessions();
+      
+      // Format with stats
+      const sessionsWithStats = allSessions.map(session => {
+        const messages = JSON.parse(session.messages);
+        const userMessages = messages.filter((m: any) => m.role === 'user');
+        const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
+        
+        return {
+          id: session.id,
+          title: session.title,
+          userId: session.userId,
+          messageCount: messages.length,
+          userMessageCount: userMessages.length,
+          assistantMessageCount: assistantMessages.length,
+          device: session.device,
+          browser: session.browser,
+          city: session.city,
+          state: session.state,
+          country: session.country,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+          firstMessage: userMessages.length > 0 ? userMessages[0].content.slice(0, 100) : null,
+        };
+      });
+
+      console.log(`[Admin] Retrieved ${sessionsWithStats.length} chat sessions`);
+      res.json(sessionsWithStats);
+    } catch (error: any) {
+      console.error("Error getting all chat sessions:", error);
+      res.status(500).json({ message: "Failed to get chat sessions: " + error.message });
+    }
+  });
+
+  // Admin endpoint to get full chat session details
+  app.get('/api/admin/chat-sessions/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const sessions = await storage.getChatSessions();
+      const session = sessions.find(s => s.id === id);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      res.json({
+        ...session,
+        messages: JSON.parse(session.messages),
+      });
+    } catch (error: any) {
+      console.error("Error getting chat session details:", error);
+      res.status(500).json({ message: "Failed to get session details: " + error.message });
     }
   });
 

@@ -423,7 +423,7 @@ export function SupportChat() {
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDebugOverlay, setShowDebugOverlay] = useState(true);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false); // Feature flagged off by default
   const [debugActivityLog, setDebugActivityLog] = useState<string>('');
   const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
@@ -1490,46 +1490,6 @@ export function SupportChat() {
 
   return (
     <>
-      {/* Debug Overlay - Top Right */}
-      {showDebugOverlay && (
-        <div className="fixed top-4 right-4 w-96 max-h-[80vh] bg-black/90 text-white rounded-lg shadow-2xl z-[10000] overflow-hidden flex flex-col">
-          <div className="bg-purple-600 px-4 py-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold">🔍 Activity Debug</span>
-              <span className="text-xs opacity-75">(AI sees this)</span>
-            </div>
-            <button
-              onClick={() => setShowDebugOverlay(false)}
-              className="text-white hover:bg-white/20 rounded px-2 py-1 text-xs"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="p-4 overflow-y-auto flex-1 text-xs font-mono">
-            <div
-              className="whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{
-                __html: debugActivityLog
-                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 rounded">$1</code>')
-                  .replace(/##\s(.+)/g, '<h2 class="text-lg font-bold mb-2 text-purple-400">$1</h2>')
-                  .replace(/- \*\*(.+?):\*\* (.+)/g, '- <strong class="text-purple-300">$1:</strong> $2')
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Toggle Debug Button - Top Right */}
-      {!showDebugOverlay && (
-        <button
-          onClick={() => setShowDebugOverlay(true)}
-          className="fixed top-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-purple-700 z-[10000] text-xs font-bold"
-        >
-          🔍 Show Debug
-        </button>
-      )}
-
       {/* Chat Button */}
       {!isOpen && (
         <>

@@ -67,9 +67,21 @@ export default function Admin() {
     queryKey: [`/api/admin/support-analytics?timerange=${timerange}&days=30`],
   });
 
+  const { data: chatSessions, isLoading: isLoadingChatSessions } = useQuery<any[]>({
+    queryKey: ['/api/admin/chat-sessions'],
+  });
+
   const { data: userQueries, isLoading: isLoadingUserQueries } = useQuery<any[]>({
     queryKey: [`/api/admin/support-queries/${selectedEmail}`],
     enabled: !!selectedEmail && dialogOpen,
+  });
+
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  
+  const { data: selectedSession } = useQuery<any>({
+    queryKey: [`/api/admin/chat-sessions/${selectedSessionId}`],
+    enabled: !!selectedSessionId && sessionDialogOpen,
   });
 
   const sendTestEmailMutation = useMutation({
@@ -429,6 +441,95 @@ export default function Admin() {
           </CardContent>
         </Card>
 
+        {/* All Chat Histories Section */}
+        <Card data-testid="card-chat-histories">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              All Chat Histories ({chatSessions?.length || 0})
+            </CardTitle>
+            <CardDescription>Every conversation stored in the database</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingChatSessions ? (
+              <p className="text-muted-foreground">Loading chat histories...</p>
+            ) : chatSessions && chatSessions.length > 0 ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-5 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
+                  <div>Session / User</div>
+                  <div>Title</div>
+                  <div className="text-right">Messages</div>
+                  <div className="text-right">Last Activity</div>
+                  <div className="text-right">Location</div>
+                </div>
+                {chatSessions.map((session, idx) => {
+                  const getUserDisplay = () => {
+                    if (session.userId) {
+                      return `User ${session.userId.slice(0, 8)}...`;
+                    }
+                    const parts = [];
+                    if (session.device) parts.push(session.device);
+                    if (session.browser) parts.push(session.browser);
+                    return parts.length > 0 ? parts.join(' • ') : 'Anonymous';
+                  };
+
+                  const getLocationDisplay = () => {
+                    const parts = [];
+                    if (session.city) parts.push(session.city);
+                    if (session.state) parts.push(session.state);
+                    if (session.country) parts.push(session.country);
+                    return parts.length > 0 ? parts.join(', ') : '-';
+                  };
+
+                  const timeSinceUpdate = () => {
+                    const now = new Date();
+                    const updated = new Date(session.updatedAt);
+                    const diffMs = now.getTime() - updated.getTime();
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMins / 60);
+                    const diffDays = Math.floor(diffHours / 24);
+                    
+                    if (diffDays > 0) return `${diffDays}d ago`;
+                    if (diffHours > 0) return `${diffHours}h ago`;
+                    if (diffMins > 0) return `${diffMins}m ago`;
+                    return 'Just now';
+                  };
+
+                  return (
+                    <div 
+                      key={session.id}
+                      className="grid grid-cols-5 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2"
+                      data-testid={`chat-history-row-${idx}`}
+                      onClick={() => {
+                        setSelectedSessionId(session.id);
+                        setSessionDialogOpen(true);
+                      }}
+                    >
+                      <div className="truncate text-primary" title={getUserDisplay()}>
+                        {getUserDisplay()}
+                      </div>
+                      <div className="truncate" title={session.title}>
+                        {session.title}
+                      </div>
+                      <div className="text-right font-medium">
+                        {session.messageCount} ({session.userMessageCount}↑ / {session.assistantMessageCount}↓)
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground">
+                        {timeSinceUpdate()}
+                      </div>
+                      <div className="text-right text-sm text-muted-foreground truncate" title={getLocationDisplay()}>
+                        {getLocationDisplay()}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No chat histories yet</p>
+            )}
+          </CardContent>
+        </Card>
+
         <Card data-testid="card-email-testing">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -481,6 +582,72 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Full Chat Session Dialog */}
+      <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Full Chat History - {selectedSession?.title || 'Loading...'}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedSession && (
+                <div className="flex gap-4 text-sm mt-2">
+                  <span>User: {selectedSession.userId || 'Anonymous'}</span>
+                  <span>•</span>
+                  <span>{selectedSession.messages?.length || 0} messages</span>
+                  <span>•</span>
+                  <span>Updated: {new Date(selectedSession.updatedAt).toLocaleString()}</span>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            {!selectedSession ? (
+              <p className="text-muted-foreground">Loading conversation...</p>
+            ) : selectedSession.messages && selectedSession.messages.length > 0 ? (
+              <div className="space-y-4">
+                {selectedSession.messages.map((msg: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
+                      }`}
+                    >
+                      <div className="text-sm font-medium mb-1">
+                        {msg.role === 'user' ? 'User' : 'AI Assistant'}
+                      </div>
+                      <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+                      <div className={`text-xs mt-2 ${
+                        msg.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      }`}>
+                        {new Date(msg.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No messages in this conversation</p>
+            )}
+          </ScrollArea>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setSessionDialogOpen(false)}
+              data-testid="button-close-session-dialog"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Support Chat History Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
