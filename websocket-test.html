@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Sync Tester - Kull AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #0f0f0f;
+            color: #fff;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #00ff88;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status.disconnected { background: #ff4444; }
+        .status.connecting { background: #ffaa00; }
+        .status.connected { background: #00ff88; color: #000; }
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .panel {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .panel h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #00ff88;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #2a2a2a;
+            color: #fff;
+            font-family: inherit;
+        }
+        button {
+            background: #00ff88;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            background: #00dd77;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid #00ff88;
+            padding-left: 10px;
+        }
+        .log-entry.error {
+            border-left-color: #ff4444;
+            color: #ff8888;
+        }
+        .log-entry.info {
+            border-left-color: #00aaff;
+            color: #88ccff;
+        }
+        .timestamp {
+            color: #666;
+            margin-right: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Sync Tester</h1>
+
+        <div id="status" class="status disconnected">
+            <div class="indicator"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+
+        <div class="panel">
+            <h2>Connection</h2>
+            <label>User ID / Token</label>
+            <input type="text" id="userId" placeholder="user_123 or user_123:device_456" value="test-user">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+
+        <div class="panel">
+            <h2>Test Shoot Progress</h2>
+            <div class="grid">
+                <div>
+                    <label>Shoot ID</label>
+                    <input type="text" id="shootId" value="test-shoot-123">
+                </div>
+                <div>
+                    <label>Status</label>
+                    <select id="shootStatus" style="width: 100%; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #333; border-radius: 4px;">
+                        <option value="queued">Queued</option>
+                        <option value="processing" selected>Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid">
+                <div>
+                    <label>Processed Count</label>
+                    <input type="number" id="processedCount" value="50">
+                </div>
+                <div>
+                    <label>Total Count</label>
+                    <input type="number" id="totalCount" value="100">
+                </div>
+            </div>
+            <label>Current Image</label>
+            <input type="text" id="currentImage" value="IMG_0050.jpg">
+            <button onclick="sendShootProgress()">Send Shoot Progress</button>
+        </div>
+
+        <div class="panel">
+            <h2>Test Credit Update</h2>
+            <div class="grid">
+                <div>
+                    <label>New Balance</label>
+                    <input type="number" id="newBalance" value="1000">
+                </div>
+                <div>
+                    <label>Change</label>
+                    <input type="number" id="change" value="100">
+                </div>
+            </div>
+            <label>Reason</label>
+            <input type="text" id="reason" value="Test credit update">
+            <button onclick="sendCreditUpdate()">Send Credit Update</button>
+        </div>
+
+        <div class="panel">
+            <h2>Message Log</h2>
+            <button onclick="clearLog()" style="width: auto; padding: 8px 15px; margin-bottom: 10px;">Clear Log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let userId = null;
+
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="timestamp">${timestamp}</span>${message}`;
+            logEl.insertBefore(entry, logEl.firstChild);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+            statusEl.className = `status ${status}`;
+            statusText.textContent = text;
+        }
+
+        function connect() {
+            userId = document.getElementById('userId').value.trim();
+            if (!userId) {
+                alert('Please enter a User ID');
+                return;
+            }
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${protocol}//${window.location.host}/ws?token=${userId}`;
+
+            log(`Connecting to ${url}...`, 'info');
+            updateStatus('connecting', 'Connecting...');
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                log('✅ Connected successfully!', 'info');
+                updateStatus('connected', 'Connected');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+            };
+
+            ws.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                log(`📨 Received: ${message.type}`, 'info');
+                log(`<pre>${JSON.stringify(message, null, 2)}</pre>`, 'info');
+            };
+
+            ws.onerror = (error) => {
+                log(`❌ WebSocket error: ${error}`, 'error');
+            };
+
+            ws.onclose = (event) => {
+                log(`🔌 Disconnected: ${event.code} ${event.reason}`, 'error');
+                updateStatus('disconnected', 'Disconnected');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        async function sendShootProgress() {
+            const shootId = document.getElementById('shootId').value;
+            const status = document.getElementById('shootStatus').value;
+            const processedCount = parseInt(document.getElementById('processedCount').value);
+            const totalCount = parseInt(document.getElementById('totalCount').value);
+            const currentImage = document.getElementById('currentImage').value;
+
+            const data = {
+                userId: userId || document.getElementById('userId').value,
+                shootId,
+                status,
+                processedCount,
+                totalCount,
+                currentImage,
+                eta: Math.floor((totalCount - processedCount) * 1.2),
+                provider: 'Test',
+            };
+
+            log(`📤 Sending shoot progress...`, 'info');
+
+            try {
+                const response = await fetch('/api/sync/shoot-progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.json();
+                log(`✅ Shoot progress sent: ${JSON.stringify(result)}`, 'info');
+            } catch (error) {
+                log(`❌ Failed to send: ${error}`, 'error');
+            }
+        }
+
+        async function sendCreditUpdate() {
+            const newBalance = parseInt(document.getElementById('newBalance').value);
+            const change = parseInt(document.getElementById('change').value);
+            const reason = document.getElementById('reason').value;
+
+            const data = {
+                userId: userId || document.getElementById('userId').value,
+                newBalance,
+                change,
+                reason,
+            };
+
+            log(`📤 Sending credit update...`, 'info');
+
+            try {
+                const response = await fetch('/api/sync/credit-update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+
+                const result = await response.json();
+                log(`✅ Credit update sent: ${JSON.stringify(result)}`, 'info');
+            } catch (error) {
+                log(`❌ Failed to send: ${error}`, 'error');
+            }
+        }
+
+        // Auto-scroll log
+        const logEl = document.getElementById('log');
+        const observer = new MutationObserver(() => {
+            logEl.scrollTop = 0; // Keep newest at top
+        });
+        observer.observe(logEl, { childList: true });
+
+        log('WebSocket tester ready. Enter a user ID and click Connect.', 'info');
+    </script>
+</body>
+</html>

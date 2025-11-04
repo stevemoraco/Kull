@@ -289,5 +289,18 @@ export const shootProgress = pgTable("shoot_progress", {
 export type ShootProgress = typeof shootProgress.$inferSelect;
 export type InsertShootProgress = typeof shootProgress.$inferInsert;
 
+// Shared report links for public access
+export const sharedReportLinks = pgTable("shared_report_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id").notNull().references(() => shootReports.id, { onDelete: 'cascade' }),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type SharedReportLink = typeof sharedReportLinks.$inferSelect;
+export type InsertSharedReportLink = typeof sharedReportLinks.$inferInsert;
+
 // Re-export email queue types
 export * from "./emailQueue";

@@ -7,6 +7,10 @@ import { insertRefundSurveySchema, supportQueries, users } from "@shared/schema"
 import { db } from "./db";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
+import promptsRouter from "./routes/prompts";
+import deviceAuthRouter from "./routes/device-auth";
+import reportsRouter from "./routes/reports";
+import exportsRouter from "./routes/exports";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -2427,6 +2431,18 @@ ${contextMarkdown}`;
       });
     }
   });
+
+  // Prompt marketplace routes
+  app.use('/api/prompts', promptsRouter);
+
+  // Device authentication routes
+  app.use('/api/device-auth', deviceAuthRouter);
+
+  // Shoot reports routes
+  app.use('/api/reports', reportsRouter);
+
+  // Export file serving routes
+  app.use('/api/exports', exportsRouter);
 
   const httpServer = createServer(app);
 

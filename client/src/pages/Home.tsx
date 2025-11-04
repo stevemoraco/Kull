@@ -4,15 +4,18 @@ import { UrgencyBanner } from "@/components/UrgencyBanner";
 import { PricingSection } from "@/components/PricingSection";
 import { ReferralForm } from "@/components/ReferralForm";
 import { Button } from "@/components/ui/button";
-import { Download, Smartphone, LogOut, Gift, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Download, Smartphone, LogOut, Gift, Clock, DollarSign } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { useCredits } from "@/hooks/useCredits";
 import type { User } from "@shared/schema";
 
 export default function Home() {
   usePageTracking('home');
   const { user } = useAuth();
   const typedUser = user as User;
+  const { balance } = useCredits();
 
   const handleLogout = () => {
     window.location.href = "/api/logout";
@@ -44,6 +47,19 @@ export default function Home() {
             <span className="text-xl font-black text-foreground">Kull</span>
           </button>
           <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.location.href = '/credits'}
+              className="relative"
+              data-testid="button-credits"
+            >
+              <DollarSign className="w-4 h-4 mr-2" />
+              Credits
+              <Badge variant="secondary" className="ml-2 font-mono text-xs">
+                ${(balance / 100).toFixed(0)}
+              </Badge>
+            </Button>
             <span className="text-sm text-muted-foreground" data-testid="text-user-email">
               {typedUser?.email}
             </span>

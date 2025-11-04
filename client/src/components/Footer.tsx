@@ -38,9 +38,10 @@ export function Footer() {
 
   const productLinks = [
     { name: "Features", href: "/#features", isSection: true, sectionId: "features" },
+    { name: "Marketplace", href: "/marketplace", isSection: false },
     { name: "Pricing", href: "/#pricing", isSection: true, sectionId: "pricing" },
     { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
-    { name: "Download", href: "/#download", isSection: true, sectionId: "download" }
+    { name: "Download Apps", href: "/download", isSection: false }
   ];
 
   const companyLinks = [
@@ -50,10 +51,11 @@ export function Footer() {
   ];
 
   const accountLinks = [
-    { name: "Dashboard", href: "/dashboard" },
-    { name: "My Account", href: "/" },
+    { name: "Dashboard", href: "/dashboard", isSection: false },
+    { name: "My Account", href: "/", isSection: false },
+    { name: "My Prompts", href: "/my-prompts", isSection: false },
     { name: "Referrals", href: "/#referrals", isSection: true, sectionId: "referrals" },
-    { name: "Downloads", href: "/#download", isSection: true, sectionId: "download" }
+    { name: "Download Apps", href: "/download", isSection: false }
   ];
 
   const legalLinks = [
@@ -72,13 +74,24 @@ export function Footer() {
             <ul className="space-y-2">
               {productLinks.map((link) => (
                 <li key={link.name}>
-                  <button
-                    onClick={() => link.isSection ? handleSectionClick(link.sectionId!) : window.location.href = link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
-                    data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    {link.name}
-                  </button>
+                  {link.isSection ? (
+                    <button
+                      onClick={() => handleSectionClick(link.sectionId!)}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {link.name}
+                    </button>
+                  ) : (
+                    <Link
+                      href={link.href}
+                      onClick={handleClick}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      data-testid={`link-footer-${link.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      {link.name}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>

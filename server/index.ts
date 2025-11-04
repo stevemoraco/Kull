@@ -1,8 +1,13 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import downloadRouter from "./routes/download";
+import creditsRouter from "./routes/credits";
+import stripeWebhooksRouter from "./routes/stripe-webhooks";
 import { setupVite, serveStatic, log } from "./vite";
 import { startEmailProcessor } from "./emailService";
 import { refreshRepoCache } from "./fetchRepo";
+import { setupWebSocketServer } from "./websocket";
+import { createSyncRouter } from "./routes/sync";
 
 const app = express();
 
@@ -47,6 +52,26 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  // Setup WebSocket server
+  log('[WebSocket] Setting up WebSocket server...');
+  const wsService = setupWebSocketServer(server);
+
+  // Register sync routes
+  const syncRouter = createSyncRouter(wsService);
+  app.use('/api/sync', syncRouter);
+  log('[Sync] Sync routes registered at /api/sync');
+
+  // Register download routes
+  app.use('/api/download', downloadRouter);
+
+  // Register credits routes
+  app.use('/api/credits', creditsRouter);
+  log('[Credits] Credits routes registered at /api/credits');
+
+  // Register Stripe webhook routes (before other middleware)
+  app.use('/api/stripe', stripeWebhooksRouter);
+  log('[Stripe] Stripe webhook routes registered at /api/stripe');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

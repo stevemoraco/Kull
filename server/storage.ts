@@ -6,6 +6,12 @@ import {
   pageVisits,
   supportQueries,
   chatSessions,
+  prompts,
+  promptVotes,
+  creditTransactions,
+  deviceSessions,
+  shootReports,
+  shootProgress,
   type User,
   type UpsertUser,
   type Referral,
@@ -20,6 +26,18 @@ import {
   type InsertSupportQuery,
   type ChatSession,
   type InsertChatSession,
+  type Prompt,
+  type InsertPrompt,
+  type PromptVote,
+  type InsertPromptVote,
+  type CreditTransaction,
+  type InsertCreditTransaction,
+  type DeviceSession,
+  type InsertDeviceSession,
+  type ShootReport,
+  type InsertShootReport,
+  type ShootProgress,
+  type InsertShootProgress,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, lte, and, isNull, gte, sql, desc } from "drizzle-orm";
@@ -88,6 +106,54 @@ export interface IStorage {
   saveChatSession(session: InsertChatSession): Promise<ChatSession>;
   getChatSessions(userId?: string): Promise<ChatSession[]>;
   deleteChatSession(sessionId: string): Promise<void>;
+
+  // Prompt marketplace operations
+  createPrompt(prompt: InsertPrompt): Promise<Prompt>;
+  getPrompt(id: string): Promise<Prompt | undefined>;
+  getPrompts(filters?: { profile?: string; tags?: string[]; authorId?: string; featured?: boolean }): Promise<Prompt[]>;
+  updatePrompt(id: string, updates: Partial<InsertPrompt>): Promise<Prompt>;
+  deletePrompt(id: string): Promise<void>;
+  incrementPromptUsage(id: string): Promise<void>;
+
+  // Prompt voting operations
+  votePrompt(vote: InsertPromptVote): Promise<PromptVote>;
+  getUserPromptVote(userId: string, promptId: string): Promise<PromptVote | undefined>;
+  getPromptVotes(promptId: string): Promise<PromptVote[]>;
+  updatePromptVoteScore(promptId: string): Promise<void>;
+
+  // Credit operations
+  getCreditBalance(userId: string): Promise<number>;
+  createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
+  getCreditTransactions(userId: string): Promise<CreditTransaction[]>;
+  getCreditUsageSummary(userId: string): Promise<{
+    totalPurchased: number;
+    totalSpent: number;
+    currentBalance: number;
+    byProvider: Array<{ provider: string; totalSpent: number; transactionCount: number; lastUsed?: Date }>;
+  }>;
+
+  // Device session operations
+  createDeviceSession(session: InsertDeviceSession): Promise<DeviceSession>;
+  getDeviceSession(deviceId: string): Promise<DeviceSession | undefined>;
+  getDeviceSessionById(id: string): Promise<DeviceSession | undefined>;
+  getUserDeviceSessions(userId: string): Promise<DeviceSession[]>;
+  updateDeviceLastSeen(deviceId: string): Promise<void>;
+  updateDevicePushToken(deviceId: string, pushToken: string): Promise<void>;
+  revokeDeviceSession(deviceId: string): Promise<void>;
+  revokeAllUserDevices(userId: string): Promise<void>;
+
+  // Shoot report operations
+  createShootReport(report: InsertShootReport): Promise<ShootReport>;
+  getShootReport(id: string): Promise<ShootReport | undefined>;
+  getShootReportByShootId(shootId: string): Promise<ShootReport | undefined>;
+  getUserShootReports(userId: string): Promise<ShootReport[]>;
+  deleteShootReport(id: string): Promise<void>;
+
+  // Shoot progress operations
+  createShootProgress(progress: InsertShootProgress): Promise<ShootProgress>;
+  getShootProgress(shootId: string): Promise<ShootProgress | undefined>;
+  updateShootProgress(shootId: string, updates: Partial<InsertShootProgress>): Promise<ShootProgress>;
+  deleteShootProgress(shootId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -637,6 +703,369 @@ export class DatabaseStorage implements IStorage {
 
     console.log(`[Storage] Associated ${anonymousSessions.length} anonymous sessions with user ${userId}`);
     return anonymousSessions.length;
+  }
+
+  // Prompt marketplace operations
+  async createPrompt(promptData: InsertPrompt): Promise<Prompt> {
+    const [prompt] = await db
+      .insert(prompts)
+      .values(promptData)
+      .returning();
+    return prompt;
+  }
+
+  async getPrompt(id: string): Promise<Prompt | undefined> {
+    const [prompt] = await db.select().from(prompts).where(eq(prompts.id, id));
+    return prompt;
+  }
+
+  async getPrompts(filters?: { profile?: string; tags?: string[]; authorId?: string; featured?: boolean }): Promise<Prompt[]> {
+    const conditions = [eq(prompts.isPublic, true)];
+
+    if (filters?.profile) {
+      conditions.push(eq(prompts.profile, filters.profile));
+    }
+    if (filters?.authorId) {
+      conditions.push(eq(prompts.authorId, filters.authorId));
+    }
+    if (filters?.featured !== undefined) {
+      conditions.push(eq(prompts.isFeatured, filters.featured));
+    }
+    if (filters?.tags && filters.tags.length > 0) {
+      // Check if prompt has ANY of the specified tags
+      conditions.push(sql`${prompts.tags} && ARRAY[${sql.join(filters.tags.map(t => sql`${t}`), sql`, `)}]::text[]`);
+    }
+
+    return db
+      .select()
+      .from(prompts)
+      .where(and(...conditions))
+      .orderBy(desc(prompts.qualityScore), desc(prompts.usageCount));
+  }
+
+  async updatePrompt(id: string, updates: Partial<InsertPrompt>): Promise<Prompt> {
+    const [updated] = await db
+      .update(prompts)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(prompts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePrompt(id: string): Promise<void> {
+    await db.delete(prompts).where(eq(prompts.id, id));
+  }
+
+  async incrementPromptUsage(id: string): Promise<void> {
+    await db
+      .update(prompts)
+      .set({
+        usageCount: sql`${prompts.usageCount} + 1`,
+      })
+      .where(eq(prompts.id, id));
+  }
+
+  // Prompt voting operations
+  async votePrompt(voteData: InsertPromptVote): Promise<PromptVote> {
+    const [vote] = await db
+      .insert(promptVotes)
+      .values(voteData)
+      .onConflictDoUpdate({
+        target: [promptVotes.userId, promptVotes.promptId],
+        set: {
+          vote: voteData.vote,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    // Update the prompt's quality score
+    await this.updatePromptVoteScore(voteData.promptId);
+
+    return vote;
+  }
+
+  async getUserPromptVote(userId: string, promptId: string): Promise<PromptVote | undefined> {
+    const [vote] = await db
+      .select()
+      .from(promptVotes)
+      .where(and(
+        eq(promptVotes.userId, userId),
+        eq(promptVotes.promptId, promptId)
+      ));
+    return vote;
+  }
+
+  async getPromptVotes(promptId: string): Promise<PromptVote[]> {
+    return db
+      .select()
+      .from(promptVotes)
+      .where(eq(promptVotes.promptId, promptId));
+  }
+
+  async updatePromptVoteScore(promptId: string): Promise<void> {
+    // Calculate average vote score and total vote count
+    const result = await db
+      .select({
+        avgScore: sql<number>`COALESCE(AVG(${promptVotes.vote}::numeric), 0)::numeric`,
+        voteCount: sql<number>`count(*)::int`,
+      })
+      .from(promptVotes)
+      .where(eq(promptVotes.promptId, promptId));
+
+    const { avgScore, voteCount } = result[0];
+
+    await db
+      .update(prompts)
+      .set({
+        qualityScore: avgScore.toString(),
+        voteCount: voteCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(prompts.id, promptId));
+  }
+
+  // Credit operations
+  async getCreditBalance(userId: string): Promise<number> {
+    const result = await db
+      .select({ balance: creditTransactions.balance })
+      .from(creditTransactions)
+      .where(eq(creditTransactions.userId, userId))
+      .orderBy(desc(creditTransactions.createdAt))
+      .limit(1);
+
+    return result[0]?.balance || 0;
+  }
+
+  async createCreditTransaction(transactionData: InsertCreditTransaction): Promise<CreditTransaction> {
+    const [transaction] = await db
+      .insert(creditTransactions)
+      .values(transactionData)
+      .returning();
+    return transaction;
+  }
+
+  async getCreditTransactions(userId: string): Promise<CreditTransaction[]> {
+    return db
+      .select()
+      .from(creditTransactions)
+      .where(eq(creditTransactions.userId, userId))
+      .orderBy(desc(creditTransactions.createdAt));
+  }
+
+  async getCreditUsageSummary(userId: string): Promise<{
+    totalPurchased: number;
+    totalSpent: number;
+    currentBalance: number;
+    byProvider: Array<{ provider: string; totalSpent: number; transactionCount: number; lastUsed?: Date }>;
+  }> {
+    const allTransactions = await this.getCreditTransactions(userId);
+
+    const totalPurchased = allTransactions
+      .filter(t => t.type === 'purchase' || t.type === 'bonus')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalSpent = Math.abs(allTransactions
+      .filter(t => t.type === 'usage')
+      .reduce((sum, t) => sum + t.amount, 0));
+
+    const currentBalance = await this.getCreditBalance(userId);
+
+    // Group by provider
+    const providerMap = new Map<string, { totalSpent: number; transactionCount: number; lastUsed?: Date }>();
+
+    allTransactions
+      .filter(t => t.type === 'usage' && t.provider)
+      .forEach(t => {
+        const existing = providerMap.get(t.provider!) || { totalSpent: 0, transactionCount: 0 };
+        providerMap.set(t.provider!, {
+          totalSpent: existing.totalSpent + Math.abs(t.amount),
+          transactionCount: existing.transactionCount + 1,
+          lastUsed: !existing.lastUsed || t.createdAt! > existing.lastUsed ? t.createdAt! : existing.lastUsed,
+        });
+      });
+
+    const byProvider = Array.from(providerMap.entries()).map(([provider, stats]) => ({
+      provider,
+      ...stats,
+    }));
+
+    return {
+      totalPurchased,
+      totalSpent,
+      currentBalance,
+      byProvider,
+    };
+  }
+
+  // Device session operations
+  async createDeviceSession(sessionData: InsertDeviceSession): Promise<DeviceSession> {
+    const [session] = await db
+      .insert(deviceSessions)
+      .values(sessionData)
+      .onConflictDoUpdate({
+        target: deviceSessions.deviceId,
+        set: {
+          userId: sessionData.userId,
+          platform: sessionData.platform,
+          deviceName: sessionData.deviceName,
+          appVersion: sessionData.appVersion,
+          jwtToken: sessionData.jwtToken,
+          pushToken: sessionData.pushToken,
+          lastSeen: new Date(),
+          isActive: true,
+        },
+      })
+      .returning();
+    return session;
+  }
+
+  async getDeviceSession(deviceId: string): Promise<DeviceSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(deviceSessions)
+      .where(eq(deviceSessions.deviceId, deviceId));
+    return session;
+  }
+
+  async getDeviceSessionById(id: string): Promise<DeviceSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(deviceSessions)
+      .where(eq(deviceSessions.id, id));
+    return session;
+  }
+
+  async getUserDeviceSessions(userId: string): Promise<DeviceSession[]> {
+    return db
+      .select()
+      .from(deviceSessions)
+      .where(and(
+        eq(deviceSessions.userId, userId),
+        eq(deviceSessions.isActive, true)
+      ))
+      .orderBy(desc(deviceSessions.lastSeen));
+  }
+
+  async updateDeviceLastSeen(deviceId: string): Promise<void> {
+    await db
+      .update(deviceSessions)
+      .set({
+        lastSeen: new Date(),
+      })
+      .where(eq(deviceSessions.deviceId, deviceId));
+  }
+
+  async updateDevicePushToken(deviceId: string, pushToken: string): Promise<void> {
+    await db
+      .update(deviceSessions)
+      .set({
+        pushToken,
+      })
+      .where(eq(deviceSessions.deviceId, deviceId));
+  }
+
+  async revokeDeviceSession(deviceId: string): Promise<void> {
+    await db
+      .update(deviceSessions)
+      .set({
+        isActive: false,
+      })
+      .where(eq(deviceSessions.deviceId, deviceId));
+  }
+
+  async revokeAllUserDevices(userId: string): Promise<void> {
+    await db
+      .update(deviceSessions)
+      .set({
+        isActive: false,
+      })
+      .where(eq(deviceSessions.userId, userId));
+  }
+
+  // Shoot report operations
+  async createShootReport(reportData: InsertShootReport): Promise<ShootReport> {
+    const [report] = await db
+      .insert(shootReports)
+      .values(reportData)
+      .returning();
+    return report;
+  }
+
+  async getShootReport(id: string): Promise<ShootReport | undefined> {
+    const [report] = await db
+      .select()
+      .from(shootReports)
+      .where(eq(shootReports.id, id));
+    return report;
+  }
+
+  async getShootReportByShootId(shootId: string): Promise<ShootReport | undefined> {
+    const [report] = await db
+      .select()
+      .from(shootReports)
+      .where(eq(shootReports.shootId, shootId));
+    return report;
+  }
+
+  async getUserShootReports(userId: string): Promise<ShootReport[]> {
+    return db
+      .select()
+      .from(shootReports)
+      .where(eq(shootReports.userId, userId))
+      .orderBy(desc(shootReports.generatedAt));
+  }
+
+  async deleteShootReport(id: string): Promise<void> {
+    await db.delete(shootReports).where(eq(shootReports.id, id));
+  }
+
+  // Shoot progress operations
+  async createShootProgress(progressData: InsertShootProgress): Promise<ShootProgress> {
+    const [progress] = await db
+      .insert(shootProgress)
+      .values(progressData)
+      .onConflictDoUpdate({
+        target: shootProgress.shootId,
+        set: {
+          status: progressData.status,
+          processedCount: progressData.processedCount,
+          totalCount: progressData.totalCount,
+          currentImage: progressData.currentImage,
+          eta: progressData.eta,
+          errorMessage: progressData.errorMessage,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return progress;
+  }
+
+  async getShootProgress(shootId: string): Promise<ShootProgress | undefined> {
+    const [progress] = await db
+      .select()
+      .from(shootProgress)
+      .where(eq(shootProgress.shootId, shootId));
+    return progress;
+  }
+
+  async updateShootProgress(shootId: string, updates: Partial<InsertShootProgress>): Promise<ShootProgress> {
+    const [updated] = await db
+      .update(shootProgress)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(shootProgress.shootId, shootId))
+      .returning();
+    return updated;
+  }
+
+  async deleteShootProgress(shootId: string): Promise<void> {
+    await db.delete(shootProgress).where(eq(shootProgress.shootId, shootId));
   }
 }
 
