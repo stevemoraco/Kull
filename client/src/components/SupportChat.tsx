@@ -479,10 +479,19 @@ export function SupportChat() {
                     }
                   }
 
-                  // Check for cutoff
-                  let cutoffIndex = fullContent.indexOf('␞');
+                  // Look for cutoff markers
+                  let cutoffIndex = -1;
+
+                  // Try to find the Unicode marker ␞
+                  cutoffIndex = fullContent.indexOf('␞');
+
+                  // Fallback: look for FOLLOW_UP_QUESTIONS text
                   if (cutoffIndex === -1) {
-                    cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
+                    const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
+                    const match = fullContent.match(followUpPattern);
+                    if (match) {
+                      cutoffIndex = match.index!;
+                    }
                   }
 
                   if (cutoffIndex !== -1) {
@@ -491,9 +500,10 @@ export function SupportChat() {
                     const questionsSection = fullContent.substring(cutoffIndex);
 
                     // Extract questions
-                    const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|$)/is);
+                    const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)$/is);
                     if (followUpMatch) {
-                      const newQuestions = followUpMatch[1]
+                      const questionsText = followUpMatch[1];
+                      const newQuestions = questionsText
                         .split('|')
                         .map((q: string) => q.trim())
                         .filter((q: string) => q.length > 0 && q.length < 200);
@@ -514,15 +524,19 @@ export function SupportChat() {
                       )
                     );
                     fullContent = cleanContent;
-                  } else {
-                    setMessages(prev =>
-                      prev.map(msg =>
-                        msg.id === welcomeMessageId
-                          ? { ...msg, content: fullContent }
-                          : msg
-                      )
-                    );
+
+                    // Don't update the message anymore
+                    continue;
                   }
+
+                  // No cutoff yet, show all content
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === welcomeMessageId
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    )
+                  );
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -634,12 +648,20 @@ export function SupportChat() {
                   }
                 }
 
-                // Look for cutoff markers - be aggressive
-                let cutoffIndex = fullContent.indexOf('␞');
+                // Look for cutoff markers - check for special character first, then plain text
+                let cutoffIndex = -1;
 
-                // Fallback: look for FOLLOW_UP_QUESTIONS (without requiring newline)
+                // Try to find the Unicode marker ␞
+                cutoffIndex = fullContent.indexOf('␞');
+
+                // Fallback: look for FOLLOW_UP_QUESTIONS text
                 if (cutoffIndex === -1) {
-                  cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
+                  // Look for patterns like "\n\nFOLLOW_UP_QUESTIONS" or just "FOLLOW_UP_QUESTIONS"
+                  const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
+                  const match = fullContent.match(followUpPattern);
+                  if (match) {
+                    cutoffIndex = match.index!;
+                  }
                 }
 
                 if (cutoffIndex !== -1) {
@@ -650,32 +672,31 @@ export function SupportChat() {
                   const cleanContent = fullContent.substring(0, cutoffIndex).trim();
                   const questionsSection = fullContent.substring(cutoffIndex);
 
-                  // Extract follow-up questions
-                  console.log('[Chat] Questions section:', questionsSection);
-                  const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|$)/is);
-                  console.log('[Chat] Follow-up match:', followUpMatch);
+                  console.log('[Chat] CUTOFF DETECTED at index:', cutoffIndex);
+                  console.log('[Chat] Clean content length:', cleanContent.length);
+                  console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
+
+                  // Extract follow-up questions - be more flexible with the pattern
+                  const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)$/is);
 
                   if (followUpMatch) {
-                    const newQuestions = followUpMatch[1]
+                    const questionsText = followUpMatch[1];
+                    const newQuestions = questionsText
                       .split('|')
                       .map((q: string) => q.trim())
-                      .filter((q: string) => q.length > 0 && q.length < 200); // Sanity check
+                      .filter((q: string) => q.length > 0 && q.length < 200);
 
                     console.log('[Chat] Extracted questions:', newQuestions);
 
                     if (newQuestions.length > 0) {
                       setQuickQuestions(prev => {
                         const combined = [...prev, ...newQuestions];
-                        const result = combined.slice(-8);
-                        console.log('[Chat] Setting quick questions:', result);
-                        return result;
+                        return combined.slice(-8);
                       });
                     }
-                  } else {
-                    console.log('[Chat] No follow-up match found');
                   }
 
-                  // Update message with clean content and stop
+                  // Update message with clean content
                   setMessages(prev =>
                     prev.map(msg =>
                       msg.id === assistantMessageId
@@ -683,17 +704,22 @@ export function SupportChat() {
                         : msg
                     )
                   );
+
+                  // Update fullContent so subsequent checks use clean version
                   fullContent = cleanContent;
-                } else {
-                  // No cutoff yet, show all content
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
+
+                  // Don't update the message anymore since we've detected cutoff
+                  continue;
                 }
+
+                // No cutoff yet, show all content
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: fullContent }
+                      : msg
+                  )
+                );
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
