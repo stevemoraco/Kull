@@ -234,11 +234,11 @@ export function SupportChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loadedSessions = loadSessions();
     if (loadedSessions.length === 0) {
-      // Create initial session with placeholder - will generate greeting after mount
+      // Create initial session with empty messages - greetings will be added via popover
       const initialSession: ChatSession = {
-        id: Date.now().toString(),
-        title: 'New Chat',
-        messages: [createPlaceholderWelcomeMessage()],
+        id: 'main-session-' + Date.now().toString(),
+        title: 'Chat with Kull',
+        messages: [],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -550,19 +550,25 @@ export function SupportChat() {
     setTranscriptSent(false);
   }, [currentSessionId]);
 
-  // Use pre-generated greeting for new sessions
+  // Add greeting to conversation when chat is opened with empty messages
   useEffect(() => {
-    const applyWelcomeGreeting = async () => {
-      const currentSession = sessions.find(s => s.id === currentSessionId);
-      if (!currentSession) return;
+    if (isOpen && messages.length === 0 && latestGreeting) {
+      const greetingMessage: Message = {
+        id: 'greeting-' + Date.now(),
+        role: 'assistant',
+        content: latestGreeting,
+        timestamp: new Date(),
+      };
 
-      // Check if this is a new session with placeholder greeting
-      const hasPlaceholder = currentSession.messages.length === 1 &&
-                            currentSession.messages[0].content === '__GENERATING_GREETING__';
+      setMessages([greetingMessage]);
 
-      if (!hasPlaceholder) return;
-
-      const welcomeMessageId = currentSession.messages[0].id;
+      // Navigate to first link in greeting
+      const linkMatch = latestGreeting.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (linkMatch) {
+        handleLinkClick(linkMatch[2]);
+      }
+    }
+  }, [isOpen, messages.length, latestGreeting, setMessages, handleLinkClick]);
 
       // Use pre-generated greeting if available
       if (latestGreeting) {
