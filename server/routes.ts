@@ -514,6 +514,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fullResponse += data.delta;
                   // Forward to client
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
+                  if (typeof (res as any).flush === 'function') {
+                    (res as any).flush();
+                  }
                 } else if (data.type === 'response.done') {
                   // Extract usage data from done event
                   if (data.response?.usage) {
@@ -526,6 +529,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else if (data.type === 'error') {
                   const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  if (typeof (res as any).flush === 'function') {
+                    (res as any).flush();
+                  }
                 }
               } catch (e) {
                 // Skip invalid JSON lines
@@ -1076,6 +1082,9 @@ ${contextMarkdown}`;
                 if (data.type === 'response.output_text.delta' && data.delta) {
                   fullResponse += data.delta;
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
+                  if (typeof (res as any).flush === 'function') {
+                    (res as any).flush();
+                  }
                 } else if (data.type === 'response.done') {
                   console.log('[Welcome] OpenAI sent response.done event');
                   // Track token usage
@@ -1087,6 +1096,9 @@ ${contextMarkdown}`;
                   console.error('[Welcome] OpenAI error:', data);
                   const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  if (typeof (res as any).flush === 'function') {
+                    (res as any).flush();
+                  }
                 }
               } catch (e) {
                 console.error('[Welcome] JSON parse error:', e, 'Line:', line);

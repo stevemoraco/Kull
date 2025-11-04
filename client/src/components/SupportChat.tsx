@@ -1359,13 +1359,16 @@ export function SupportChat() {
                 }
 
                 // No cutoff yet, show all content
-                setMessages(prev =>
-                  prev.map(msg =>
+                console.log('[Chat] Updating message', assistantMessageId, 'with content length:', fullContent.length);
+                setMessages(prev => {
+                  const updated = prev.map(msg =>
                     msg.id === assistantMessageId
                       ? { ...msg, content: fullContent }
                       : msg
-                  )
-                );
+                  );
+                  console.log('[Chat] Messages after update:', updated.length, 'Updated msg found:', updated.some(m => m.id === assistantMessageId));
+                  return updated;
+                });
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
@@ -1390,6 +1393,7 @@ export function SupportChat() {
               }
             } catch (e) {
               // Skip invalid JSON lines
+              console.log('[Chat] Skipped invalid JSON line:', line.substring(0, 100));
             }
           }
         }
@@ -1405,6 +1409,7 @@ export function SupportChat() {
         }, 500);
       }
     } catch (error) {
+      console.error('[Chat] Error in sendMessage:', error);
       toast({
         title: 'Error',
         description: 'Failed to send message. Please try again.',
@@ -1413,6 +1418,7 @@ export function SupportChat() {
       // Remove the failed assistant message
       setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
     } finally {
+      console.log('[Chat] sendMessage finally block, setting isLoading to false');
       setIsLoading(false);
     }
   };
