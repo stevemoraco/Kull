@@ -304,6 +304,8 @@ export function SupportChat() {
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(true);
+  const [debugActivityLog, setDebugActivityLog] = useState<string>('');
 
   // Store pre-generated greeting for initial use
   const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
@@ -474,12 +476,47 @@ export function SupportChat() {
       }
     };
 
+    // Update debug overlay
+    const updateDebugOverlay = () => {
+      const activity = getActivity();
+      const recentActivity = activity.slice(-20); // Last 20 events
+
+      const formatted = recentActivity.map((event, idx) => {
+        const time = new Date(event.timestamp);
+        const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        if (event.type === 'click') {
+          const elementText = event.value ? ` - TEXT: "${event.value}"` : '';
+          return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\`${elementText} at ${timeStr}`;
+        } else if (event.type === 'hover') {
+          return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
+        } else if (event.type === 'input') {
+          const displayValue = event.value && event.value.length > 0 ? `"${event.value}"` : '(empty)';
+          return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
+        } else if (event.type === 'select') {
+          return `${idx + 1}. **✏️ HIGHLIGHTED TEXT**: "${event.value}" at ${timeStr}`;
+        }
+        return '';
+      }).join('\n\n');
+
+      const insights = `**Activity Insights:**
+- **Total Clicks:** ${activity.filter(e => e.type === 'click').length}
+- **Elements Hovered:** ${activity.filter(e => e.type === 'hover').length}
+- **Input Events:** ${activity.filter(e => e.type === 'input').length}
+- **Text Selections:** ${activity.filter(e => e.type === 'select').length}`;
+
+      setDebugActivityLog(`## 🔍 User Activity History (Last 20 Events)\n\n${formatted || '- No recent activity tracked'}\n\n${insights}`);
+    };
+
     // Add event listeners
     document.addEventListener('click', handleClick, true);
     document.addEventListener('mouseover', handleMouseOver, true);
     document.addEventListener('input', handleInput, true);
     document.addEventListener('mouseup', handleTextSelect, true); // Track text selection
     document.addEventListener('keyup', handleTextSelect, true); // Track keyboard selection
+
+    // Update debug overlay every second
+    const debugInterval = setInterval(updateDebugOverlay, 1000);
 
     // Cleanup
     return () => {
@@ -489,6 +526,7 @@ export function SupportChat() {
       document.removeEventListener('mouseup', handleTextSelect, true);
       document.removeEventListener('keyup', handleTextSelect, true);
       clearTimeout(hoverTimeout);
+      clearInterval(debugInterval);
     };
   }, []);
 
@@ -747,6 +785,9 @@ export function SupportChat() {
           timestamp: m.timestamp,
         }));
 
+        console.log('[Chat] Sending welcome request with history:', fullChatHistory.length, 'messages');
+        console.log('[Chat] Latest 3 messages:', fullChatHistory.slice(-3));
+
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -801,15 +842,37 @@ export function SupportChat() {
         }
 
         if (fullContent && isActive) {
-          // Parse next message timing if present
+          // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
+          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
 
+          // Remove metadata from displayed content
+          if (nextMessageMatch && nextMessageMatch.index !== undefined) {
+            cleanContent = fullContent.substring(0, nextMessageMatch.index).trim();
+          }
+
+          // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-            // Remove the NEXT_MESSAGE line from displayed content
-            cleanContent = fullContent.substring(0, nextMessageMatch.index).trim();
+          }
+
+          // Parse and display follow-up questions
+          if (followUpMatch) {
+            const questionsText = followUpMatch[1];
+            const newQuestions = questionsText
+              .split('|')
+              .map((q: string) => q.trim())
+              .filter((q: string) => q.length > 5 && q.length < 200);
+
+            console.log('[Chat] Welcome greeting follow-up questions:', newQuestions);
+
+            if (newQuestions.length > 0) {
+              setQuickQuestions(newQuestions);
+              setShowSuggestions(true);
+            }
           }
 
           if (!currentGreetingGenerated) {
@@ -1104,21 +1167,24 @@ export function SupportChat() {
                   console.log('[Chat] Clean content length:', cleanContent.length);
                   console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
 
-                  // Extract follow-up questions - be more flexible with the pattern
-                  const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|␞|$)/is);
+                  // Extract follow-up questions - look for the line after cutoff
+                  const followUpMatch = questionsSection.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
 
                   if (followUpMatch) {
                     const questionsText = followUpMatch[1];
                     const newQuestions = questionsText
                       .split('|')
                       .map((q: string) => q.trim())
-                      .filter((q: string) => q.length > 0 && q.length < 200);
+                      .filter((q: string) => q.length > 5 && q.length < 200);
 
-                    console.log('[Chat] Extracted questions:', newQuestions);
+                    console.log('[Chat] Extracted follow-up questions:', newQuestions);
 
                     if (newQuestions.length > 0) {
                       setQuickQuestions(newQuestions);
+                      setShowSuggestions(true); // Show them by default when new questions arrive
                     }
+                  } else {
+                    console.log('[Chat] No follow-up questions found in:', questionsSection);
                   }
 
                   // Extract next message timing
@@ -1295,6 +1361,46 @@ export function SupportChat() {
 
   return (
     <>
+      {/* Debug Overlay - Top Right */}
+      {showDebugOverlay && (
+        <div className="fixed top-4 right-4 w-96 max-h-[80vh] bg-black/90 text-white rounded-lg shadow-2xl z-[10000] overflow-hidden flex flex-col">
+          <div className="bg-purple-600 px-4 py-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold">🔍 Activity Debug</span>
+              <span className="text-xs opacity-75">(AI sees this)</span>
+            </div>
+            <button
+              onClick={() => setShowDebugOverlay(false)}
+              className="text-white hover:bg-white/20 rounded px-2 py-1 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="p-4 overflow-y-auto flex-1 text-xs font-mono">
+            <div
+              className="whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{
+                __html: debugActivityLog
+                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 rounded">$1</code>')
+                  .replace(/##\s(.+)/g, '<h2 class="text-lg font-bold mb-2 text-purple-400">$1</h2>')
+                  .replace(/- \*\*(.+?):\*\* (.+)/g, '- <strong class="text-purple-300">$1:</strong> $2')
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Toggle Debug Button - Top Right */}
+      {!showDebugOverlay && (
+        <button
+          onClick={() => setShowDebugOverlay(true)}
+          className="fixed top-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-lg shadow-lg hover:bg-purple-700 z-[10000] text-xs font-bold"
+        >
+          🔍 Show Debug
+        </button>
+      )}
+
       {/* Chat Button */}
       {!isOpen && (
         <>

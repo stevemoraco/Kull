@@ -628,6 +628,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { context, history } = req.body;
 
+      console.log('[Welcome] Received request with history length:', history?.length || 0);
+      if (history && history.length > 0) {
+        console.log('[Welcome] Last 2 messages in history:');
+        history.slice(-2).forEach((msg: any, idx: number) => {
+          console.log(`  ${idx + 1}. ${msg.role}: ${msg.content?.substring(0, 100)}...`);
+        });
+      }
+
       if (!context) {
         return res.status(400).json({ message: "Context required" });
       }
@@ -841,33 +849,59 @@ You have access to:
 - Ask questions directly related to what they just read or clicked
 - Be observant and curious about their SPECIFIC interest, not generic
 
-**BUILD ON THE CONVERSATION:**
-- Review the full chat history - what questions have you already asked?
-- Are they answering your questions? Build on their answers
-- Are they ignoring you? Try a different playful angle or tease
-- If they've shared workflow details, calculate their ROI for them
-- If they've given numbers, show them the math
-- DON'T repeat questions - each message should advance the discovery
-- Progress from rapport → understanding workflow → calculating value → trial
+**BUILD ON THE CONVERSATION (CRITICAL - READ YOUR HISTORY):**
+- **LOOK AT THE CONVERSATION HISTORY SECTION BELOW** - what have you ALREADY said?
+- **IF YOU ALREADY MENTIONED "free trial" or "culling late at night" - DO NOT SAY IT AGAIN**
+- **IF YOU ALREADY ASKED ABOUT THEIR WORKFLOW - MOVE TO THE NEXT STEP**
+- If they're not responding, try COMPLETELY different angles:
+  - First message: playful tease about their behavior
+  - Second message: ask about workflow specifics
+  - Third message: if still no response, make a joke or try different topic
+  - Fourth message: direct question about what they're looking for
+- Are they answering? Build DIRECTLY on their answer with follow-up questions
+- If they've shared numbers, show the math calculation
+- **NEVER repeat the same angle twice** - progression: tease → question → calculate → offer
 
 **Format:**
 1-2 sentences, conversational and curious. Ask questions that make them think about their workflow. Occasionally drop in calculated savings if you have enough data.
 
 **REQUIRED ENDING:**
-End your message with:
+End your message with these TWO lines:
+
+␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
 ␞NEXT_MESSAGE: X
 
-Where X is seconds until your next message (20-60 recommended based on engagement level).
+Where:
+- FOLLOW_UP_QUESTIONS = 4 relevant questions they can click to continue the conversation
+- NEXT_MESSAGE = seconds until your next message (20-60 recommended based on engagement level)
 
-**Examples of specific, reactive messages:**
-- "Just saw you click 'Studio Tier' - are you managing a team or just looking at options?"
-- "You hovered over 'Lightroom integration' for like 5 seconds... is that your main editor?"
-- "Noticed you read the section about batch processing 2000 photos - is that your typical shoot size?"
-- "You clicked on the testimonial from that wedding photographer - do you also shoot weddings?"
-- "Saw you scroll past the '384 hours/year saved' stat - quick Q: how many shoots do YOU do per week?"
-- "You're reading about AI confidence scores right now - do you want full control over which photos get flagged?"
-- "Just clicked 'money-back guarantee' - what's the main concern? The AI accuracy or workflow fit?"
-- "I see you've now hovered on pricing THREE times but haven't clicked - what number are you hoping to see?"
+**Examples of VARIED, specific messages (NEVER repeat same angle):**
+
+**First contact (tease about behavior):**
+- "Caught you clicking between Professional and Studio 3 times 👀 - managing a team or solo?"
+- "You've hovered over 'Lightroom integration' twice now... that your main editor?"
+- "I see you scrolling back up to pricing... something not adding up?"
+
+**Second message (if no response - ask specific question):**
+- "Real Q: how many photos do you typically shoot per wedding/session?"
+- "What's eating most of your time right now - culling, editing, or client management?"
+- "Are you using any AI tools currently, or still 100% manual?"
+
+**Third message (if still no response - different angle entirely):**
+- "Not a talker, I get it. Mind if I ask - what brings you here at [TIME]?"
+- "Okay last try 😅 - what would you do with an extra 10 hours per week?"
+- "You've been quiet - just browsing or actually considering this?"
+
+**NEVER say these phrases more than ONCE:**
+- "free trial"
+- "culling late at night"
+- "10+ hours per week"
+- "Professional plan"
+
+**IF ALREADY MENTIONED TRIAL - MOVE ON:**
+- Ask about their specific workflow
+- Ask what concerns they have
+- Ask what they're comparing Kull against
 
 Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.
 
@@ -879,11 +913,21 @@ ${history.map((msg: any, idx: number) => {
   const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
   return `${idx + 1}. **${msg.role.toUpperCase()}** (${timestamp}): ${msg.content}`;
 }).join('\n\n')}
+
+**⚠️ CRITICAL SELF-AWARENESS CHECK:**
+You have sent ${history.filter((m: any) => m.role === 'assistant').length} messages already.
+Look at what you've ALREADY SAID above. DO NOT repeat yourself.
+
+- If you mentioned "trial" or "Professional plan" → Talk about something else now
+- If you asked about workflow → Ask a different question
+- If they haven't replied → Try a completely different approach
+- Vary your angle with EVERY message
+
 ` : 'No conversation yet - this is your opening message.'}
 
 ---
 
-Now respond to their most recent activity and work it into your sales pitch. Reference what they just did!`;
+Now respond to their most recent activity (check the user activity log above) and work it into your message. Be specific about what they just clicked/read!`;
 
       const { getChatResponseStream, getRepoContent } = await import('./chatService');
 
@@ -892,8 +936,9 @@ Now respond to their most recent activity and work it into your sales pitch. Ref
 
       const fullContextMarkdown = `# Full Context for Welcome Message
 
-## GitHub Repository Content
+<GITHUB_SOURCE_CODE>
 ${repoContent}
+</GITHUB_SOURCE_CODE>
 
 ---
 
@@ -905,6 +950,11 @@ ${contextMarkdown}`;
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+
+      // Track the full response for analytics
+      let fullResponse = '';
+      let tokensIn = 0;
+      let tokensOut = 0;
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -924,9 +974,14 @@ ${contextMarkdown}`;
 
                 // Transform OpenAI format to our client format
                 if (data.type === 'response.output_text.delta' && data.delta) {
+                  fullResponse += data.delta;
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
                 } else if (data.type === 'response.done') {
-                  // Don't send done yet, we'll send it after the loop
+                  // Track token usage
+                  if (data.response?.usage) {
+                    tokensIn = data.response.usage.input_tokens || 0;
+                    tokensOut = data.response.usage.output_tokens || 0;
+                  }
                 } else if (data.type === 'error') {
                   res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
                 }
@@ -939,6 +994,75 @@ ${contextMarkdown}`;
 
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         res.end();
+
+        // Track welcome greeting in database
+        const storage = await import('./storage');
+        const userEmail = req.user?.claims?.email;
+        const userId = req.user?.claims?.sub;
+
+        if (fullResponse) {
+          // Calculate cost (same model as main chat)
+          const inputCostPer1M = 0.075;
+          const outputCostPer1M = 0.30;
+          const cost = (tokensIn * inputCostPer1M + tokensOut * outputCostPer1M) / 1_000_000;
+
+          // Extract metadata
+          const userAgent = req.headers['user-agent'] || '';
+          let device = 'Desktop';
+          if (/mobile/i.test(userAgent)) device = 'Mobile';
+          else if (/tablet|ipad/i.test(userAgent)) device = 'Tablet';
+
+          let browser = 'Unknown';
+          if (/chrome/i.test(userAgent) && !/edg/i.test(userAgent)) browser = 'Chrome';
+          else if (/safari/i.test(userAgent) && !/chrome/i.test(userAgent)) browser = 'Safari';
+          else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+          else if (/edg/i.test(userAgent)) browser = 'Edge';
+
+          // Get geolocation for anonymous users
+          let city, state, country;
+          if (!userId) {
+            const ip = req.headers['cf-connecting-ip'] ||
+                       req.headers['x-real-ip'] ||
+                       req.headers['x-forwarded-for']?.split(',')[0] ||
+                       'unknown';
+
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2000);
+              const geoRes = await fetch(`https://ipapi.co/${ip}/json/`, {
+                signal: controller.signal,
+                headers: { 'User-Agent': 'Kull Support Chat' }
+              });
+              clearTimeout(timeoutId);
+              if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                city = geoData.city;
+                state = geoData.region;
+                country = geoData.country_name;
+              }
+            } catch (e) {
+              // Silently fail geolocation
+            }
+          }
+
+          await storage.default.trackSupportQuery({
+            userEmail,
+            userId,
+            userMessage: '[Welcome Greeting - No User Message]',
+            aiResponse: fullResponse,
+            tokensIn,
+            tokensOut,
+            cost: cost.toString(),
+            model: 'gpt-5-mini',
+            device,
+            browser,
+            city,
+            state,
+            country,
+          });
+
+          console.log(`[Welcome] Tracked greeting: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
+        }
       } catch (streamError) {
         console.error('[Welcome] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);

@@ -152,5 +152,24 @@ export const repoContentCache = pgTable("repo_content_cache", {
 export type RepoContentCache = typeof repoContentCache.$inferSelect;
 export type InsertRepoContentCache = typeof repoContentCache.$inferInsert;
 
+// Chat sessions table for full conversation persistence
+export const chatSessions = pgTable("chat_sessions", {
+  id: varchar("id").primaryKey(), // Client-generated ID for consistency
+  userId: varchar("user_id").references(() => users.id), // Optional, for logged-in users
+  title: varchar("title").notNull(),
+  messages: text("messages").notNull(), // JSON string of messages
+  // Anonymous user metadata for tracking (when userId is null)
+  device: varchar("device"),
+  browser: varchar("browser"),
+  city: varchar("city"),
+  state: varchar("state"),
+  country: varchar("country"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+
+export type ChatSession = typeof chatSessions.$inferSelect;
+export type InsertChatSession = typeof chatSessions.$inferInsert;
+
 // Re-export email queue types
 export * from "./emailQueue";

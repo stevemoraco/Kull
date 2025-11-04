@@ -5,6 +5,7 @@ import {
   refundSurveys,
   pageVisits,
   supportQueries,
+  chatSessions,
   type User,
   type UpsertUser,
   type Referral,
@@ -17,6 +18,8 @@ import {
   type InsertPageVisit,
   type SupportQuery,
   type InsertSupportQuery,
+  type ChatSession,
+  type InsertChatSession,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, lte, and, isNull, gte, sql, desc } from "drizzle-orm";
@@ -79,6 +82,11 @@ export interface IStorage {
   }>;
   getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>>;
   getSupportQueriesByEmail(email: string): Promise<SupportQuery[]>;
+
+  // Chat session operations
+  saveChatSession(session: InsertChatSession): Promise<ChatSession>;
+  getChatSessions(userId?: string): Promise<ChatSession[]>;
+  deleteChatSession(sessionId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -511,6 +519,43 @@ export class DatabaseStorage implements IStorage {
       .from(supportQueries)
       .where(eq(supportQueries.userEmail, email))
       .orderBy(desc(supportQueries.createdAt));
+  }
+
+  // Chat session operations
+  async saveChatSession(session: InsertChatSession): Promise<ChatSession> {
+    const [savedSession] = await db
+      .insert(chatSessions)
+      .values(session)
+      .onConflictDoUpdate({
+        target: chatSessions.id,
+        set: {
+          title: session.title,
+          messages: session.messages,
+          updatedAt: session.updatedAt,
+        },
+      })
+      .returning();
+    return savedSession;
+  }
+
+  async getChatSessions(userId?: string): Promise<ChatSession[]> {
+    if (userId) {
+      return db
+        .select()
+        .from(chatSessions)
+        .where(eq(chatSessions.userId, userId))
+        .orderBy(desc(chatSessions.updatedAt));
+    } else {
+      // Return all sessions (for anonymous users, admin, etc.)
+      return db
+        .select()
+        .from(chatSessions)
+        .orderBy(desc(chatSessions.updatedAt));
+    }
+  }
+
+  async deleteChatSession(sessionId: string): Promise<void> {
+    await db.delete(chatSessions).where(eq(chatSessions.id, sessionId));
   }
 }
 
