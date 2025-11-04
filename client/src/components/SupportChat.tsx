@@ -29,9 +29,30 @@ interface ChatSession {
   updatedAt: Date;
 }
 
+// Helper to transform raw URLs into markdown links (client-side safety check)
+function transformRawUrlsToMarkdown(text: string): string {
+  // Regex to find URLs that are NOT already part of markdown links
+  // Negative lookbehind to avoid matching URLs inside [text](URL) format
+  const urlRegex = /(?<!\]\()https?:\/\/[^\s)]+/g;
+
+  return text.replace(urlRegex, (url) => {
+    // Extract domain for link text
+    try {
+      const domain = new URL(url).hostname.replace('www.', '');
+      console.warn('[Chat] ⚠️ Found raw URL, converting to markdown:', url);
+      return `[${domain}](${url})`;
+    } catch {
+      console.warn('[Chat] ⚠️ Found malformed URL, converting to markdown:', url);
+      return `[link](${url})`;
+    }
+  });
+}
+
 // Helper function to render markdown with purple theme
 function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
-  const lines = text.split('\n');
+  // First, transform any raw URLs to markdown links (safety check)
+  const safeText = transformRawUrlsToMarkdown(text);
+  const lines = safeText.split('\n');
   const elements: JSX.Element[] = [];
   let key = 0;
 

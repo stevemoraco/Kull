@@ -958,11 +958,11 @@ You have access to:
 **Format:**
 1-2 sentences, conversational and curious. Ask questions that make them think about their workflow. Occasionally drop in calculated savings if you have enough data.
 
-**CRITICAL: NEVER PRINT RAW URLs**
-- ALWAYS use markdown link format: [link text](https://url)
-- NEVER output bare URLs like "https://kullai.com/pricing"
-- WRONG: "Check out https://kullai.com/pricing for details"
-- RIGHT: "Check out [our pricing](https://kullai.com/pricing) for details"
+**CRITICAL: NEVER PRINT RAW URLs OR MAKE UP LINKS**
+- ALWAYS use markdown link format: [link text](URL)
+- NEVER output bare URLs - they must ALWAYS be in markdown format
+- ONLY use URLs that exist in the GitHub repository code - NEVER invent or make up URLs
+- Extract real URLs from the repository content, routes, and HTML files
 
 **REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP):**
 You MUST ALWAYS end EVERY response with these EXACT TWO lines:
@@ -972,18 +972,24 @@ You MUST ALWAYS end EVERY response with these EXACT TWO lines:
 
 CRITICAL REQUIREMENTS:
 - Start each line with the exact character "␞" (Unicode U+241E) - NO EXCEPTIONS
-- FOLLOW_UP_QUESTIONS = Exactly 4 questions the USER might want to ASK YOU based on what they're looking at
-- These should be from the USER's perspective asking YOU about things they're curious about
-- Examples: "How many photos can I cull?" "Does this work with Capture One?" "What's the refund policy?"
+- FOLLOW_UP_QUESTIONS = These are questions the USER would TYPE INTO THE CHAT to ask YOU (the AI assistant)
+- Think: "What questions might the user want to ask me next based on what they're viewing?"
+- These are NOT questions you're asking the user - they're questions FOR the user TO ASK you
+- Format them as if the user is typing them: "How does X work?" NOT "How many X do you have?"
+- Make them actionable queries the user can click to learn more from you
 - Each question must be 5-15 words, natural, and directly relevant to their current activity
 - NEXT_MESSAGE = seconds until your next message (20-60 recommended based on engagement level)
 - These lines are NOT optional - EVERY response must include them
 
-CORRECT EXAMPLE:
+CORRECT EXAMPLE - Questions user asks YOU:
 Your 1-2 sentence message here...
 
-␞FOLLOW_UP_QUESTIONS: How many photos per shoot? | Using Lightroom currently? | Want to see pricing? | Ready to try it free?
+␞FOLLOW_UP_QUESTIONS: How does AI culling work? | What are the pricing options? | Can I try it for free? | Does it work with Lightroom?
 ␞NEXT_MESSAGE: 45
+
+WRONG EXAMPLE - DO NOT DO THIS:
+␞FOLLOW_UP_QUESTIONS: How many shoots do you run weekly? | How long does culling take you now? | Want me to run an ROI estimate? | What's your budget?
+(These are backwards - you're asking the user, not the user asking you!)
 
 **Examples of VARIED, specific messages (NEVER repeat same angle):**
 
@@ -1376,6 +1382,122 @@ ${contextMarkdown}`;
     } catch (error: any) {
       console.error("Error deleting chat session:", error);
       res.status(500).json({ message: "Failed to delete session: " + error.message });
+    }
+  });
+
+  // Admin endpoint to get all unique chat users with aggregated stats
+  app.get('/api/admin/chat-users', isAuthenticated, async (req: any, res) => {
+    try {
+      const allSessions = await storage.getChatSessions();
+
+      // Group sessions by user (userId or IP for anonymous)
+      const userMap = new Map<string, any>();
+
+      allSessions.forEach(session => {
+        const messages = JSON.parse(session.messages);
+        const userKey = session.userId || session.ipAddress || 'unknown';
+        const isAnonymous = !session.userId;
+
+        if (!userMap.has(userKey)) {
+          userMap.set(userKey, {
+            userKey,
+            userId: session.userId,
+            userEmail: session.userEmail,
+            ipAddress: session.ipAddress,
+            isAnonymous,
+            sessions: [],
+            totalMessages: 0,
+            lastActivity: session.updatedAt,
+            location: {
+              city: session.city,
+              state: session.state,
+              country: session.country,
+            },
+            device: session.device,
+            browser: session.browser,
+          });
+        }
+
+        const user = userMap.get(userKey)!;
+        user.sessions.push(session.id);
+        user.totalMessages += messages.length;
+
+        // Update last activity if this session is more recent
+        if (new Date(session.updatedAt) > new Date(user.lastActivity)) {
+          user.lastActivity = session.updatedAt;
+          user.location = {
+            city: session.city,
+            state: session.state,
+            country: session.country,
+          };
+          user.device = session.device;
+          user.browser = session.browser;
+        }
+      });
+
+      // Convert to array and sort by last activity
+      const users = Array.from(userMap.values()).map(user => ({
+        ...user,
+        sessionCount: user.sessions.length,
+      })).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+
+      console.log(`[Admin] Retrieved ${users.length} unique chat users`);
+      res.json(users);
+    } catch (error: any) {
+      console.error("Error getting chat users:", error);
+      res.status(500).json({ message: "Failed to get chat users: " + error.message });
+    }
+  });
+
+  // Admin endpoint to get all sessions for a specific user
+  app.get('/api/admin/chat-users/:userKey/sessions', isAuthenticated, async (req: any, res) => {
+    try {
+      const { userKey } = req.params;
+      const allSessions = await storage.getChatSessions();
+
+      // Filter sessions for this user (match userId or IP)
+      const userSessions = allSessions.filter(session => {
+        const sessionKey = session.userId || session.ipAddress || 'unknown';
+        return sessionKey === userKey;
+      });
+
+      // Format with stats
+      const sessionsWithStats = userSessions.map(session => {
+        const messages = JSON.parse(session.messages);
+        const userMessages = messages.filter((m: any) => m.role === 'user');
+        const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
+
+        // Calculate duration
+        const firstTimestamp = messages.length > 0 ? new Date(messages[0].timestamp) : new Date(session.createdAt);
+        const lastTimestamp = messages.length > 0 ? new Date(messages[messages.length - 1].timestamp) : new Date(session.updatedAt);
+        const durationMinutes = Math.round((lastTimestamp.getTime() - firstTimestamp.getTime()) / 60000);
+
+        return {
+          id: session.id,
+          title: session.title,
+          userId: session.userId,
+          userEmail: session.userEmail,
+          ipAddress: session.ipAddress,
+          messageCount: messages.length,
+          userMessageCount: userMessages.length,
+          assistantMessageCount: assistantMessages.length,
+          durationMinutes,
+          device: session.device,
+          browser: session.browser,
+          city: session.city,
+          state: session.state,
+          country: session.country,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+          firstMessage: userMessages.length > 0 ? userMessages[0].content.slice(0, 100) : null,
+        };
+      }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+      console.log(`[Admin] Retrieved ${sessionsWithStats.length} sessions for user ${userKey}`);
+      res.json(sessionsWithStats);
+    } catch (error: any) {
+      console.error("Error getting user sessions:", error);
+      res.status(500).json({ message: "Failed to get user sessions: " + error.message });
     }
   });
 
