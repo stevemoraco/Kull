@@ -46,6 +46,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Track page visits
+  app.post('/api/track-visit', async (req: any, res) => {
+    try {
+      const { page, sessionId, referrer, userAgent } = req.body;
+      
+      const userId = req.user?.claims?.sub || null;
+      
+      await storage.trackVisit({
+        page,
+        sessionId,
+        userId,
+        referrer: referrer || null,
+        userAgent: userAgent || null,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking visit:", error);
+      res.status(500).json({ message: "Failed to track visit" });
+    }
+  });
+
   // Create SetupIntent for trial with card pre-authorization
   app.post('/api/trial/setup-intent', isAuthenticated, async (req: any, res) => {
     try {
@@ -438,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Chat support endpoint
+  // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     try {
       const { message, history } = req.body;
@@ -447,28 +469,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message is required" });
       }
 
-      const { getChatResponse } = await import('./chatService');
-      const response = await getChatResponse(message, history || []);
+      // Set up Server-Sent Events headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
 
-      // Track support query in database
-      const userEmail = req.user?.claims?.email;
-      const userId = req.user?.claims?.sub;
+      const { getChatResponseStream } = await import('./chatService');
+      const stream = await getChatResponseStream(message, history || []);
 
-      await storage.trackSupportQuery({
-        userEmail,
-        userId,
-        userMessage: message,
-        aiResponse: response.message,
-        tokensIn: response.tokensIn,
-        tokensOut: response.tokensOut,
-        cost: response.cost.toString(),
-        model: 'gpt-4o-mini',
-      });
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
 
-      res.json({ message: response.message });
+      let fullResponse = '';
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let cost = 0;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                // Handle different event types from Responses API
+                if (data.type === 'response.output_text.delta' && data.delta) {
+                  fullResponse += data.delta;
+                  // Forward to client
+                  res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
+                } else if (data.type === 'response.completed') {
+                  // Extract usage data from completed event
+                  if (data.response?.usage) {
+                    tokensIn = data.response.usage.input_tokens || 0;
+                    tokensOut = data.response.usage.output_tokens || 0;
+                    // Calculate cost: Input $0.150/1M, Output $0.600/1M
+                    cost = (tokensIn / 1_000_000) * 0.150 + (tokensOut / 1_000_000) * 0.600;
+                  }
+                } else if (data.type === 'error') {
+                  res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
+                }
+              } catch (e) {
+                // Skip invalid JSON lines
+              }
+            }
+          }
+        }
+
+        // Signal completion
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        res.end();
+
+        // Track support query in database
+        const userEmail = req.user?.claims?.email;
+        const userId = req.user?.claims?.sub;
+
+        if (fullResponse) {
+          await storage.trackSupportQuery({
+            userEmail,
+            userId,
+            userMessage: message,
+            aiResponse: fullResponse,
+            tokensIn,
+            tokensOut,
+            cost: cost.toString(),
+            model: 'gpt-4o-mini',
+          });
+
+          console.log(`[Chat] Streamed response: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
+        }
+      } catch (streamError) {
+        console.error('[Chat] Error processing stream:', streamError);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        res.end();
+      }
     } catch (error: any) {
       console.error("Error processing chat message:", error);
-      res.status(500).json({ message: "Failed to process message" });
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to process message" });
+      }
     }
   });
 

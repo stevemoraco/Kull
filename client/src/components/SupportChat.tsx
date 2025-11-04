@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -354,41 +354,107 @@ export function SupportChat() {
     setInputValue('');
     setIsLoading(true);
 
+    // Create placeholder assistant message for streaming
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+
     try {
-      const response = await apiRequest('POST', '/api/chat/message', {
-        message: messageText.trim(),
-        history: messages.slice(-5), // Send last 5 messages for context
+      const response = await fetch('/api/chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: messageText.trim(),
+          history: messages.slice(-5), // Send last 5 messages for context
+        }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to get response');
       }
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Parse follow-up questions if present (format: FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4)
-      let messageContent = data.message;
-      const followUpMatch = data.message.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
-      if (followUpMatch) {
-        const newQuestions = followUpMatch[1].split('|').map((q: string) => q.trim()).filter((q: string) => q.length > 0);
-        if (newQuestions.length > 0) {
-          setQuickQuestions(prev => [...prev, ...newQuestions]);
-        }
-        // Remove the follow-up questions marker from the displayed message
-        messageContent = messageContent.replace(/FOLLOW_UP_QUESTIONS:\s*[^\n]+/gi, '').trim();
+      if (!reader) {
+        throw new Error('No response stream');
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: messageContent,
-        timestamp: new Date(),
-      };
+      let fullContent = '';
 
-      setMessages(prev => [...prev, assistantMessage]);
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'delta' && data.content) {
+                fullContent += data.content;
+                // Update the assistant message with streaming content
+                setMessages(prev =>
+                  prev.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: fullContent }
+                      : msg
+                  )
+                );
+              } else if (data.type === 'error') {
+                throw new Error(data.message || 'Stream error');
+              } else if (data.type === 'done') {
+                // Stream complete
+              }
+            } catch (e) {
+              // Skip invalid JSON lines
+            }
+          }
+        }
+      }
+
+      // Parse follow-up questions from final content
+      const followUpMatch = fullContent.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+      if (followUpMatch) {
+        const newQuestions = followUpMatch[1]
+          .split('|')
+          .map((q: string) => q.trim())
+          .filter((q: string) => q.length > 0);
+
+        if (newQuestions.length > 0) {
+          // Replace old suggestions with new ones, max 8 total
+          setQuickQuestions(prev => {
+            const combined = [...prev, ...newQuestions];
+            return combined.slice(-8); // Keep only the last 8
+          });
+        }
+
+        // Remove follow-up questions marker from displayed message
+        const cleanContent = fullContent.replace(/FOLLOW_UP_QUESTIONS:\s*[^\n]+/gi, '').trim();
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: cleanContent }
+              : msg
+          )
+        );
+        fullContent = cleanContent;
+      }
 
       // Auto-navigate to first link in response
-      const linkMatch = messageContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
       if (linkMatch) {
         const url = linkMatch[2];
         // Small delay to let user see the response before navigating
@@ -402,6 +468,8 @@ export function SupportChat() {
         description: 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
+      // Remove the failed assistant message
+      setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
     } finally {
       setIsLoading(false);
     }
@@ -418,6 +486,8 @@ export function SupportChat() {
     "How does the rating system work?",
     "Can I cancel my trial?",
   ]);
+
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   const handleNewSession = () => {
     const newSession: ChatSession = {
