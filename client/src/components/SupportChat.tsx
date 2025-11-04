@@ -188,11 +188,11 @@ function parseInlineMarkdown(text: string, onLinkClick: (url: string) => void, b
   return parts;
 }
 
-// Helper to create default welcome message
-const createWelcomeMessage = (): Message => ({
-  id: '1',
+// Helper to create placeholder welcome message (will be replaced by streamed greeting)
+const createPlaceholderWelcomeMessage = (): Message => ({
+  id: 'welcome-' + Date.now(),
   role: 'assistant',
-  content: "Hi! I'm here to help you with Kull AI. Check out the [Dashboard](/dashboard) to download and get started, or ask me anything about installation, features, or how to use the app!",
+  content: '__GENERATING_GREETING__', // Special marker for rendering
   timestamp: new Date(),
 });
 
@@ -234,11 +234,11 @@ export function SupportChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loadedSessions = loadSessions();
     if (loadedSessions.length === 0) {
-      // Create initial session if none exist
+      // Create initial session with placeholder - will generate greeting after mount
       const initialSession: ChatSession = {
         id: Date.now().toString(),
         title: 'New Chat',
-        messages: [createWelcomeMessage()],
+        messages: [createPlaceholderWelcomeMessage()],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -298,6 +298,18 @@ export function SupportChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [transcriptSent, setTranscriptSent] = useState(false);
+
+  // Track page visits in sessionStorage for context
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+    const visited = sessionStorage.getItem('kull-visited-pages');
+    const visitedArray = visited ? visited.split(',') : [];
+
+    if (!visitedArray.includes(currentPath)) {
+      visitedArray.push(currentPath);
+      sessionStorage.setItem('kull-visited-pages', visitedArray.join(','));
+    }
+  }, []);
 
   // Save current session ID to localStorage whenever it changes
   useEffect(() => {
@@ -389,6 +401,151 @@ export function SupportChat() {
     setTranscriptSent(false);
   }, [currentSessionId]);
 
+  // Generate personalized welcome greeting for new sessions
+  useEffect(() => {
+    const generateWelcomeGreeting = async () => {
+      const currentSession = sessions.find(s => s.id === currentSessionId);
+      if (!currentSession) return;
+
+      // Check if this is a new session with placeholder greeting
+      const hasPlaceholder = currentSession.messages.length === 1 &&
+                            currentSession.messages[0].content === '__GENERATING_GREETING__';
+
+      if (!hasPlaceholder) return;
+
+      const welcomeMessageId = currentSession.messages[0].id;
+
+      try {
+        // Gather session context
+        const sessionContext = {
+          userName: user?.firstName || null,
+          userEmail: user?.email || null,
+          isLoggedIn: !!user,
+          currentPath: window.location.pathname,
+          timeOnSite: Date.now() - (performance.timing?.navigationStart || Date.now()), // milliseconds
+          scrollDepth: Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100) || 0,
+          visitedPages: sessionStorage.getItem('kull-visited-pages')?.split(',') || [window.location.pathname],
+        };
+
+        const response = await fetch('/api/chat/welcome', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ context: sessionContext }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate greeting');
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response stream');
+        }
+
+        let fullContent = '';
+        let cutoffDetected = false;
+        let hasNavigated = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.type === 'delta' && data.content) {
+                  if (cutoffDetected) continue;
+
+                  fullContent += data.content;
+
+                  // Check for first link and navigate immediately
+                  if (!hasNavigated) {
+                    const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                    if (linkMatch) {
+                      const url = linkMatch[2];
+                      hasNavigated = true;
+                      // Navigate immediately!
+                      handleLinkClick(url);
+                    }
+                  }
+
+                  // Check for cutoff
+                  let cutoffIndex = fullContent.indexOf('␞');
+                  if (cutoffIndex === -1) {
+                    cutoffIndex = fullContent.indexOf('FOLLOW_UP_QUESTIONS:');
+                  }
+
+                  if (cutoffIndex !== -1) {
+                    cutoffDetected = true;
+                    const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+                    const questionsSection = fullContent.substring(cutoffIndex);
+
+                    // Extract questions
+                    const followUpMatch = questionsSection.match(/(?:␞\s*)?FOLLOW_UP_QUESTIONS:\s*(.+?)(?:\n|$)/is);
+                    if (followUpMatch) {
+                      const newQuestions = followUpMatch[1]
+                        .split('|')
+                        .map((q: string) => q.trim())
+                        .filter((q: string) => q.length > 0 && q.length < 200);
+
+                      if (newQuestions.length > 0) {
+                        setQuickQuestions(prev => {
+                          const combined = [...prev, ...newQuestions];
+                          return combined.slice(-8);
+                        });
+                      }
+                    }
+
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === welcomeMessageId
+                          ? { ...msg, content: cleanContent }
+                          : msg
+                      )
+                    );
+                    fullContent = cleanContent;
+                  } else {
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === welcomeMessageId
+                          ? { ...msg, content: fullContent }
+                          : msg
+                      )
+                    );
+                  }
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to generate welcome greeting:', error);
+        // Fallback to simple greeting
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === welcomeMessageId
+              ? { ...msg, content: "Hi! I'm here to help you with Kull AI. Ask me anything!" }
+              : msg
+          )
+        );
+      }
+    };
+
+    generateWelcomeGreeting();
+  }, [currentSessionId, sessions, user]);
+
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
 
@@ -408,7 +565,7 @@ export function SupportChat() {
     const assistantMessage: Message = {
       id: assistantMessageId,
       role: 'assistant',
-      content: '_Thinking..._',
+      content: '__THINKING__', // Special marker for rendering
       timestamp: new Date(),
     };
 
@@ -440,6 +597,7 @@ export function SupportChat() {
       let fullContent = '';
       let firstTokenReceived = false;
       let cutoffDetected = false; // Flag to stop processing after cutoff
+      let hasNavigated = false; // Flag to track if we've already navigated
 
       while (true) {
         const { done, value } = await reader.read();
@@ -464,6 +622,17 @@ export function SupportChat() {
                 }
 
                 fullContent += data.content;
+
+                // Check for first link and navigate immediately
+                if (!hasNavigated) {
+                  const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                  if (linkMatch) {
+                    const url = linkMatch[2];
+                    hasNavigated = true;
+                    // Navigate immediately!
+                    handleLinkClick(url);
+                  }
+                }
 
                 // Look for cutoff markers - be aggressive
                 let cutoffIndex = fullContent.indexOf('␞');
@@ -594,7 +763,7 @@ export function SupportChat() {
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title: 'New Chat',
-      messages: [createWelcomeMessage()],
+      messages: [createPlaceholderWelcomeMessage()],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -634,14 +803,17 @@ export function SupportChat() {
   };
 
   const handleResetChat = () => {
-    // Replace current session with fresh one
+    // Replace current session with fresh one - force new ID to trigger greeting
+    const newSessionId = Date.now().toString();
+
     setSessions(prevSessions => {
       const updated = prevSessions.map(session => {
         if (session.id === currentSessionId) {
           return {
             ...session,
+            id: newSessionId, // New ID to force greeting regeneration
             title: 'New Chat',
-            messages: [createWelcomeMessage()],
+            messages: [createPlaceholderWelcomeMessage()],
             updatedAt: new Date(),
           };
         }
@@ -650,6 +822,9 @@ export function SupportChat() {
       saveSessions(updated);
       return updated;
     });
+
+    // Switch to new session ID to trigger greeting
+    setCurrentSessionId(newSessionId);
 
     // Reset quick questions to defaults
     setQuickQuestions([
@@ -700,20 +875,20 @@ export function SupportChat() {
             </div>
             
             {/* Action Buttons Row */}
-            <div className="flex items-center justify-center gap-2">
+            <div className="flex items-center justify-center gap-2 flex-wrap">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon"
-                    className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                    size="sm"
+                    className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
                     data-testid="button-chat-history"
-                    title="Chat history"
                   >
-                    <History className="w-4 h-4" />
+                    <History className="w-4 h-4 mr-1.5" />
+                    <span className="text-xs font-medium">History</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuContent align="end" className="w-64 z-[10000]">
                   <DropdownMenuLabel>Chat History</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleNewSession} data-testid="button-new-chat">
@@ -751,22 +926,23 @@ export function SupportChat() {
               </DropdownMenu>
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={handleResetChat}
-                className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
                 data-testid="button-reset-chat"
-                title="Reset chat"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className="w-4 h-4 mr-1.5" />
+                <span className="text-xs font-medium">Clear Chat</span>
               </Button>
               <Button
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={() => setIsOpen(false)}
-                className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate"
+                className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
                 data-testid="button-close-chat"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 mr-1.5" />
+                <span className="text-xs font-medium">Close</span>
               </Button>
             </div>
           </div>
@@ -787,10 +963,25 @@ export function SupportChat() {
                   data-testid={`message-${message.role}`}
                 >
                   <div className="text-sm">
-                    {message.role === 'assistant'
-                      ? renderMarkdown(message.content, handleLinkClick)
-                      : <p className="whitespace-pre-wrap">{message.content}</p>
-                    }
+                    {message.role === 'assistant' ? (
+                      message.content === '__GENERATING_GREETING__' ? (
+                        // Special rendering for greeting placeholder
+                        <div className="flex items-start gap-3 border-l-4 border-purple-400 pl-3 py-1 bg-purple-50/50 rounded-r">
+                          <Loader2 className="w-4 h-4 animate-spin text-purple-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-purple-700 italic">Generating your personalized greeting...</span>
+                        </div>
+                      ) : message.content === '__THINKING__' ? (
+                        // Special rendering for thinking placeholder
+                        <div className="flex items-start gap-3 border-l-4 border-purple-400 pl-3 py-1 bg-purple-50/50 rounded-r">
+                          <Loader2 className="w-4 h-4 animate-spin text-purple-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-purple-700 italic">Thinking...</span>
+                        </div>
+                      ) : (
+                        renderMarkdown(message.content, handleLinkClick)
+                      )
+                    ) : (
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    )}
                   </div>
                   <p className={`text-xs mt-2 ${
                     message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'

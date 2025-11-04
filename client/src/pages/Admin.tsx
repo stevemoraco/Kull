@@ -493,7 +493,7 @@ export default function Admin() {
                         <span>•</span>
                         <span>Tokens Out: {query.tokensOut}</span>
                         <span>•</span>
-                        <span>Cost: ${query.cost?.toFixed(6) || '0.000000'}</span>
+                        <span>Cost: ${query.cost ? parseFloat(query.cost).toFixed(6) : '0.000000'}</span>
                       </div>
                     </div>
                   </Card>

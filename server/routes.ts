@@ -563,6 +563,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate personalized welcome greeting
+  app.post('/api/chat/welcome', async (req: any, res) => {
+    try {
+      const { context } = req.body;
+
+      if (!context) {
+        return res.status(400).json({ message: "Context required" });
+      }
+
+      // Build personalized greeting prompt
+      let greetingPrompt = 'Generate a friendly, personalized welcome greeting for a user visiting the Kull AI website chat.';
+
+      if (context.userName) {
+        greetingPrompt += `\n\nThe user's name is ${context.userName} and they are logged in.`;
+      } else if (context.isLoggedIn) {
+        greetingPrompt += '\n\nThe user is logged in but we don\'t have their name.';
+      } else {
+        greetingPrompt += '\n\nThe user is not logged in (potential new customer).';
+      }
+
+      greetingPrompt += `\n\nCurrent page: ${context.currentPath}`;
+
+      if (context.timeOnSite > 10000) {
+        const minutes = Math.floor(context.timeOnSite / 60000);
+        greetingPrompt += `\nTime on site: ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      }
+
+      if (context.scrollDepth > 50) {
+        greetingPrompt += `\nThey've scrolled ${context.scrollDepth}% down the page (engaged user)`;
+      }
+
+      if (context.visitedPages && context.visitedPages.length > 1) {
+        greetingPrompt += `\nPages visited: ${context.visitedPages.join(', ')}`;
+      }
+
+      greetingPrompt += '\n\nMake the greeting:\n- Warm and helpful\n- Reference their current page context naturally\n- If they\'re on pricing, mention you can help with plan questions\n- If they\'re on dashboard, offer to help with getting started\n- If they\'re a returning user (multiple pages), acknowledge that\n- Keep it conversational and under 2-3 sentences\n- Start with a relevant navigation link using FULL https://kullai.com URLs (NOT relative paths, NOT GitHub)\n- Use hash anchors (#section) to link to specific sections when relevant\n- Analyze the repository to determine which pages and section IDs exist';
+
+      const { getChatResponseStream } = await import('./chatService');
+      const stream = await getChatResponseStream(greetingPrompt, []);
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              res.write(`${line}\n\n`);
+            }
+          }
+        }
+
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        res.end();
+      } catch (streamError) {
+        console.error('[Welcome] Error processing stream:', streamError);
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        res.end();
+      }
+    } catch (error: any) {
+      console.error("Error generating welcome greeting:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to generate greeting" });
+      }
+    }
+  });
+
   // Send chat transcript via email after inactivity
   app.post('/api/chat/send-transcript', async (req: any, res) => {
     try {
