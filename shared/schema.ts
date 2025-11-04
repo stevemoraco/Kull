@@ -129,5 +129,20 @@ export const supportQueries = pgTable("support_queries", {
 export type SupportQuery = typeof supportQueries.$inferSelect;
 export type InsertSupportQuery = typeof supportQueries.$inferInsert;
 
+// GitHub repository content cache table
+export const repoContentCache = pgTable("repo_content_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  repo: varchar("repo").notNull().unique(), // e.g., "stevemoraco/kull"
+  content: text("content").notNull(), // Markdown formatted repo content
+  fileCount: integer("file_count").notNull().default(0),
+  characterCount: integer("character_count").notNull().default(0),
+  lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type RepoContentCache = typeof repoContentCache.$inferSelect;
+export type InsertRepoContentCache = typeof repoContentCache.$inferInsert;
+
 // Re-export email queue types
 export * from "./emailQueue";

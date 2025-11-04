@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startEmailProcessor } from "./emailService";
+import { refreshRepoCache } from "./fetchRepo";
 
 const app = express();
 
@@ -74,8 +75,24 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-    
+
     // Start email processor (runs every minute)
     startEmailProcessor();
+
+    // Initialize GitHub repo cache immediately on startup
+    log('[Repo Cache] Initializing GitHub repository cache on startup...');
+    refreshRepoCache().catch(err => {
+      log(`[Repo Cache] Initial cache load failed: ${err.message}`);
+    });
+
+    // Refresh GitHub repo cache every hour
+    setInterval(() => {
+      log('[Repo Cache] Running hourly cache refresh...');
+      refreshRepoCache().catch(err => {
+        log(`[Repo Cache] Hourly refresh failed: ${err.message}`);
+      });
+    }, 60 * 60 * 1000); // 1 hour
+
+    log('[Repo Cache] Hourly cache refresh scheduled');
   });
 })();

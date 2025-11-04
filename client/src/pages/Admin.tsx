@@ -4,9 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign } from "lucide-react";
+import { BarChart3, Send, Users, UserCheck, TrendingUp, Mail, Eye, MousePointerClick, MessageSquare, DollarSign, X } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { usePageTracking } from "@/hooks/usePageTracking";
 
@@ -45,6 +47,8 @@ export default function Admin() {
   const [testEmail, setTestEmail] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [timerange, setTimerange] = useState("all");
+  const [selectedEmail, setSelectedEmail] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: analytics, isLoading } = useQuery<Analytics>({
     queryKey: [`/api/admin/analytics?timerange=${timerange}`],
@@ -52,6 +56,11 @@ export default function Admin() {
 
   const { data: supportAnalytics, isLoading: isLoadingSupportAnalytics } = useQuery<SupportAnalytics>({
     queryKey: [`/api/admin/support-analytics?timerange=${timerange}&days=30`],
+  });
+
+  const { data: userQueries, isLoading: isLoadingUserQueries } = useQuery<any[]>({
+    queryKey: [`/api/admin/support-queries/${selectedEmail}`],
+    enabled: !!selectedEmail && dialogOpen,
   });
 
   const sendTestEmailMutation = useMutation({
@@ -269,8 +278,16 @@ export default function Admin() {
                   <div className="text-right">Cost</div>
                 </div>
                 {supportAnalytics.queriesByEmail.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-3 gap-4 py-2 border-b last:border-0" data-testid={`leaderboard-row-${idx}`}>
-                    <div className="truncate" title={row.email}>{row.email}</div>
+                  <div 
+                    key={idx} 
+                    className="grid grid-cols-3 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
+                    data-testid={`leaderboard-row-${idx}`}
+                    onClick={() => {
+                      setSelectedEmail(row.email);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    <div className="truncate text-primary" title={row.email}>{row.email}</div>
                     <div className="text-right font-medium">{row.count}</div>
                     <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
                   </div>
@@ -390,6 +407,64 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Support Chat History Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Support Chat History - {selectedEmail}
+            </DialogTitle>
+            <DialogDescription>
+              All support conversations for this user
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[500px] pr-4">
+            {isLoadingUserQueries ? (
+              <div className="text-center py-8 text-muted-foreground">Loading chat history...</div>
+            ) : userQueries && userQueries.length > 0 ? (
+              <div className="space-y-4">
+                {userQueries.map((query: any) => (
+                  <Card key={query.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">User Question</p>
+                          <p className="text-sm text-muted-foreground mt-1">{query.userMessage}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 bg-muted/50 p-3 rounded-lg">
+                        <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                          <MessageSquare className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">AI Response</p>
+                          <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{query.aiResponse}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{new Date(query.createdAt).toLocaleString()}</span>
+                        <span>•</span>
+                        <span>Tokens In: {query.tokensIn}</span>
+                        <span>•</span>
+                        <span>Tokens Out: {query.tokensOut}</span>
+                        <span>•</span>
+                        <span>Cost: ${query.cost?.toFixed(6) || '0.000000'}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">No chat history found</div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -837,6 +837,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/support-queries/:email', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { email } = req.params;
+      const queries = await storage.getSupportQueriesByEmail(email);
+      res.json(queries);
+    } catch (error: any) {
+      console.error("Error fetching support queries by email:", error);
+      res.status(500).json({ message: "Failed to fetch support queries: " + error.message });
+    }
+  });
+
   app.post('/api/admin/test-email', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { templateName, testEmail } = req.body;

@@ -67,6 +67,7 @@ export interface IStorage {
     queriesByEmail: Array<{ email: string; count: number; totalCost: number }>;
   }>;
   getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>>;
+  getSupportQueriesByEmail(email: string): Promise<SupportQuery[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -436,6 +437,14 @@ export class DatabaseStorage implements IStorage {
       count: row.count,
       avgCost: Number(row.avgCost),
     }));
+  }
+
+  async getSupportQueriesByEmail(email: string): Promise<SupportQuery[]> {
+    return db
+      .select()
+      .from(supportQueries)
+      .where(eq(supportQueries.userEmail, email))
+      .orderBy(desc(supportQueries.createdAt));
   }
 }
 

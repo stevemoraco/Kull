@@ -1,4 +1,8 @@
 // Fetch and cache GitHub repository content
+import { db } from './db';
+import { repoContentCache } from '@shared/schema';
+import { eq } from 'drizzle-orm';
+
 interface RepoFile {
   path: string;
   content: string;
@@ -10,9 +14,9 @@ interface RepoCache {
   timestamp: number;
 }
 
-// Cache repo content in memory (per session)
-const repoCache = new Map<string, RepoCache>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+// In-memory fallback cache (for emergency use only)
+const fallbackCache = new Map<string, RepoCache>();
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 async function fetchGitHubRepo(owner: string, repo: string, branch: string = 'main'): Promise<RepoFile[]> {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
@@ -104,48 +108,109 @@ function formatRepoAsMarkdown(files: RepoFile[]): string {
   return markdown;
 }
 
-export async function getRepoContent(sessionId: string = 'default'): Promise<string> {
-  // Check cache
-  const cached = repoCache.get(sessionId);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    console.log('[Repo] Using cached content');
-    return cached.content;
-  }
-
-  console.log('[Repo] Fetching fresh content from GitHub...');
-
+export async function getRepoContent(repoName: string = 'stevemoraco/kull'): Promise<string> {
   try {
-    const files = await fetchGitHubRepo('stevemoraco', 'kull');
-    const markdown = formatRepoAsMarkdown(files);
+    // Step 1: Check database cache
+    const cached = await db
+      .select()
+      .from(repoContentCache)
+      .where(eq(repoContentCache.repo, repoName))
+      .limit(1);
 
-    // Cache the result
-    repoCache.set(sessionId, {
-      content: markdown,
-      timestamp: Date.now(),
-    });
+    const now = Date.now();
+    const cachedEntry = cached[0];
 
-    console.log(`[Repo] Fetched ${files.length} files, ${markdown.length} characters`);
-    return markdown;
-  } catch (error) {
-    console.error('[Repo] Failed to fetch:', error);
+    // If cache is fresh (less than 1 hour old), use it
+    if (cachedEntry && now - cachedEntry.lastFetchedAt.getTime() < CACHE_DURATION) {
+      console.log('[Repo] Using database cached content');
 
-    // Return cached content if available, even if expired
-    if (cached) {
-      console.log('[Repo] Using stale cache due to fetch error');
-      return cached.content;
+      // Also update fallback cache
+      fallbackCache.set(repoName, {
+        content: cachedEntry.content,
+        timestamp: cachedEntry.lastFetchedAt.getTime(),
+      });
+
+      return cachedEntry.content;
     }
 
-    // Fallback to basic content
+    // Step 2: Cache is stale or doesn't exist - fetch fresh content
+    console.log('[Repo] Fetching fresh content from GitHub...');
+    const [owner, repo] = repoName.split('/');
+    const files = await fetchGitHubRepo(owner, repo);
+    const markdown = formatRepoAsMarkdown(files);
+
+    // Step 3: Update database cache
+    if (cachedEntry) {
+      // Update existing entry
+      await db
+        .update(repoContentCache)
+        .set({
+          content: markdown,
+          fileCount: files.length,
+          characterCount: markdown.length,
+          lastFetchedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(repoContentCache.repo, repoName));
+      console.log(`[Repo] Updated cache: ${files.length} files, ${markdown.length} characters`);
+    } else {
+      // Create new entry
+      await db.insert(repoContentCache).values({
+        repo: repoName,
+        content: markdown,
+        fileCount: files.length,
+        characterCount: markdown.length,
+        lastFetchedAt: new Date(),
+      });
+      console.log(`[Repo] Created cache: ${files.length} files, ${markdown.length} characters`);
+    }
+
+    // Update fallback cache
+    fallbackCache.set(repoName, {
+      content: markdown,
+      timestamp: now,
+    });
+
+    return markdown;
+  } catch (error) {
+    console.error('[Repo] Failed to fetch from GitHub:', error);
+
+    // Step 4: Try database cache even if stale
+    try {
+      const staleCache = await db
+        .select()
+        .from(repoContentCache)
+        .where(eq(repoContentCache.repo, repoName))
+        .limit(1);
+
+      if (staleCache[0]) {
+        console.log('[Repo] Using stale database cache due to fetch error');
+        return staleCache[0].content;
+      }
+    } catch (dbError) {
+      console.error('[Repo] Database cache access failed:', dbError);
+    }
+
+    // Step 5: Try fallback in-memory cache
+    const fallback = fallbackCache.get(repoName);
+    if (fallback) {
+      console.log('[Repo] Using fallback in-memory cache');
+      return fallback.content;
+    }
+
+    // Step 6: Ultimate fallback
+    console.warn('[Repo] All cache attempts failed, using basic fallback');
     return '# Kull AI\n\nUnable to fetch repository content. Using basic information.\n\nKull AI is a universal Mac/iPhone/iPad app for AI-powered photo rating and organization.';
   }
 }
 
-// Clear old cache entries periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of Array.from(repoCache.entries())) {
-    if (now - value.timestamp > CACHE_DURATION * 2) {
-      repoCache.delete(key);
-    }
+// Function to refresh cache (called by cron job)
+export async function refreshRepoCache(repoName: string = 'stevemoraco/kull'): Promise<void> {
+  console.log(`[Repo] Starting scheduled cache refresh for ${repoName}`);
+  try {
+    await getRepoContent(repoName);
+    console.log('[Repo] Scheduled cache refresh completed');
+  } catch (error) {
+    console.error('[Repo] Scheduled cache refresh failed:', error);
   }
-}, CACHE_DURATION);
+}
