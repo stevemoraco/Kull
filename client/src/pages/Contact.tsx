@@ -55,7 +55,7 @@ export default function Contact() {
           </Link>
           <div className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-primary" />
-            <span className="font-bold text-lg">Kull AI</span>
+            <span className="font-bold text-lg">Kull</span>
           </div>
         </div>
       </header>
@@ -83,7 +83,7 @@ export default function Contact() {
                 <div className="flex-1">
                   <h2 className="text-3xl font-bold mb-3 text-foreground">Start with Chat Support</h2>
                   <p className="text-muted-foreground leading-relaxed text-lg mb-4">
-                    Our AI assistant knows everything about Kull AI - installation, features, billing, troubleshooting, and more. Available 24/7 with instant answers.
+                    Our AI assistant knows everything about Kull - installation, features, billing, troubleshooting, and more. Available 24/7 with instant answers.
                   </p>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="w-4 h-4" />
@@ -111,14 +111,14 @@ export default function Contact() {
                     {profileImage && (
                       <img 
                         src={profileImage} 
-                        alt="Steve Moraco - Kull AI Founder" 
+                        alt="Steve Moraco - Kull Founder" 
                         className="w-24 h-24 rounded-full border-4 border-primary/20"
                         data-testid="img-founder-profile"
                       />
                     )}
                     <div className="text-center md:text-left">
                       <h3 className="text-2xl font-bold text-foreground mb-2">Steve Moraco</h3>
-                      <p className="text-muted-foreground mb-1">Founder, Kull AI</p>
+                      <p className="text-muted-foreground mb-1">Founder, Kull</p>
                       <a 
                         href="https://twitter.com/stevemoraco" 
                         target="_blank" 

@@ -24,7 +24,7 @@ export function ValueStack() {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-value-headline">
-            Everything You Get With Kull AI
+            Everything You Get With Kull
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground">
             A complete AI-powered photo rating system that saves you hundreds of hours

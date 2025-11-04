@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 export const ChatResponseSchema = z.object({
-  navigationUrl: z.string().describe('A markdown link URL that the page will auto-navigate to. Must be a valid URL from the Kull AI website or documentation.'),
+  navigationUrl: z.string().describe('A markdown link URL that the page will auto-navigate to. Must be a valid URL from the Kull website or documentation.'),
   responseText: z.string().describe('The main response text in markdown format. Should be 2-4 paragraphs with proper formatting (bold, italic, lists, etc).'),
   followUpQuestions: z.array(z.string()).length(4).describe('Exactly 4 natural, relevant follow-up questions the user might want to ask next. Make these actual questions, NOT placeholders.')
 });
@@ -15,7 +15,7 @@ export const chatResponseJsonSchema = {
   properties: {
     navigationUrl: {
       type: 'string',
-      description: 'A markdown link URL that the page will auto-navigate to. Must be a valid URL from the Kull AI website or documentation.'
+      description: 'A markdown link URL that the page will auto-navigate to. Must be a valid URL from the Kull website or documentation.'
     },
     responseText: {
       type: 'string',

@@ -47,7 +47,7 @@ export default function Dashboard() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-black text-lg">K</span>
             </div>
-            <span className="text-xl font-black text-foreground">Kull AI</span>
+            <span className="text-xl font-black text-foreground">Kull</span>
           </div>
           {!isAuthenticated && (
             <Button
@@ -71,7 +71,7 @@ export default function Dashboard() {
               Start Your Free Trial to Access Downloads
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-4 max-w-3xl mx-auto">
-              Choose a plan below to start your 24-hour free trial and download Kull AI for Mac, iPhone, and iPad.
+              Choose a plan below to start your 24-hour free trial and download Kull for Mac, iPhone, and iPad.
             </p>
             <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2">
               <Zap className="w-4 h-4 text-primary" />
@@ -163,7 +163,7 @@ export default function Dashboard() {
           {/* Info Section */}
           <div className="text-center max-w-2xl mx-auto space-y-4">
             <p className="text-muted-foreground">
-              After selecting a plan, you'll be able to download Kull AI for Mac, iPhone, and iPad immediately during your free trial.
+              After selecting a plan, you'll be able to download Kull for Mac, iPhone, and iPad immediately during your free trial.
             </p>
             <p className="text-sm text-muted-foreground">
               All plans can be canceled anytime. No long-term commitments.

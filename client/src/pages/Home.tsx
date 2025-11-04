@@ -39,7 +39,7 @@ export default function Home() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-black text-lg">K</span>
             </div>
-            <span className="text-xl font-black text-foreground">Kull AI</span>
+            <span className="text-xl font-black text-foreground">Kull</span>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground" data-testid="text-user-email">
@@ -68,7 +68,7 @@ export default function Home() {
         {/* Welcome section */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-black mb-4 text-foreground" data-testid="text-welcome-headline">
-            Welcome to Kull AI, {typedUser?.firstName || 'Photographer'}!
+            Welcome to Kull, {typedUser?.firstName || 'Photographer'}!
           </h1>
           {isOnTrial && (
             <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4">
@@ -81,7 +81,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             {hasActiveSubscription 
               ? "You're all set! Download the app and start rating photos with AI."
-              : "Choose a plan to continue using Kull AI after your trial ends."
+              : "Choose a plan to continue using Kull after your trial ends."
             }
           </p>
         </div>

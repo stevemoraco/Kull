@@ -10,7 +10,7 @@ interface ChatMessage {
 }
 
 // Instructions before repo content
-const PROMPT_PREFIX = `You are Kull AI customer support assistant with complete access to the website and GitHub repository.
+const PROMPT_PREFIX = `You are Kull customer support assistant with complete access to the website and GitHub repository.
 
 **CRITICAL DEPLOYMENT INFO:**
 - This GitHub repository is deployed LIVE at **https://kullai.com**

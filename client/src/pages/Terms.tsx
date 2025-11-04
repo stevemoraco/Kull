@@ -19,7 +19,7 @@ export default function Terms() {
           </Link>
           <div className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
-            <span className="font-bold text-lg">Kull AI</span>
+            <span className="font-bold text-lg">Kull</span>
           </div>
         </div>
       </header>
@@ -41,14 +41,14 @@ export default function Terms() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Agreement to Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing or using Kull AI, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the service.
+                By accessing or using Kull, you agree to be bound by these Terms of Service. If you disagree with any part of these terms, you may not access the service.
               </p>
             </section>
 
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Service Description</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Kull AI provides a universal Mac/iPhone/iPad app with AI-powered photo rating and organization services. Our service uses multiple AI models (Gemini, Grok, Groq, Claude, and OpenAI) to analyze, rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with a 1-5 star rating system.
+                Kull provides a universal Mac/iPhone/iPad app with AI-powered photo rating and organization services. Our service uses multiple AI models (Gemini, Grok, Groq, Claude, and OpenAI) to analyze, rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with a 1-5 star rating system.
               </p>
             </section>
 
@@ -185,14 +185,14 @@ export default function Terms() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Intellectual Property</h2>
               <p className="text-muted-foreground leading-relaxed">
-                You retain all rights to your photos. Kull AI does not claim ownership of your images. We only process them to provide rating services. The Kull AI software, AI models, and service are protected by copyright and other intellectual property laws.
+                You retain all rights to your photos. Kull does not claim ownership of your images. We only process them to provide rating services. The Kull software, AI models, and service are protected by copyright and other intellectual property laws.
               </p>
             </section>
 
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Limitation of Liability</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Kull AI is provided "as is" without warranties of any kind. We strive for accuracy in our AI ratings, but cannot guarantee perfection. We are not liable for any indirect, incidental, or consequential damages arising from your use of the service.
+                Kull is provided "as is" without warranties of any kind. We strive for accuracy in our AI ratings, but cannot guarantee perfection. We are not liable for any indirect, incidental, or consequential damages arising from your use of the service.
               </p>
             </section>
 

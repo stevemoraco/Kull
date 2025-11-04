@@ -38,7 +38,7 @@ async function extractWebsiteContent() {
   const pagesDir = path.join(process.cwd(), 'client/src/pages');
   const componentsDir = path.join(process.cwd(), 'client/src/components');
 
-  let markdown = '# Kull AI Website Content\n\n';
+  let markdown = '# Kull Website Content\n\n';
   markdown += 'This content is auto-generated from the actual website codebase.\n\n';
 
   // Extract from key pages

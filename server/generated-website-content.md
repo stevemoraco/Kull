@@ -1,21 +1,21 @@
-# Kull AI Website Content
+# Kull Website Content
 
 This content is auto-generated from the actual website codebase.
 
 ## Home Page (/)
 
-Kull AI
+Kull
 Sign In
 text-logo
 button-login-nav
 
 ## Dashboard (/dashboard)
 
-Kull AI
+Kull
 window.location.href =
 Sign In
 Start Your Free Trial to Access Downloads
-Choose a plan below to start your 24-hour free trial and download Kull AI for Mac, iPhone, and iPad.
+Choose a plan below to start your 24-hour free trial and download Kull for Mac, iPhone, and iPad.
 No charge until your trial ends • Cancel anytime
 Professional
 Perfect for individual photographers
@@ -39,7 +39,7 @@ card-pricing-professional
 button-select-professional
 card-pricing-studio
 button-select-studio
-After selecting a plan, you'll be able to download Kull AI for Mac, iPhone, and iPad immediately during your free trial.
+After selecting a plan, you'll be able to download Kull for Mac, iPhone, and iPad immediately during your free trial.
 
 ## Checkout (/checkout)
 
@@ -59,7 +59,7 @@ By starting your trial, you agree to our Terms of Service and Privacy Policy.
           You can cancel anytime during your 24-hour trial with zero charge.
 (null);
   const [bonus, setBonus] = useState
-Kull AI
+Kull
 setLocation(
 Back
 Start Your Free Trial
@@ -79,7 +79,7 @@ new Date();
 
   // Check trial status
   const isOnTrial = typedUser?.subscriptionStatus ===
-Kull AI
+Kull
 Sign Out
 Download for Mac
 Get the universal Mac app and start rating, organizing, and tagging photos from any folder.
@@ -108,7 +108,7 @@ button-download-ios
 (null);
   const audioChunksRef = useRef
 Back to Home
-Kull AI
+Kull
 Refund Policy
 Last Updated: November 3, 2025
 Help Us Improve - Quick Survey
@@ -119,11 +119,11 @@ Missing features I needed
 Technical problems or bugs
 Product wasn
 Other reason
-2. Would you recommend Kull AI to other photographers?
+2. Would you recommend Kull to other photographers?
 setWouldRecommend(val ===
 Yes, despite this issue
 No, not in its current state
-3. What feature or capability were you hoping to find in Kull AI?
+3. What feature or capability were you hoping to find in Kull?
 4. Did you experience any technical issues or bugs?
 5. Any other feedback you
 Voice Feedback
@@ -138,10 +138,10 @@ Request Instant Refund
 Within 7 days of your first payment, you can request an instant refund. We just need a few minutes of your time to understand what didn
 Start Refund Request
 Our Commitment to Satisfaction
-We want you to love Kull AI. That
+We want you to love Kull. That
 Free Trial Period
 24-Hour Trial - Zero Risk
-All new users receive a full 24-hour trial period. You can cancel anytime during this period with absolutely no charge. This is your risk-free opportunity to test Kull AI with your own photos.
+All new users receive a full 24-hour trial period. You can cancel anytime during this period with absolutely no charge. This is your risk-free opportunity to test Kull with your own photos.
 7-Day Money-Back Guarantee
 If you
 Request a refund within 7 days of your first payment
@@ -181,10 +181,10 @@ button-start-refund
 1. What's the main reason you're requesting a refund? *
 Product wasn't as described
 5. Any other feedback you'd like to share?
-Thank you for your valuable feedback. We'll use it to improve Kull AI!
+Thank you for your valuable feedback. We'll use it to improve Kull!
 Within 7 days of your first payment, you can request an instant refund. We just need a few minutes of your time to understand what didn't work for you.
-We want you to love Kull AI. That's why we offer a generous 1-day free trial and a fair refund policy for new subscribers.
-If you're not satisfied with Kull AI after your trial ends, we offer a 7-day money-back guarantee on your first payment:
+We want you to love Kull. That's why we offer a generous 1-day free trial and a fair refund policy for new subscribers.
+If you're not satisfied with Kull after your trial ends, we offer a 7-day money-back guarantee on your first payment:
 Make sure you're logged into your account.
 Your refund will be processed instantly and you'll see the credit in 5-7 business days.
 e.g., Support for video rating, batch export, specific AI model, etc.
@@ -244,11 +244,11 @@ text-problem-headline
 
 ### SolutionSection
 Introducing
-Kull AI
+Kull
 The first AI-powered photo rating and organization system for Mac, iPhone, and iPad, 
           combining 5 advanced AI models to rate and organize your photos with professional-level accuracy.
 Live Demo Coming Soon
-See Kull AI rating photos in real-time
+See Kull rating photos in real-time
 Try It Free for 1 Day
 section-solution
 text-solution-headline
@@ -256,7 +256,7 @@ demo-mockup
 button-start-trial-solution
 
 ### ValueStack
-Everything You Get With Kull AI
+Everything You Get With Kull
 A complete AI-powered photo rating system that saves you hundreds of hours
 Core Features
 Bonus Features (Included Free)
@@ -274,14 +274,14 @@ text-value-headline
 
 ### FAQSection
 Frequently Asked Questions
-Everything you need to know about Kull AI
+Everything you need to know about Kull
 section-faq
 text-faq-headline
 
 ### ReferralSection
 Refer Photographers,
 Unlock Incredible Bonuses
-Share Kull AI with your photography network during signup or checkout and stack rewards as your referrals grow
+Share Kull with your photography network during signup or checkout and stack rewards as your referrals grow
 Referrals
 Referral Rewards Timeline
 Your referrals get the same amazing free trial, and you get rewarded for spreading the word

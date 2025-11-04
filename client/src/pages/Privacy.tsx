@@ -17,7 +17,7 @@ export default function Privacy() {
           </Link>
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary" />
-            <span className="font-bold text-lg">Kull AI</span>
+            <span className="font-bold text-lg">Kull</span>
           </div>
         </div>
       </header>
@@ -39,7 +39,7 @@ export default function Privacy() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Our Commitment to Your Privacy</h2>
               <p className="text-muted-foreground leading-relaxed">
-                At Kull AI, we take your privacy seriously. This policy explains how we collect, use, and protect your personal information when you use our AI-powered photo rating service.
+                At Kull, we take your privacy seriously. This policy explains how we collect, use, and protect your personal information when you use our AI-powered photo rating service.
               </p>
             </section>
 
@@ -61,13 +61,13 @@ export default function Privacy() {
                 <div>
                   <h3 className="font-semibold text-lg text-foreground mb-2">Usage Data</h3>
                   <p className="leading-relaxed">
-                    We collect data about how you use Kull AI, including the number of photos rated, feature usage, and subscription tier. This helps us improve the service and provide better support.
+                    We collect data about how you use Kull, including the number of photos rated, feature usage, and subscription tier. This helps us improve the service and provide better support.
                   </p>
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg text-foreground mb-2">Your Photos</h3>
                   <p className="leading-relaxed">
-                    <strong className="text-foreground">We do NOT store your actual photos.</strong> When you use Kull AI, your images are processed by our AI models in real-time and only the ratings data (1-5 stars) is saved. Your creative work stays on your device, always.
+                    <strong className="text-foreground">We do NOT store your actual photos.</strong> When you use Kull, your images are processed by our AI models in real-time and only the ratings data (1-5 stars) is saved. Your creative work stays on your device, always.
                   </p>
                 </div>
               </div>
@@ -154,7 +154,7 @@ export default function Privacy() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Third-Party Services</h2>
               <p className="text-muted-foreground leading-relaxed mb-4">
-                We use trusted third-party services to provide Kull AI:
+                We use trusted third-party services to provide Kull:
               </p>
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-start gap-3">

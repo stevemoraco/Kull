@@ -19,7 +19,7 @@ export function FinalCTA() {
         </h2>
 
         <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-          Join 500+ photographers who've already saved hundreds of hours with Kull AI
+          Join 500+ photographers who've already saved hundreds of hours with Kull
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">

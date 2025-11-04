@@ -1,4 +1,4 @@
-# Kull AI Website Content
+# Kull Website Content
 
 ## Home Page (/)
 
@@ -14,7 +14,7 @@
 Addresses pain points photographers face with manual photo selection and organization
 
 ### Solution Section
-Explains how Kull AI solves these problems with AI-powered automation
+Explains how Kull solves these problems with AI-powered automation
 
 ### Value Stack
 Shows all the features and benefits included
@@ -55,7 +55,7 @@ Call to action to start free trial
 ## Dashboard Page (/dashboard)
 
 **Headline:** Start Your Free Trial to Access Downloads
-**Subheadline:** Choose a plan below to start your 24-hour free trial and download Kull AI for Mac, iPhone, and iPad.
+**Subheadline:** Choose a plan below to start your 24-hour free trial and download Kull for Mac, iPhone, and iPad.
 **Badge:** No charge until your trial ends • Cancel anytime
 
 ### Pricing Cards (same as home page)
@@ -63,7 +63,7 @@ Both Professional and Studio plans with all features listed
 
 **CTA Buttons:** Download Kull Now (with download icon)
 
-**Info Text:** After selecting a plan, you'll be able to download Kull AI for Mac, iPhone, and iPad immediately during your free trial. All plans can be canceled anytime. No long-term commitments.
+**Info Text:** After selecting a plan, you'll be able to download Kull for Mac, iPhone, and iPad immediately during your free trial. All plans can be canceled anytime. No long-term commitments.
 
 ---
 

@@ -9,7 +9,7 @@ async function createProducts() {
     // Create Professional Product
     console.log('Creating Professional product...');
     const professionalProduct = await stripe.products.create({
-      name: 'Kull AI Professional',
+      name: 'Kull Professional',
       description: 'Unlimited photo ratings with all 5 AI models, universal Mac/iPhone/iPad app, and email support',
     });
     console.log(`✓ Professional product created: ${professionalProduct.id}\n`);
@@ -43,7 +43,7 @@ async function createProducts() {
     // Create Studio Product
     console.log('Creating Studio product...');
     const studioProduct = await stripe.products.create({
-      name: 'Kull AI Studio',
+      name: 'Kull Studio',
       description: 'Everything in Professional plus priority processing, batch up to 10,000 photos, team collaboration, and priority support',
     });
     console.log(`✓ Studio product created: ${studioProduct.id}\n`);

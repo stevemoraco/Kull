@@ -124,7 +124,7 @@ const getOfferHoursRemaining = (user: User): number => {
 
 // FIRST LOGIN WELCOME EMAIL
 export const firstLoginWelcomeEmail = (user: User) => ({
-  subject: "🎉 Welcome to Kull AI - Let's Get Started!",
+  subject: "🎉 Welcome to Kull - Let's Get Started!",
   html: `
 <!DOCTYPE html>
 <html>
@@ -132,7 +132,7 @@ export const firstLoginWelcomeEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to Kull AI! 🚀</h1>
+      <h1>Welcome to Kull! 🚀</h1>
     </div>
     <div class="content">
       <p>Hi ${user.firstName || 'there'},</p>
@@ -172,7 +172,7 @@ export const firstLoginWelcomeEmail = (user: User) => ({
 
       <p>Excited to see what you create! 📸</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -189,7 +189,7 @@ export const firstLoginWelcomeEmail = (user: User) => ({
 </body>
 </html>
   `,
-  text: `Welcome to Kull AI! 🚀
+  text: `Welcome to Kull! 🚀
 
 Hi ${user.firstName || 'there'},
 
@@ -224,13 +224,13 @@ Questions? Visit ${baseUrl}/support
 Excited to see what you create! 📸
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 // REFERRAL CONFIRMATION EMAIL (sent to referrer after sending invites)
 export const referralConfirmationEmail = (user: User, referredEmails: string[], unlockedRewards: string[], potentialRewards: string[]) => ({
-  subject: `🎉 Thank You for Spreading the Word About Kull AI!`,
+  subject: `🎉 Thank You for Spreading the Word About Kull!`,
   html: `
 <!DOCTYPE html>
 <html>
@@ -267,7 +267,7 @@ export const referralConfirmationEmail = (user: User, referredEmails: string[], 
       <h3>What Happens Next?</h3>
       <ul class="feature-list">
         <li>Your friends will receive a personalized invitation email from you</li>
-        <li>They get a FREE 1-day unlimited trial to test Kull AI</li>
+        <li>They get a FREE 1-day unlimited trial to test Kull</li>
         <li>When they become paying subscribers, <strong>BOTH of you receive bonus rewards!</strong></li>
         <li>You can track your referral status anytime in your dashboard</li>
       </ul>
@@ -285,9 +285,9 @@ export const referralConfirmationEmail = (user: User, referredEmails: string[], 
 
       <p><strong>Want to earn more rewards?</strong> Keep sharing! The more photographer friends you invite, the bigger the bonuses.</p>
 
-      <p>Thanks for being an amazing Kull AI advocate! 🙌</p>
+      <p>Thanks for being an amazing Kull advocate! 🙌</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -335,16 +335,16 @@ WHAT HAPPENS NEXT:
 
 View your dashboard: ${baseUrl}/home
 
-Thanks for being an amazing Kull AI advocate! 🙌
+Thanks for being an amazing Kull advocate! 🙌
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 // POST-CHECKOUT EMAILS
 export const welcome5minEmail = (user: User) => ({
-  subject: "🎉 Welcome to Kull AI - Your Journey Starts Now!",
+  subject: "🎉 Welcome to Kull - Your Journey Starts Now!",
   html: `
 <!DOCTYPE html>
 <html>
@@ -352,7 +352,7 @@ export const welcome5minEmail = (user: User) => ({
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to Kull AI! 🚀</h1>
+      <h1>Welcome to Kull! 🚀</h1>
     </div>
     <div class="content">
       <p>Hi ${user.firstName || 'there'},</p>
@@ -366,13 +366,13 @@ export const welcome5minEmail = (user: User) => ({
       <h2>🎯 Get Started in 3 Simple Steps:</h2>
       
       <ol>
-        <li><strong>Download Kull AI:</strong> One-click Mac installation (2 minutes)</li>
+        <li><strong>Download Kull:</strong> One-click Mac installation (2 minutes)</li>
         <li><strong>Launch the app:</strong> Point it to any photo folder</li>
         <li><strong>Start Rating:</strong> Watch AI analyze your photos in real-time</li>
       </ol>
 
       <center>
-        <a href="${baseUrl}/home" class="button">Download Kull AI Now →</a>
+        <a href="${baseUrl}/home" class="button">Download Kull Now →</a>
       </center>
 
       <h3>💎 What's Included in Your Trial:</h3>
@@ -394,7 +394,7 @@ export const welcome5minEmail = (user: User) => ({
 
       <p>Happy rating! 📸</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -411,7 +411,7 @@ export const welcome5minEmail = (user: User) => ({
 </body>
 </html>
   `,
-  text: `🎉 Welcome to Kull AI! 🚀
+  text: `🎉 Welcome to Kull! 🚀
 
 Hi ${user.firstName || 'there'},
 
@@ -420,7 +420,7 @@ You've just unlocked the future of photo rating! Your 24-hour free trial gives y
 ✅ Trial Active: Free until ${new Date(user.trialEndsAt!).toLocaleString()}
 
 🎯 Get Started:
-1. Download Kull AI (2 minutes)
+1. Download Kull (2 minutes)
 2. Open app and select photo folder
 3. Start Rating
 
@@ -434,14 +434,14 @@ Need help? Visit ${baseUrl}/support
 Happy rating! 📸
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco
 
 © 2025 Lander Media`
 });
 
 export const installCheck45minEmail = (user: User) => ({
-  subject: "🔍 Quick Check: Is Kull AI Rating Your Photos Yet?",
+  subject: "🔍 Quick Check: Is Kull Rating Your Photos Yet?",
   html: `
 <!DOCTYPE html>
 <html>
@@ -460,10 +460,10 @@ export const installCheck45minEmail = (user: User) => ({
       <h3>🎯 5-Minute Quick Start:</h3>
       <ol>
         <li><strong>Open the DMG</strong> file you downloaded</li>
-        <li><strong>Drag Kull AI</strong> to Applications folder</li>
-        <li><strong>Open Kull AI app</strong></li>
+        <li><strong>Drag Kull</strong> to Applications folder</li>
+        <li><strong>Open Kull app</strong></li>
         <li><strong>Go to Select photo folder</strong></li>
-        <li><strong>Click "Add"</strong> and select Kull AI</li>
+        <li><strong>Click "Add"</strong> and select Kull</li>
         <li><strong>and start organizing</strong> and begin rating</li>
       </ol>
 
@@ -490,7 +490,7 @@ export const installCheck45minEmail = (user: User) => ({
 
       <p>Make the most of your trial!</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -512,8 +512,8 @@ export const installCheck45minEmail = (user: User) => ({
 🎯 5-Minute Quick Start:
 1. Open DMG file
 2. Drag to Applications
-3. Open Kull AI app
-4. Select photo folder → Add Kull AI
+3. Open Kull app
+4. Select photo folder → Add Kull
 5. Enable and restart
 
 💡 Pro Tip: Start with Gemini model for balanced ratings.
@@ -523,13 +523,13 @@ Running into issues? Chat with us at ${baseUrl}/support
 ⏰ Trial Status: ${Math.ceil((new Date(user.trialEndsAt!).getTime() - Date.now()) / (1000 * 60 * 60))} hours remaining
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 // TRIAL ENDING WARNINGS
 export const trialEnding6hrEmail = (user: User) => ({
-  subject: "⏰ Your Kull AI Trial Ends in 6 Hours - What's Next?",
+  subject: "⏰ Your Kull Trial Ends in 6 Hours - What's Next?",
   html: `
 <!DOCTYPE html>
 <html>
@@ -566,7 +566,7 @@ export const trialEnding6hrEmail = (user: User) => ({
         <a href="${baseUrl}/refunds" class="button button-secondary">View Refund Policy</a>
       </center>
 
-      <h3>💎 Love Kull AI? Here's What You'll Keep:</h3>
+      <h3>💎 Love Kull? Here's What You'll Keep:</h3>
       <ul class="feature-list">
         <li>Unlimited photo rating across all projects</li>
         <li>All 5 AI models (Gemini, GPT-5, Claude, Grok, Kimi k2)</li>
@@ -577,9 +577,9 @@ export const trialEnding6hrEmail = (user: User) => ({
 
       <p><strong>Questions?</strong> Chat with us instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
-      <p>Thanks for trying Kull AI!</p>
+      <p>Thanks for trying Kull!</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -613,12 +613,12 @@ Manage subscription: ${baseUrl}/home
 Refund policy: ${baseUrl}/refunds
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 export const trialEnding1hrEmail = (user: User) => ({
-  subject: "🚨 Final Notice: Your Kull AI Trial Ends in 1 Hour",
+  subject: "🚨 Final Notice: Your Kull Trial Ends in 1 Hour",
   html: `
 <!DOCTYPE html>
 <html>
@@ -662,9 +662,9 @@ export const trialEnding1hrEmail = (user: User) => ({
 
       <p><strong>Questions?</strong> Chat instantly at <a href="${baseUrl}/support">${baseUrl}/support</a></p>
 
-      <p>Whatever you decide, thank you for trying Kull AI!</p>
+      <p>Whatever you decide, thank you for trying Kull!</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -695,14 +695,14 @@ Cancel trial: ${baseUrl}/home
 Questions: ${baseUrl}/support
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 // NON-CHECKOUT DRIP CAMPAIGN (Every 4-5 hours if no checkout in first 2 hours)
 
 export const drip1_2hrEmail = (user: User) => ({
-  subject: "🤔 Still Deciding? Here's Everything Kull AI Can Do For You",
+  subject: "🤔 Still Deciding? Here's Everything Kull Can Do For You",
   html: `
 <!DOCTYPE html>
 <html>
@@ -712,7 +712,7 @@ export const drip1_2hrEmail = (user: User) => ({
     <div class="content">
       <p>Hi ${user.firstName},</p>
       
-      <p>I noticed you haven't started your free trial yet. No worries! I wanted to share exactly what Kull AI can do for your photography workflow.</p>
+      <p>I noticed you haven't started your free trial yet. No worries! I wanted to share exactly what Kull can do for your photography workflow.</p>
 
       <h2>😓 The Problem Every Photographer Faces:</h2>
       <p>You spend hours culling through thousands of photos, manually rating each one. It's exhausting, time-consuming, and honestly... boring.</p>
@@ -724,7 +724,7 @@ export const drip1_2hrEmail = (user: User) => ({
         • Mental fatigue leads to inconsistent ratings
       </div>
 
-      <h2>🚀 How Kull AI Changes Everything:</h2>
+      <h2>🚀 How Kull Changes Everything:</h2>
       <ul class="feature-list">
         <li><strong>Rate 1,000 photos in 10-15 minutes</strong> using AI batch processing</li>
         <li><strong>5 different AI perspectives</strong> - Gemini, GPT-5, Claude, Grok, Kimi k2</li>
@@ -738,8 +738,8 @@ export const drip1_2hrEmail = (user: User) => ({
 
       <h3>💡 Pro Photographer Workflow:</h3>
       <ol>
-        <li>Open your photo folder in Kull AI</li>
-        <li>Let Kull AI rate everything (10-15 minutes for 1,000 photos)</li>
+        <li>Open your photo folder in Kull</li>
+        <li>Let Kull rate everything (10-15 minutes for 1,000 photos)</li>
         <li>Review AI suggestions, adjust as needed</li>
         <li>Export keepers - done in 1/3 the time!</li>
       </ol>
@@ -752,7 +752,7 @@ export const drip1_2hrEmail = (user: User) => ({
 
       <p>Ready to transform your workflow?</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -768,13 +768,13 @@ export const drip1_2hrEmail = (user: User) => ({
 </body>
 </html>
   `,
-  text: `🤔 Still Deciding? Here's What Kull AI Does
+  text: `🤔 Still Deciding? Here's What Kull Does
 
 Hi ${user.firstName},
 
 😓 The Problem: 3-5 hours culling 1,000 photos manually
 
-🚀 The Solution: Kull AI rates 1,000 photos in 10-15 minutes
+🚀 The Solution: Kull rates 1,000 photos in 10-15 minutes
 • 5 different AI models
 • Context-aware ratings
 • Works with any folder on your Mac
@@ -784,7 +784,7 @@ Start free trial: ${baseUrl}
 ⏰ Special Offer: ${getOfferHoursRemaining(user)} hours left - 3 extra months free!
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
@@ -854,7 +854,7 @@ export const drip2_6hrEmail = (user: User) => ({
       <p>Questions about AI models? <a href="${baseUrl}/support">Chat with us →</a></p>
 
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -889,12 +889,12 @@ Try free: ${baseUrl}
 ⏰ Offer: ${getOfferHoursRemaining(user)} hours left!
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 export const drip3_11hrEmail = (user: User) => ({
-  subject: "💰 Is Kull AI Worth It? Let's Do The Math Together",
+  subject: "💰 Is Kull Worth It? Let's Do The Math Together",
   html: `
 <!DOCTYPE html>
 <html>
@@ -912,7 +912,7 @@ export const drip3_11hrEmail = (user: User) => ({
         <strong>📊 Manual culling 4 shoots/month:</strong><br>
         4 shoots × 4 hours each = <strong>16 hours/month</strong><br>
         <br>
-        <strong>With Kull AI:</strong><br>
+        <strong>With Kull:</strong><br>
         4 shoots × 1 hour each = <strong>4 hours/month</strong><br>
         <br>
         <strong>⏰ Time Saved:</strong> <span style="color: #10B981; font-weight: bold;">12 hours/month</span>
@@ -954,7 +954,7 @@ export const drip3_11hrEmail = (user: User) => ({
       <p><strong>Still have questions?</strong> <a href="${baseUrl}/support">Chat with us</a> or check our <a href="${baseUrl}/refunds">refund policy</a></p>
 
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -970,12 +970,12 @@ export const drip3_11hrEmail = (user: User) => ({
 </body>
 </html>
   `,
-  text: `💰 Is Kull AI Worth It? The Math
+  text: `💰 Is Kull Worth It? The Math
 
 Hi ${user.firstName},
 
 📊 Manual culling: 16 hours/month
-🚀 With Kull AI: 4 hours/month
+🚀 With Kull: 4 hours/month
 ⏰ Time Saved: 12 hours/month
 
 💎 That's time for:
@@ -992,7 +992,7 @@ Try free: ${baseUrl}
 ⏰ Special offer: ${getOfferHoursRemaining(user)} hours left!
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
@@ -1007,7 +1007,7 @@ export const drip4_16hrEmail = (user: User) => ({
     <div class="content">
       <p>Hi ${user.firstName},</p>
       
-      <p>Whether or not you try Kull AI, I wanted to share our <strong>free guide to optimizing your photo culling workflow</strong>.</p>
+      <p>Whether or not you try Kull, I wanted to share our <strong>free guide to optimizing your photo culling workflow</strong>.</p>
 
       <h2>📚 The Complete Photo Rating Guide:</h2>
 
@@ -1023,7 +1023,7 @@ export const drip4_16hrEmail = (user: User) => ({
         <li>Use keyboard shortcuts (P for pick, X for reject)</li>
         <li>Don't overthink - trust your gut</li>
         <li>Delete: Out of focus, wrong exposure, eyes closed</li>
-        <li><strong>With Kull AI:</strong> This step happens automatically in minutes</li>
+        <li><strong>With Kull:</strong> This step happens automatically in minutes</li>
       </ul>
 
       <h3>⭐ Step 3: Star Rating (The "What's Worth Editing" Round)</h3>
@@ -1033,7 +1033,7 @@ export const drip4_16hrEmail = (user: User) => ({
         <li>3 stars = Good, will likely deliver</li>
         <li>4 stars = Great, definitely deliver</li>
         <li>5 stars = Portfolio-worthy, hero shots</li>
-        <li><strong>With Kull AI:</strong> AI suggests ratings based on composition, lighting, emotion</li>
+        <li><strong>With Kull:</strong> AI suggests ratings based on composition, lighting, emotion</li>
       </ul>
 
       <h3>✅ Step 4: Final Selection</h3>
@@ -1059,7 +1059,7 @@ export const drip4_16hrEmail = (user: User) => ({
       <p>Questions about workflow? <a href="${baseUrl}/support">Ask our AI chat →</a></p>
 
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -1087,11 +1087,11 @@ Hi ${user.firstName},
 
 🗑️ Step 2: Delete Obviously Bad
 • Out of focus, wrong exposure, eyes closed
-• With Kull AI: Automatic in minutes
+• With Kull: Automatic in minutes
 
 ⭐ Step 3: Star Rating
 • 1-5 stars based on quality
-• With Kull AI: AI suggests ratings
+• With Kull: AI suggests ratings
 
 ✅ Step 4: Final Selection
 • Filter 3+ stars
@@ -1102,7 +1102,7 @@ Try AI rating: ${baseUrl}
 ⏰ Bonus expires: ${getOfferHoursRemaining(user)} hours!
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
@@ -1161,7 +1161,7 @@ export const drip5_21hrEmail = (user: User) => ({
 
       <p>This is your moment. Don't let it pass!</p>
       <p><strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -1197,13 +1197,13 @@ Claim now: ${baseUrl}
 After this expires: Regular pricing (no bonus)
 
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
 // REFERRAL INVITATION EMAIL
 const referralInvitationEmail = (referrerName: string, referrerEmail: string, referredEmail: string) => ({
-  subject: `🎁 ${referrerName} invited you to try Kull AI - Free 1-Day Trial!`,
+  subject: `🎁 ${referrerName} invited you to try Kull - Free 1-Day Trial!`,
   html: `
 <!DOCTYPE html>
 <html>
@@ -1220,14 +1220,14 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
     <div class="content">
       <p style="font-size: 18px; font-weight: 600; color: #111827;">Hi there!</p>
       
-      <p><strong>${referrerName}</strong> (${referrerEmail}) thinks you'd love Kull AI and invited you to try our AI-powered photo rating system for free!</p>
+      <p><strong>${referrerName}</strong> (${referrerEmail}) thinks you'd love Kull and invited you to try our AI-powered photo rating system for free!</p>
 
       <div class="alert alert-success">
         <p style="margin: 0; font-weight: 600;">🎁 Special Referral Offer for You</p>
-        <p style="margin: 8px 0 0 0; font-size: 14px;">Get a FREE 1-day unlimited trial of Kull AI, plus if you become a paid customer, both you and ${referrerName} will receive exclusive bonus rewards!</p>
+        <p style="margin: 8px 0 0 0; font-size: 14px;">Get a FREE 1-day unlimited trial of Kull, plus if you become a paid customer, both you and ${referrerName} will receive exclusive bonus rewards!</p>
       </div>
 
-      <h2>🚀 Why Kull AI?</h2>
+      <h2>🚀 Why Kull?</h2>
       <p>Stop wasting hours manually rating thousands of photos. Our universal Mac/iPhone/iPad app uses advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to automatically rate, organize, title, describe, tag, and color-code your photos from any folder with 1-5 stars in real-time.</p>
 
       <ul class="feature-list">
@@ -1263,7 +1263,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
       </ul>
 
       <h3>📋 How It Works:</h3>
-      <p>1. Click the button above to visit Kull AI<br>
+      <p>1. Click the button above to visit Kull<br>
       2. Sign up with this email (${referredEmail})<br>
       3. Start your 1-day free trial instantly<br>
       4. Download the app and watch the magic happen<br>
@@ -1276,7 +1276,7 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
 
       <p style="margin-top: 32px;">Best regards,<br>
       <strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -1293,11 +1293,11 @@ const referralInvitationEmail = (referrerName: string, referrerEmail: string, re
 </body>
 </html>
   `,
-  text: `🎁 You've Been Invited to Try Kull AI! 🎉
+  text: `🎁 You've Been Invited to Try Kull! 🎉
 
 Hi there!
 
-${referrerName} (${referrerEmail}) thinks you'd love Kull AI and invited you to try our AI-powered photo rating system for free!
+${referrerName} (${referrerEmail}) thinks you'd love Kull and invited you to try our AI-powered photo rating system for free!
 
 🎁 SPECIAL REFERRAL OFFER:
 - 🎁 FREE 1-day unlimited trial
@@ -1334,7 +1334,7 @@ Start your free trial: ${baseUrl}
 
 Best regards,
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
 });
 
@@ -1364,7 +1364,7 @@ const chatTranscriptEmail = (userEmail: string, messages: Array<{role: string, c
     }).join('');
 
   return {
-    subject: 'Your Kull AI Support Chat Transcript',
+    subject: 'Your Kull Support Chat Transcript',
     html: `
 <!DOCTYPE html>
 <html>
@@ -1394,7 +1394,7 @@ const chatTranscriptEmail = (userEmail: string, messages: Array<{role: string, c
 
       <p style="margin-top: 32px;">Best regards,<br>
       <strong>Steve Moraco</strong><br>
-      Founder, Kull AI</p>
+      Founder, Kull</p>
     </div>
     <div class="footer">
       <div class="footer-links">
@@ -1431,7 +1431,7 @@ Our AI support has access to our entire GitHub repository and website backend, s
 
 Best regards,
 Steve Moraco
-Founder, Kull AI
+Founder, Kull
 Follow me: https://x.com/steveMoraco`
   };
 };

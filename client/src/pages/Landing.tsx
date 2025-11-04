@@ -32,7 +32,7 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-black text-lg">K</span>
             </div>
-            <span className="text-xl font-black text-foreground" data-testid="text-logo">Kull AI</span>
+            <span className="text-xl font-black text-foreground" data-testid="text-logo">Kull</span>
           </button>
           <Button
             variant="outline"

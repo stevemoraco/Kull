@@ -38,7 +38,7 @@ export function ReferralSection() {
             <span className="text-primary">Unlock Incredible Bonuses</span>
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Share Kull AI with your photography network during signup or checkout and stack rewards as your referrals grow
+            Share Kull with your photography network during signup or checkout and stack rewards as your referrals grow
           </p>
         </div>
 

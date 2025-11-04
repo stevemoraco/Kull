@@ -1,4 +1,4 @@
-# Kull AI Sales Funnel Design Guidelines
+# Kull Sales Funnel Design Guidelines
 
 ## Design Approach
 
@@ -63,7 +63,7 @@
 ### 4. The Solution (Product Showcase)
 - **Layout**: Centered content, max-w-5xl
 - **Components**:
-  - Bold headline introducing Kull AI
+  - Bold headline introducing Kull
   - Animated product demo mockup (Lightroom interface with AI ratings appearing)
   - Feature grid (2 columns mobile, 4 columns desktop):
     - "5 AI Models" with icons (Gemini, Grok, Kimi k2, Claude, GPT-5)
@@ -73,7 +73,7 @@
 
 ### 5. Value Stack Section (Grand Slam Offer Framework)
 - **Layout**: Single column, max-w-4xl centered
-- **Headline**: "Everything You Get With Kull AI"
+- **Headline**: "Everything You Get With Kull"
 - **Visual Treatment**: Stacked cards with checkmarks, each revealing value
 - **Components**:
   - Core features list (8-10 items)
@@ -156,7 +156,7 @@
 
 **Problem Section**: Image showing cluttered Lightroom catalog with thousands of unrated images, photographer looking stressed.
 
-**Solution/Demo**: Animated mockup or screenshot of Lightroom interface with Kull AI rating panel showing real-time 1-5 star ratings appearing.
+**Solution/Demo**: Animated mockup or screenshot of Lightroom interface with Kull rating panel showing real-time 1-5 star ratings appearing.
 
 **Testimonial Photos**: Professional headshots of photographers (circular crop, 80px diameter).
 

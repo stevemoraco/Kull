@@ -574,7 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Build personalized greeting prompt
-      let greetingPrompt = 'Generate a friendly, personalized welcome greeting for a user visiting the Kull AI website chat.';
+      let greetingPrompt = 'Generate a friendly, personalized welcome greeting for a user visiting the Kull website chat.';
 
       if (context.userName) {
         greetingPrompt += `\n\nThe user's name is ${context.userName} and they are logged in.`;
@@ -621,7 +621,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
-              res.write(`${line}\n\n`);
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                // Transform OpenAI format to our client format
+                if (data.type === 'response.output_text.delta' && data.delta) {
+                  res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
+                } else if (data.type === 'response.done') {
+                  // Don't send done yet, we'll send it after the loop
+                } else if (data.type === 'error') {
+                  res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
             }
           }
         }

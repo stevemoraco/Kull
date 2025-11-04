@@ -76,7 +76,7 @@ async function fetchGitHubRepo(owner: string, repo: string, branch: string = 'ma
 }
 
 function formatRepoAsMarkdown(files: RepoFile[]): string {
-  let markdown = '# Kull AI Repository Code\n\n';
+  let markdown = '# Kull Repository Code\n\n';
   markdown += 'Complete codebase from github.com/stevemoraco/kull\n\n';
 
   // Group files by directory
@@ -200,7 +200,7 @@ export async function getRepoContent(repoName: string = 'stevemoraco/kull'): Pro
 
     // Step 6: Ultimate fallback
     console.warn('[Repo] All cache attempts failed, using basic fallback');
-    return '# Kull AI\n\nUnable to fetch repository content. Using basic information.\n\nKull AI is a universal Mac/iPhone/iPad app for AI-powered photo rating and organization.';
+    return '# Kull\n\nUnable to fetch repository content. Using basic information.\n\nKull is a universal Mac/iPhone/iPad app for AI-powered photo rating and organization.';
   }
 }
 

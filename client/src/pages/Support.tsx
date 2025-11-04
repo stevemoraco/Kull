@@ -20,7 +20,7 @@ export default function Support() {
           </Link>
           <div className="flex items-center gap-2">
             <LifeBuoy className="w-5 h-5 text-primary" />
-            <span className="font-bold text-lg">Kull AI</span>
+            <span className="font-bold text-lg">Kull</span>
           </div>
         </div>
       </header>
@@ -34,7 +34,7 @@ export default function Support() {
               Support Center
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Get instant help with Kull AI. Our AI-powered chat support is available 24/7.
+              Get instant help with Kull. Our AI-powered chat support is available 24/7.
             </p>
           </div>
 
@@ -47,12 +47,12 @@ export default function Support() {
               </div>
               <h2 className="text-3xl font-bold mb-3 text-foreground text-center">Live Chat Support</h2>
               <p className="text-muted-foreground leading-relaxed mb-6 text-center text-lg">
-                Get instant answers from our AI assistant trained on Kull AI's documentation and codebase. Click the chat widget in the bottom-right corner of any page.
+                Get instant answers from our AI assistant trained on Kull's documentation and codebase. Click the chat widget in the bottom-right corner of any page.
               </p>
               <div className="bg-card/50 backdrop-blur-sm rounded-lg p-6 text-center">
                 <p className="text-foreground font-semibold mb-2">Available 24/7</p>
                 <p className="text-sm text-muted-foreground">
-                  Powered by advanced AI with complete knowledge of Kull AI features, installation, troubleshooting, and billing. For additional support, founder Steve Moraco is available via Twitter DM.
+                  Powered by advanced AI with complete knowledge of Kull features, installation, troubleshooting, and billing. For additional support, founder Steve Moraco is available via Twitter DM.
                 </p>
               </div>
             </div>
@@ -66,14 +66,14 @@ export default function Support() {
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
-                <h3 className="text-xl font-bold mb-3 text-foreground">How do I install Kull AI?</h3>
+                <h3 className="text-xl font-bold mb-3 text-foreground">How do I install Kull?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   Download the Mac app from your account dashboard. Double-click to install, then point it to any photo folder on your Mac. The AI ratings, titles, descriptions, tags, and color-coding appear automatically as you browse.
                 </p>
               </div>
 
               <div className="bg-card border border-card-border rounded-xl p-6 hover-elevate">
-                <h3 className="text-xl font-bold mb-3 text-foreground">Which AI models does Kull AI use?</h3>
+                <h3 className="text-xl font-bold mb-3 text-foreground">Which AI models does Kull use?</h3>
                 <p className="text-muted-foreground leading-relaxed">
                   We use 5 advanced models you can choose from: Gemini (Google), Grok (xAI), Kimi k2 (via Groq), Claude (Anthropic), and GPT-5 (OpenAI). All 5 analyze each photo using their low-cost batch APIs when possible, and rate each based on context in the photoshoot for maximum accuracy.
                 </p>

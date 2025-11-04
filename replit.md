@@ -1,13 +1,13 @@
-# Kull AI - AI-Powered Photo Rating Sales Funnel
+# Kull - AI-Powered Photo Rating Sales Funnel
 
 ### Overview
-Kull AI is a premium SaaS application designed to empower photographers with a universal Mac/iPhone/iPad app that uses advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with 1-5 stars in real-time. This project is a high-converting sales funnel website built on Alex Hormozi's Grand Slam Offer framework, aiming for significant market potential in the photography industry. It provides a seamless user journey from trial to paid subscription, incorporating sophisticated payment, referral, and AI-powered customer support systems.
+Kull is a premium SaaS application designed to empower photographers with a universal Mac/iPhone/iPad app that uses advanced AI models (Gemini, Grok, Kimi k2, Claude, GPT-5) to rate, organize, title, describe, tag, and color-code photos from any folder on your Mac with 1-5 stars in real-time. This project is a high-converting sales funnel website built on Alex Hormozi's Grand Slam Offer framework, aiming for significant market potential in the photography industry. It provides a seamless user journey from trial to paid subscription, incorporating sophisticated payment, referral, and AI-powered customer support systems.
 
 ### User Preferences
 I prefer simple language in explanations. I want iterative development with clear communication at each step. Ask before making major changes or decisions. Do not make changes to the existing folder structure unless explicitly requested. I prefer detailed explanations for complex technical decisions.
 
 ### System Architecture
-Kull AI is built with a modern web stack. The **Frontend** uses React with TypeScript, Tailwind CSS, and Shadcn UI for a responsive and consistent user experience. **UI/UX decisions** emphasize a mobile-first, responsive design following the Grand Slam Offer framework with high contrast, clear CTAs, and a professional photography aesthetic. **Backend** services are powered by Express.js and Node.js. **Technical implementations** include a robust pre-authorization trial system using Stripe's SetupIntent, a database-backed email queue for transactional communications via SendGrid, and an AI-powered customer support chat.
+Kull is built with a modern web stack. The **Frontend** uses React with TypeScript, Tailwind CSS, and Shadcn UI for a responsive and consistent user experience. **UI/UX decisions** emphasize a mobile-first, responsive design following the Grand Slam Offer framework with high contrast, clear CTAs, and a professional photography aesthetic. **Backend** services are powered by Express.js and Node.js. **Technical implementations** include a robust pre-authorization trial system using Stripe's SetupIntent, a database-backed email queue for transactional communications via SendGrid, and an AI-powered customer support chat.
 
 **Feature Specifications**:
 - **Authentication**: Replit Auth provides secure login with various providers and integrates a 1-day free trial with a 24-hour special offer timer.

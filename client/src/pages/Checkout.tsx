@@ -333,7 +333,7 @@ export default function Checkout() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-black text-lg">K</span>
             </div>
-            <span className="text-xl font-black text-foreground">Kull AI</span>
+            <span className="text-xl font-black text-foreground">Kull</span>
           </div>
           <Button
             variant="ghost"

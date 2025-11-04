@@ -33,7 +33,7 @@ export function SolutionSection() {
     <section className="py-20 md:py-32 px-4 bg-muted/30" data-testid="section-solution">
       <div className="max-w-5xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-solution-headline">
-          Introducing <span className="text-primary">Kull AI</span>
+          Introducing <span className="text-primary">Kull</span>
         </h2>
         <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
           The first AI-powered photo rating and organization system for Mac, iPhone, and iPad, 
@@ -46,7 +46,7 @@ export function SolutionSection() {
             <div className="text-center">
               <Zap className="w-16 h-16 text-primary mx-auto mb-4" />
               <p className="text-xl font-semibold text-foreground">Live Demo Coming Soon</p>
-              <p className="text-sm text-muted-foreground mt-2">See Kull AI rating photos in real-time</p>
+              <p className="text-sm text-muted-foreground mt-2">See Kull rating photos in real-time</p>
             </div>
           </div>
         </div>

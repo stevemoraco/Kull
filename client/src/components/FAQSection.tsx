@@ -9,7 +9,7 @@ export function FAQSection() {
   const faqs = [
     {
       question: "How does the 1-day free trial work?",
-      answer: "Sign up and get unlimited access to Kull AI for 24 hours. Rate as many photos as you want during your trial. After entering your payment details, you can cancel anytime during the trial period with no charge. If you don't cancel, your subscription starts after 24 hours."
+      answer: "Sign up and get unlimited access to Kull for 24 hours. Rate as many photos as you want during your trial. After entering your payment details, you can cancel anytime during the trial period with no charge. If you don't cancel, your subscription starts after 24 hours."
     },
     {
       question: "What's the 24-hour special offer?",
@@ -21,11 +21,11 @@ export function FAQSection() {
     },
     {
       question: "How does the app work?",
-      answer: "Kull AI is a universal Mac/iPhone/iPad app that works with any folder on your Mac. Download the Mac app, point it to your photo folders, and the AI instantly rates, organizes, titles, describes, tags, and color-codes your images. Continue organizing on your iPhone or iPad with automatic sync across all devices."
+      answer: "Kull is a universal Mac/iPhone/iPad app that works with any folder on your Mac. Download the Mac app, point it to your photo folders, and the AI instantly rates, organizes, titles, describes, tags, and color-codes your images. Continue organizing on your iPhone or iPad with automatic sync across all devices."
     },
     {
       question: "How accurate are the AI ratings?",
-      answer: "Kull AI uses 5 different AI models (Gemini, Grok, Groq, Claude, and OpenAI) working together to analyze composition, exposure, focus, and artistic merit. The consensus rating from multiple models provides professional-level accuracy that improves with every update."
+      answer: "Kull uses 5 different AI models (Gemini, Grok, Groq, Claude, and OpenAI) working together to analyze composition, exposure, focus, and artistic merit. The consensus rating from multiple models provides professional-level accuracy that improves with every update."
     },
     {
       question: "Can I cancel anytime?",
@@ -49,7 +49,7 @@ export function FAQSection() {
             Frequently Asked Questions
           </h2>
           <p className="text-lg text-muted-foreground">
-            Everything you need to know about Kull AI
+            Everything you need to know about Kull
           </p>
         </div>
 

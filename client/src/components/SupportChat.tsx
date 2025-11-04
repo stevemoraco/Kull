@@ -299,6 +299,11 @@ export function SupportChat() {
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [transcriptSent, setTranscriptSent] = useState(false);
 
+  // Store pre-generated greeting
+  const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
+  const greetingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [greetingGenerated, setGreetingGenerated] = useState(false);
+
   // Track page visits in sessionStorage for context
   useEffect(() => {
     const currentPath = window.location.pathname;
@@ -320,6 +325,103 @@ export function SupportChat() {
   useEffect(() => {
     localStorage.setItem('kull-chat-open', isOpen.toString());
   }, [isOpen]);
+
+  // Background greeting generation - runs every 30 seconds
+  useEffect(() => {
+    const generateBackgroundGreeting = async () => {
+      try {
+        const sessionContext = {
+          userName: user?.firstName || null,
+          userEmail: user?.email || null,
+          isLoggedIn: !!user,
+          currentPath: window.location.pathname,
+          timeOnSite: Date.now() - (performance.timing?.navigationStart || Date.now()),
+          scrollDepth: Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100) || 0,
+          visitedPages: sessionStorage.getItem('kull-visited-pages')?.split(',') || [window.location.pathname],
+        };
+
+        const response = await fetch('/api/chat/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ context: sessionContext }),
+        });
+
+        if (!response.ok) throw new Error('Failed to generate greeting');
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        if (!reader) throw new Error('No response stream');
+
+        let fullContent = '';
+        let cutoffDetected = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'delta' && data.content) {
+                  if (cutoffDetected) continue;
+                  fullContent += data.content;
+
+                  // Check for cutoff
+                  let cutoffIndex = fullContent.indexOf('␞');
+                  if (cutoffIndex === -1) {
+                    const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
+                    const match = fullContent.match(followUpPattern);
+                    if (match) cutoffIndex = match.index!;
+                  }
+
+                  if (cutoffIndex !== -1) {
+                    cutoffDetected = true;
+                    fullContent = fullContent.substring(0, cutoffIndex).trim();
+                  }
+                }
+              } catch (e) {
+                // Skip invalid JSON
+              }
+            }
+          }
+        }
+
+        if (fullContent) {
+          setLatestGreeting(fullContent);
+          setGreetingGenerated(true);
+
+          // Show toast notification with preview
+          if (greetingGenerated) {
+            // Only show toast on subsequent generations, not the first one
+            const preview = fullContent.substring(0, 100) + (fullContent.length > 100 ? '...' : '');
+            toast({
+              title: 'Chat greeting updated',
+              description: preview,
+              duration: 4000,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Background greeting generation failed:', error);
+      }
+    };
+
+    // Generate immediately on mount
+    generateBackgroundGreeting();
+
+    // Then regenerate every 30 seconds
+    greetingTimerRef.current = setInterval(generateBackgroundGreeting, 30000);
+
+    return () => {
+      if (greetingTimerRef.current) {
+        clearInterval(greetingTimerRef.current);
+      }
+    };
+  }, [user, toast, greetingGenerated]);
 
   const handleLinkClick = (url: string) => {
     // Check if it's an internal link (starts with /)
@@ -550,7 +652,7 @@ export function SupportChat() {
         setMessages(prev =>
           prev.map(msg =>
             msg.id === welcomeMessageId
-              ? { ...msg, content: "Hi! I'm here to help you with Kull AI. Ask me anything!" }
+              ? { ...msg, content: "Hi! I'm here to help you with Kull. Ask me anything!" }
               : msg
           )
         );
@@ -777,7 +879,7 @@ export function SupportChat() {
   };
 
   const [quickQuestions, setQuickQuestions] = useState<string[]>([
-    "How do I install Kull AI?",
+    "How do I install Kull?",
     "Which AI model is best?",
     "How does the rating system work?",
     "Can I cancel my trial?",
@@ -804,7 +906,7 @@ export function SupportChat() {
 
     // Reset quick questions to defaults
     setQuickQuestions([
-      "How do I install Kull AI?",
+      "How do I install Kull?",
       "Which AI model is best?",
       "How does the rating system work?",
       "Can I cancel my trial?",
@@ -821,7 +923,7 @@ export function SupportChat() {
 
     // Reset quick questions when switching
     setQuickQuestions([
-      "How do I install Kull AI?",
+      "How do I install Kull?",
       "Which AI model is best?",
       "How does the rating system work?",
       "Can I cancel my trial?",
@@ -854,7 +956,7 @@ export function SupportChat() {
 
     // Reset quick questions to defaults
     setQuickQuestions([
-      "How do I install Kull AI?",
+      "How do I install Kull?",
       "Which AI model is best?",
       "How does the rating system work?",
       "Can I cancel my trial?",

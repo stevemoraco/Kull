@@ -371,7 +371,7 @@ export function ReferralForm() {
           <Gift className="w-12 h-12 text-primary mx-auto mb-3" />
           <h3 className="font-bold text-xl mb-2 text-foreground">Maximum Reached!</h3>
           <p className="text-muted-foreground">
-            You've unlocked all referral bonuses. Amazing work spreading the word about Kull AI!
+            You've unlocked all referral bonuses. Amazing work spreading the word about Kull!
           </p>
         </div>
       )}

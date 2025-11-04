@@ -125,7 +125,7 @@ export default function Refunds() {
     if (wouldRecommend === null) {
       toast({
         title: "Please Complete Survey",
-        description: "Please let us know if you would recommend Kull AI.",
+        description: "Please let us know if you would recommend Kull.",
         variant: "destructive",
       });
       return;
@@ -194,7 +194,7 @@ export default function Refunds() {
           </Link>
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-primary" />
-            <span className="font-bold text-lg">Kull AI</span>
+            <span className="font-bold text-lg">Kull</span>
           </div>
         </div>
       </header>
@@ -218,7 +218,7 @@ export default function Refunds() {
               <h2 className="text-2xl font-bold mb-6 text-foreground">Help Us Improve - Quick Survey</h2>
               <p className="text-muted-foreground mb-6">
                 Before we process your refund, we'd love to understand what didn't work for you. 
-                Your feedback helps us improve Kull AI for future photographers.
+                Your feedback helps us improve Kull for future photographers.
               </p>
 
               <div className="space-y-6">
@@ -264,7 +264,7 @@ export default function Refunds() {
                 {/* Question 2: Would Recommend */}
                 <div>
                   <Label className="text-base font-semibold mb-3 block">
-                    2. Would you recommend Kull AI to other photographers?
+                    2. Would you recommend Kull to other photographers?
                   </Label>
                   <RadioGroup value={wouldRecommend === null ? "" : wouldRecommend.toString()} 
                               onValueChange={(val) => setWouldRecommend(val === "true")}>
@@ -286,7 +286,7 @@ export default function Refunds() {
                 {/* Question 3: Missing Feature */}
                 <div>
                   <Label htmlFor="missing-feature" className="text-base font-semibold mb-3 block">
-                    3. What feature or capability were you hoping to find in Kull AI?
+                    3. What feature or capability were you hoping to find in Kull?
                   </Label>
                   <Textarea
                     id="missing-feature"
@@ -400,7 +400,7 @@ export default function Refunds() {
                   <p className="font-semibold">Refund Processed Successfully!</p>
                   <p>Amount: ${(refundResult.refund.amount / 100).toFixed(2)}</p>
                   <p className="text-sm">You will see the credit in your account within 5-7 business days.</p>
-                  <p className="text-sm mt-4">Thank you for your valuable feedback. We'll use it to improve Kull AI!</p>
+                  <p className="text-sm mt-4">Thank you for your valuable feedback. We'll use it to improve Kull!</p>
                 </div>
               </AlertDescription>
             </Alert>
@@ -437,7 +437,7 @@ export default function Refunds() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">Our Commitment to Satisfaction</h2>
               <p className="text-muted-foreground leading-relaxed">
-                We want you to love Kull AI. That's why we offer a generous 1-day free trial and a fair refund policy for new subscribers.
+                We want you to love Kull. That's why we offer a generous 1-day free trial and a fair refund policy for new subscribers.
               </p>
             </section>
 
@@ -446,7 +446,7 @@ export default function Refunds() {
               <div className="bg-primary/10 border border-primary/20 rounded-xl p-6 mb-4">
                 <p className="text-foreground font-semibold mb-2">24-Hour Trial - Zero Risk</p>
                 <p className="text-muted-foreground leading-relaxed">
-                  All new users receive a full 24-hour trial period. You can cancel anytime during this period with absolutely no charge. This is your risk-free opportunity to test Kull AI with your own photos.
+                  All new users receive a full 24-hour trial period. You can cancel anytime during this period with absolutely no charge. This is your risk-free opportunity to test Kull with your own photos.
                 </p>
               </div>
             </section>
@@ -454,7 +454,7 @@ export default function Refunds() {
             <section className="bg-card border border-card-border rounded-2xl p-8">
               <h2 className="text-2xl font-bold mb-4 text-foreground">7-Day Money-Back Guarantee</h2>
               <p className="text-muted-foreground leading-relaxed mb-4">
-                If you're not satisfied with Kull AI after your trial ends, we offer a 7-day money-back guarantee on your first payment:
+                If you're not satisfied with Kull after your trial ends, we offer a 7-day money-back guarantee on your first payment:
               </p>
               <ul className="space-y-3 text-muted-foreground">
                 <li className="flex items-start gap-3">
