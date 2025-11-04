@@ -626,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context } = req.body;
+      const { context, history } = req.body;
 
       if (!context) {
         return res.status(400).json({ message: "Context required" });
@@ -812,6 +812,14 @@ When you include a link to https://kullai.com, the page will AUTOMATICALLY navig
 - Include 1 strategic link to move them forward (use hash anchors like #pricing, #features when relevant)
 - Remember: the link will navigate them there automatically, so use it to guide their journey
 
+**CRITICAL - BUILD ON YOUR PREVIOUS MESSAGES:**
+- You can see your previous welcome messages in the conversation history
+- DO NOT repeat yourself - each message should advance the pitch
+- Build on what you've already said
+- If you already mentioned pricing, talk about features next
+- If they haven't engaged after 2-3 messages, try a different angle
+- Progress the conversation toward the close
+
 **Format:**
 1-2 sentences MAX. Make every word count. Focus on the outcome they want, not features.
 
@@ -829,7 +837,16 @@ Where X is seconds until your next message (20-60 recommended based on engagemen
 Don't mention their IP, browser, device specs, or technical details. Use those insights to inform your message, not to show off.`;
 
       const { getChatResponseStream } = await import('./chatService');
-      const stream = await getChatResponseStream(contextMarkdown, []);
+
+      // Pass previous welcome messages as history so AI can build on them
+      const conversationHistory = history && Array.isArray(history)
+        ? history.map((msg: any) => ({
+            role: msg.role,
+            content: msg.content,
+          }))
+        : [];
+
+      const stream = await getChatResponseStream(contextMarkdown, conversationHistory);
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');

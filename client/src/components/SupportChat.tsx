@@ -681,10 +681,22 @@ export function SupportChat() {
           })(),
         };
 
+        // Get recent assistant messages (last 5 welcome messages) for context
+        const recentWelcomeMessages = currentMessages
+          .filter(m => m.role === 'assistant' && m.id.startsWith('context-'))
+          .slice(-5)
+          .map(m => ({
+            role: m.role,
+            content: m.content,
+          }));
+
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ context: sessionContext }),
+          body: JSON.stringify({
+            context: sessionContext,
+            history: recentWelcomeMessages,
+          }),
         });
 
         if (!response.ok) throw new Error('Failed to generate greeting');
@@ -811,7 +823,7 @@ export function SupportChat() {
   }, []); // EMPTY ARRAY - only run once on mount, never re-create interval
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
 
   useEffect(() => {
@@ -1319,7 +1331,7 @@ export function SupportChat() {
           {/* Header */}
           <div className="bg-primary px-4 py-3">
             {/* Title Row */}
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-start gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center flex-shrink-0 relative">
                 <MessageCircle className="w-5 h-5 text-primary-foreground" />
                 {nextMessageIn !== null && nextMessageIn > 0 && (
@@ -1328,7 +1340,7 @@ export function SupportChat() {
                   </span>
                 )}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-primary-foreground">
                   Kull Support
                   {nextMessageIn !== null && nextMessageIn > 0 && (
@@ -1339,12 +1351,28 @@ export function SupportChat() {
                 </h3>
                 <p className="text-xs text-primary-foreground/80 leading-tight">Has access to entire github repo & website backend, can answer any sales, technical, or support question instantly.</p>
               </div>
+
+              {/* Fullscreen button - desktop only, top corner */}
+              <div className="hidden md:block flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="text-primary-foreground hover:bg-primary-foreground/20 no-default-hover-elevate h-8 w-8"
+                  data-testid="button-fullscreen-chat"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
-            
+
             {/* Action Buttons Row */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <DropdownMenu>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -1412,24 +1440,6 @@ export function SupportChat() {
                 <X className="w-4 h-4 mr-1.5" />
                 <span className="text-xs font-medium">Close</span>
               </Button>
-              </div>
-
-              {/* Fullscreen button - desktop only */}
-              <div className="hidden md:block">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
-                  data-testid="button-fullscreen-chat"
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
             </div>
           </div>
 
