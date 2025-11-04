@@ -76,6 +76,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user's preferred chat model
+  app.post('/api/user/update-model', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { model } = req.body;
+
+      if (!model || !['gpt-5-nano', 'gpt-5-mini', 'gpt-5'].includes(model)) {
+        return res.status(400).json({ message: "Invalid model. Must be gpt-5-nano, gpt-5-mini, or gpt-5" });
+      }
+
+      const { db } = await import('./db');
+      const { users } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+
+      await db.update(users)
+        .set({ preferredChatModel: model, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+
+      console.log(`[User] Updated chat model to ${model} for user ${userId}`);
+      res.json({ success: true, model });
+    } catch (error) {
+      console.error("Error updating model preference:", error);
+      res.status(500).json({ message: "Failed to update model preference" });
+    }
+  });
+
   // Track page visits
   app.post('/api/track-visit', async (req: any, res) => {
     try {
@@ -499,6 +525,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message is required" });
       }
 
+      // Get user's preferred chat model (default: gpt-5-nano)
+      const userId = req.user?.claims?.sub;
+      let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
+
+      if (userId) {
+        try {
+          const user = await storage.getUser(userId);
+          if (user?.preferredChatModel) {
+            preferredModel = user.preferredChatModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
+          }
+        } catch (err) {
+          console.error('[Chat] Error fetching user model preference:', err);
+        }
+      }
+
+      console.log(`[Chat] Using model: ${preferredModel} for user: ${userId || 'anonymous'}`);
       console.log(`[Chat] Received message with: ${history?.length || 0} history messages, ${userActivity?.length || 0} activity events, ${pageVisits?.length || 0} page visits, ${allSessions?.length || 0} previous sessions`);
 
       // Build rich markdown context for user activity (same as welcome endpoint)
@@ -546,7 +588,7 @@ ${userActivity.map((event: any, idx: number) => {
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
 
-      const stream = await getChatResponseStream(message, history || [], userActivityMarkdown, pageVisits, allSessions);
+      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions);
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -612,9 +654,10 @@ ${userActivity.map((event: any, idx: number) => {
                 if (data.usage) {
                   tokensIn = data.usage.prompt_tokens || 0;
                   tokensOut = data.usage.completion_tokens || 0;
-                  // Calculate cost for gpt-5-mini: Input $0.25/1M, Output $2.00/1M
-                  cost = (tokensIn / 1_000_000) * 0.25 + (tokensOut / 1_000_000) * 2.00;
-                  console.log(`[Chat] ✅ USAGE RECEIVED: tokensIn=${tokensIn}, tokensOut=${tokensOut}, cost=$${cost.toFixed(6)}`);
+                  // Calculate cost using accurate pricing for the selected model
+                  const { calculateChatCost } = await import('./modelPricing');
+                  cost = calculateChatCost(preferredModel, tokensIn, tokensOut);
+                  console.log(`[Chat] ✅ USAGE RECEIVED (${preferredModel}): tokensIn=${tokensIn}, tokensOut=${tokensOut}, cost=$${cost.toFixed(6)}`);
                 }
                 
                 // Handle error
@@ -1508,6 +1551,53 @@ ${contextMarkdown}`;
     }
   });
 
+  // Helper function to calculate session length bucket
+  const getSessionLengthBucket = (durationMinutes: number): string => {
+    if (durationMinutes < 1) return '0-1min';
+    else if (durationMinutes < 5) return '1-5min';
+    else if (durationMinutes < 15) return '5-15min';
+    else if (durationMinutes < 30) return '15-30min';
+    else return '30min+';
+  };
+
+  // Helper function to generate consistent user keys
+  // For registered users: returns userId
+  // For anonymous users: returns composite key from metadata + session length
+  const generateUserKey = (data: any): string => {
+    if (data.userId) {
+      return data.userId; // Registered users: use userId
+    }
+
+    // Anonymous users: generate composite key from metadata
+    // Calculate session length bucket
+    let sessionLengthBucket: string;
+    if (data.sessionLength !== null && data.sessionLength !== undefined) {
+      // For queries: sessionLength is in seconds
+      const durationMinutes = data.sessionLength / 60;
+      sessionLengthBucket = getSessionLengthBucket(durationMinutes);
+    } else if (data.createdAt && data.updatedAt) {
+      // For sessions: calculate from timestamps
+      const sessionStart = new Date(data.createdAt).getTime();
+      const sessionEnd = new Date(data.updatedAt).getTime();
+      const durationMinutes = (sessionEnd - sessionStart) / 1000 / 60;
+      sessionLengthBucket = getSessionLengthBucket(durationMinutes);
+    } else {
+      sessionLengthBucket = '0-1min'; // Default
+    }
+
+    // Create composite key for anonymous users based on metadata + session length
+    const parts = [
+      data.device || 'Unknown Device',
+      data.browser || 'Unknown Browser',
+      data.city || '',
+      data.state || '',
+      data.country || 'Unknown Location',
+      sessionLengthBucket
+    ].filter(Boolean);
+
+    return `anon_${parts.join('_').replace(/\s+/g, '_')}`;
+  };
+
   // Debug endpoint to check database contents
   app.get('/api/admin/debug/database', isAuthenticated, async (req: any, res) => {
     try {
@@ -1562,39 +1652,24 @@ ${contextMarkdown}`;
       allSessions.forEach(session => {
         const messages = JSON.parse(session.messages);
         const isAnonymous = !session.userId;
-        
-        // For anonymous users, create composite key from metadata
-        let userKey: string;
+
+        // Use helper to generate consistent user key
+        const userKey = generateUserKey(session);
+
+        // Generate display name
         let displayName: string;
-        
         if (session.userId) {
-          userKey = session.userId;
           const userDetails = userMap.get(session.userId);
           displayName = userDetails?.email || `User ${session.userId}`;
         } else {
-          // Calculate session length bucket
-          const sessionStart = new Date(session.createdAt).getTime();
-          const sessionEnd = new Date(session.updatedAt).getTime();
-          const durationMinutes = (sessionEnd - sessionStart) / 1000 / 60;
-          
-          let sessionLengthBucket: string;
-          if (durationMinutes < 1) sessionLengthBucket = '0-1min';
-          else if (durationMinutes < 5) sessionLengthBucket = '1-5min';
-          else if (durationMinutes < 15) sessionLengthBucket = '5-15min';
-          else if (durationMinutes < 30) sessionLengthBucket = '15-30min';
-          else sessionLengthBucket = '30min+';
-          
-          // Create composite key for anonymous users based on metadata + session length
+          // For anonymous users, create display name from metadata
           const parts = [
             session.device || 'Unknown Device',
             session.browser || 'Unknown Browser',
             session.city || '',
             session.state || '',
-            session.country || 'Unknown Location',
-            sessionLengthBucket
+            session.country || 'Unknown Location'
           ].filter(Boolean);
-          
-          userKey = `anon_${parts.join('_').replace(/\s+/g, '_')}`;
           displayName = parts.join(' • ');
         }
 
@@ -1646,41 +1721,16 @@ ${contextMarkdown}`;
       // Aggregate costs and tokens per user from support queries
       console.log(`[Admin] Aggregating costs from ${allQueries.length} queries into ${chatUserMap.size} users`);
       allQueries.forEach(query => {
+        // Use helper to generate consistent user key
         let userKey: string;
-        
-        // Match by userId first
-        if (query.userId) {
-          userKey = query.userId;
-        } 
-        // Then try by email
-        else if (query.userEmail) {
+
+        // For queries with email but no userId, try to match to existing user
+        if (query.userEmail && !query.userId) {
           const matchedUser = Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail);
-          userKey = matchedUser?.userKey || query.userEmail;
-        }
-        // For anonymous queries, create composite key from metadata
-        else {
-          // Calculate session length bucket from query's session_length
-          let sessionLengthBucket = '0-1min'; // default
-          if (query.sessionLength !== null && query.sessionLength !== undefined) {
-            const durationMinutes = query.sessionLength / 60; // sessionLength is in seconds
-            if (durationMinutes < 1) sessionLengthBucket = '0-1min';
-            else if (durationMinutes < 5) sessionLengthBucket = '1-5min';
-            else if (durationMinutes < 15) sessionLengthBucket = '5-15min';
-            else if (durationMinutes < 30) sessionLengthBucket = '15-30min';
-            else sessionLengthBucket = '30min+';
-          }
-          
-          // Create composite key matching session grouping logic
-          const parts = [
-            query.device || 'Unknown Device',
-            query.browser || 'Unknown Browser',
-            query.city || '',
-            query.state || '',
-            query.country || 'Unknown Location',
-            sessionLengthBucket
-          ].filter(Boolean);
-          
-          userKey = `anon_${parts.join('_').replace(/\s+/g, '_')}`;
+          userKey = matchedUser?.userKey || generateUserKey(query);
+        } else {
+          // For all other cases (has userId, or anonymous), use helper
+          userKey = generateUserKey(query);
         }
 
         if (chatUserMap.has(userKey)) {
@@ -1728,9 +1778,9 @@ ${contextMarkdown}`;
         .from(supportQueries)
         .orderBy(desc(supportQueries.createdAt));
 
-      // Filter sessions for this user (match userId or IP)
+      // Filter sessions for this user using the same key generation logic
       const userSessions = allSessions.filter(session => {
-        const sessionKey = session.userId || session.ipAddress || 'unknown';
+        const sessionKey = generateUserKey(session);
         return sessionKey === userKey;
       });
 

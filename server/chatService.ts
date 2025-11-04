@@ -168,6 +168,7 @@ export async function buildFullPromptMarkdown(
 export async function getChatResponseStream(
   userMessage: string,
   history: ChatMessage[],
+  model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano',
   userActivityMarkdown?: string,
   pageVisits?: any[],
   allSessions?: any[]
@@ -233,6 +234,7 @@ export async function getChatResponseStream(
     console.log(`[Chat] Sending request with ${systemMessage.length} chars system message, ${messages.length} total messages`);
 
     // Call OpenAI Chat Completions API with streaming (supports stream_options)
+    console.log(`[Chat] Using model: ${model}`);
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -240,7 +242,7 @@ export async function getChatResponseStream(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model, // Use the selected model (gpt-5-nano, gpt-5-mini, or gpt-5)
         messages,
         max_completion_tokens: 8000, // Generous limit for detailed responses (GPT-5 uses max_completion_tokens)
         stream: true,

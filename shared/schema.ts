@@ -45,6 +45,8 @@ export const users = pgTable("users", {
   specialOfferExpiresAt: timestamp("special_offer_expires_at"), // 24 hours after sign-in
   // App installation tracking
   appInstalledAt: timestamp("app_installed_at"),
+  // AI Model preference
+  preferredChatModel: varchar("preferred_chat_model").default('gpt-5-nano'), // 'gpt-5-nano', 'gpt-5-mini', 'gpt-5'
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
