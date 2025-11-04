@@ -533,6 +533,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
 
+        // Validate response format before completing
+        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
+        const hasUnicodeMarker = fullResponse.includes('␞');
+
+        if (!hasFollowUpQuestions || !hasNextMessage) {
+          console.error('[Chat] ⚠️  RESPONSE MISSING REQUIRED METADATA!');
+          console.error('[Chat]   - Has FOLLOW_UP_QUESTIONS:', hasFollowUpQuestions);
+          console.error('[Chat]   - Has NEXT_MESSAGE:', hasNextMessage);
+          console.error('[Chat]   - Has ␞ marker:', hasUnicodeMarker);
+          console.error('[Chat]   - Response length:', fullResponse.length);
+          console.error('[Chat]   - Last 200 chars:', fullResponse.slice(-200));
+        } else {
+          console.log('[Chat] ✅ Response format validated - metadata present');
+        }
+
         // Signal completion
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         res.end();
@@ -1029,11 +1045,20 @@ ${contextMarkdown}`;
       const decoder = new TextDecoder();
 
       try {
+        let serverChunkCount = 0;
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            console.log('[Welcome] OpenAI stream reader done');
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
+          serverChunkCount++;
+          if (serverChunkCount <= 3) {
+            console.log(`[Welcome] OpenAI chunk #${serverChunkCount}:`, chunk.substring(0, 200));
+          }
+
           const lines = chunk.split('\n');
 
           for (const line of lines) {
@@ -1041,28 +1066,55 @@ ${contextMarkdown}`;
               try {
                 const data = JSON.parse(line.slice(6));
 
+                // Log first few events
+                if (serverChunkCount <= 3) {
+                  console.log('[Welcome] OpenAI event:', data.type, Object.keys(data));
+                }
+
                 // Transform OpenAI format to our client format
                 if (data.type === 'response.output_text.delta' && data.delta) {
                   fullResponse += data.delta;
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
                 } else if (data.type === 'response.done') {
+                  console.log('[Welcome] OpenAI sent response.done event');
                   // Track token usage
                   if (data.response?.usage) {
                     tokensIn = data.response.usage.input_tokens || 0;
                     tokensOut = data.response.usage.output_tokens || 0;
                   }
                 } else if (data.type === 'error') {
+                  console.error('[Welcome] OpenAI error:', data);
                   res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
                 }
               } catch (e) {
-                // Skip invalid JSON
+                console.error('[Welcome] JSON parse error:', e, 'Line:', line);
               }
             }
           }
         }
 
+        console.log('[Welcome] Finished reading OpenAI stream, total chunks:', serverChunkCount);
+
+        // Validate response format before completing
+        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
+        const hasUnicodeMarker = fullResponse.includes('␞');
+
+        if (!hasFollowUpQuestions || !hasNextMessage) {
+          console.error('[Welcome] ⚠️  RESPONSE MISSING REQUIRED METADATA!');
+          console.error('[Welcome]   - Has FOLLOW_UP_QUESTIONS:', hasFollowUpQuestions);
+          console.error('[Welcome]   - Has NEXT_MESSAGE:', hasNextMessage);
+          console.error('[Welcome]   - Has ␞ marker:', hasUnicodeMarker);
+          console.error('[Welcome]   - Response length:', fullResponse.length);
+          console.error('[Welcome]   - Last 200 chars:', fullResponse.slice(-200));
+        } else {
+          console.log('[Welcome] ✅ Response format validated - metadata present');
+        }
+
+        console.log('[Welcome] Sending done event to client and closing stream...');
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         res.end();
+        console.log('[Welcome] Stream closed');
 
         // Track welcome greeting in database
         const storage = await import('./storage');

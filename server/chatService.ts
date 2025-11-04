@@ -170,30 +170,28 @@ export async function getChatResponseStream(
 
     console.log(`[Chat] Sending request with ${instructions.length} chars of instructions (includes repo), ${input.length} messages in history`);
 
-    // Call OpenAI Responses API with streaming
-    // TODO: Re-enable structured outputs after debugging
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    // Call OpenAI Chat Completions API with streaming
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
-        instructions, // High-priority instructions with full repo content
-        input, // Conversation history
-        max_output_tokens: 8000, // Generous limit for detailed responses
-        stream: true,
-        /* Temporarily disabled - debugging streaming
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'chat_response',
-            schema: chatResponseJsonSchema,
-            strict: true,
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: instructions,
           },
-        },
-        */
+          ...input.map(msg => ({
+            role: msg.role === 'developer' ? 'system' : msg.role,
+            content: msg.content,
+          })),
+        ],
+        max_tokens: 4096,
+        temperature: 0.7,
+        stream: true,
       }),
     });
 

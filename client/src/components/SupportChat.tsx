@@ -892,23 +892,42 @@ export function SupportChat() {
         if (!reader) throw new Error('No response stream');
 
         let fullContent = '';
+        let chunkCount = 0;
+
+        console.log('[Chat] Starting stream read...');
 
         while (true) {
+          console.log('[Chat] Waiting for chunk...');
           const { done, value } = await reader.read();
-          if (done) break;
+          console.log('[Chat] Received chunk:', { done, valueLength: value?.length });
+
+          if (done) {
+            console.log('[Chat] Stream done, breaking loop');
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
+          chunkCount++;
+          console.log(`[Chat] Chunk #${chunkCount}:`, chunk.substring(0, 100));
+
           const lines = chunk.split('\n');
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
+                console.log('[Chat] Parsed SSE data:', data);
+
                 if (data.type === 'delta' && data.content) {
                   fullContent += data.content;
+                  console.log('[Chat] Added delta, total length now:', fullContent.length);
+                } else if (data.type === 'done') {
+                  console.log('[Chat] Received done event');
+                } else if (data.type === 'error') {
+                  console.error('[Chat] Received error event:', data.message);
                 }
               } catch (e) {
-                // Skip invalid JSON
+                console.error('[Chat] Failed to parse JSON:', line, e);
               }
             }
           }
@@ -967,6 +986,8 @@ export function SupportChat() {
               setQuickQuestions(newQuestions);
               setShowSuggestions(true);
             }
+          } else {
+            console.log('[Chat] No follow-up questions in welcome message');
           }
 
           console.log('[Chat] ===== SETTING STATE =====');
@@ -1303,13 +1324,17 @@ export function SupportChat() {
                     console.log('[Chat] No follow-up questions found in:', questionsSection);
                   }
 
-                  // Extract next message timing
+                  // Extract next message timing - ALWAYS set a countdown
                   const nextMessageMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
+                  let nextMsgSeconds = 45; // Default countdown
                   if (nextMessageMatch) {
-                    const seconds = parseInt(nextMessageMatch[1], 10);
-                    console.log('[Chat] Next message in:', seconds, 'seconds');
-                    setNextMessageIn(seconds);
+                    nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
+                    console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
+                  } else {
+                    console.log('[Chat] No NEXT_MESSAGE found, using default:', nextMsgSeconds, 'seconds');
                   }
+                  // ALWAYS set the countdown
+                  setNextMessageIn(nextMsgSeconds);
 
                   // Update message with clean content
                   setMessages(prev =>
