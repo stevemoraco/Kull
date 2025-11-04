@@ -626,9 +626,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context, history } = req.body;
+      const { context, history, lastAiMessageTime, currentTime } = req.body;
 
       console.log('[Welcome] Received request with history length:', history?.length || 0);
+      console.log('[Welcome] Last AI message time:', lastAiMessageTime ? new Date(lastAiMessageTime).toISOString() : 'never');
+      console.log('[Welcome] Current time:', new Date(currentTime).toISOString());
+
       if (history && history.length > 0) {
         console.log('[Welcome] Last 2 messages in history:');
         history.slice(-2).forEach((msg: any, idx: number) => {

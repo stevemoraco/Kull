@@ -425,6 +425,7 @@ export function SupportChat() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState(true);
   const [debugActivityLog, setDebugActivityLog] = useState<string>('');
+  const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
   // Store pre-generated greeting for initial use
   const [latestGreeting, setLatestGreeting] = useState<string | null>(null);
@@ -598,9 +599,9 @@ export function SupportChat() {
     // Update debug overlay
     const updateDebugOverlay = () => {
       const activity = getActivity();
-      const recentActivity = activity.slice(-20); // Last 20 events
+      // Show ALL events, no trimming!
 
-      const formatted = recentActivity.map((event, idx) => {
+      const formatted = activity.map((event, idx) => {
         const time = new Date(event.timestamp);
         const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -624,7 +625,7 @@ export function SupportChat() {
 - **Input Events:** ${activity.filter(e => e.type === 'input').length}
 - **Text Selections:** ${activity.filter(e => e.type === 'select').length}`;
 
-      setDebugActivityLog(`## 🔍 User Activity History (Last 20 Events)\n\n${formatted || '- No recent activity tracked'}\n\n${insights}`);
+      setDebugActivityLog(`## 🔍 User Activity History (ALL ${activity.length} Events)\n\n${formatted || '- No recent activity tracked'}\n\n${insights}`);
     };
 
     // Add event listeners
@@ -904,8 +905,12 @@ export function SupportChat() {
           timestamp: m.timestamp,
         }));
 
+        // Track timestamp of last AI message for activity delimiting
+        const lastAiMessageTime = lastAiMessageTimeRef.current;
+
         console.log('[Chat] Sending welcome request with history:', fullChatHistory.length, 'messages');
         console.log('[Chat] Latest 3 messages:', fullChatHistory.slice(-3));
+        console.log('[Chat] Last AI message was at:', new Date(lastAiMessageTime).toISOString());
 
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
@@ -913,6 +918,8 @@ export function SupportChat() {
           body: JSON.stringify({
             context: sessionContext,
             history: fullChatHistory,
+            lastAiMessageTime: lastAiMessageTime,
+            currentTime: Date.now(),
           }),
         });
 
@@ -1028,6 +1035,9 @@ export function SupportChat() {
                 return [...prev, newMessage];
               });
               setNextMessageIn(nextMsgSeconds);
+
+              // Update last AI message time
+              lastAiMessageTimeRef.current = Date.now();
 
               // Note: Welcome messages don't auto-navigate, only user chat responses do
               // No toast notifications - rely on popover when chat is closed
