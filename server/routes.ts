@@ -510,14 +510,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fullResponse += data.delta;
                   // Forward to client
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                } else if (data.type === 'response.completed') {
-                  // Extract usage data from completed event
+                } else if (data.type === 'response.done') {
+                  // Extract usage data from done event
                   if (data.response?.usage) {
                     tokensIn = data.response.usage.input_tokens || 0;
                     tokensOut = data.response.usage.output_tokens || 0;
-                    // Calculate cost: Input $0.150/1M, Output $0.600/1M
-                    cost = (tokensIn / 1_000_000) * 0.150 + (tokensOut / 1_000_000) * 0.600;
+                    // Calculate cost for gpt-5-mini: Input $0.100/1M, Output $0.400/1M
+                    cost = (tokensIn / 1_000_000) * 0.100 + (tokensOut / 1_000_000) * 0.400;
                   }
+                  console.log('[Chat] Response done, usage:', data.response?.usage);
                 } else if (data.type === 'error') {
                   res.write(`data: ${JSON.stringify({ type: 'error', message: data.message })}\n\n`);
                 }
@@ -545,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tokensIn,
             tokensOut,
             cost: cost.toString(),
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-mini',
           });
 
           console.log(`[Chat] Streamed response: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
