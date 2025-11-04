@@ -494,6 +494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      res.setHeader('Transfer-Encoding', 'chunked');
+      res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
       (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
@@ -541,11 +543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Handle different event types from Responses API
                 if (data.type === 'response.output_text.delta' && data.delta) {
                   fullResponse += data.delta;
-                  // Forward to client
+                  // Forward to client immediately (no buffering due to flushHeaders)
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                  if (typeof (res as any).flush === 'function') {
-                    (res as any).flush();
-                  }
                 } else if (data.type === 'response.done') {
                   // Extract usage data from done event
                   if (data.response?.usage) {
@@ -558,9 +557,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 } else if (data.type === 'error') {
                   const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
-                  if (typeof (res as any).flush === 'function') {
-                    (res as any).flush();
-                  }
                 }
                 // Silently ignore other event types (response.in_progress, etc.)
               } catch (e) {
@@ -975,8 +971,15 @@ You have access to:
 - If they've shared numbers, show the math calculation
 - **NEVER repeat the same angle twice** - progression: tease → question → calculate → offer
 
-**Format:**
-1-2 sentences, conversational and curious. Ask questions that make them think about their workflow. Occasionally drop in calculated savings if you have enough data.
+**Format & Style (CRITICAL):**
+- Text like Gen Z - casual, friendly, lowercase vibes
+- ONE OR TWO SENTENCES MAX - this is NOT negotiable
+- Each sentence on its own line - break up every thought
+- Use emojis sparingly but naturally (1-2 per message)
+- NO PARAGRAPHS - line breaks between every thought
+- Think: quick text message to a friend, not email
+- Be conversational and curious
+- Ask questions that make them think about their workflow
 
 **CRITICAL: NEVER PRINT RAW URLs OR MAKE UP LINKS**
 - ALWAYS use markdown link format: [link text](URL)
@@ -1063,6 +1066,12 @@ Look at what you've ALREADY SAID above. DO NOT repeat yourself.
 
 ---
 
+**FINAL REMINDER BEFORE YOU RESPOND:**
+You text like Gen Z.
+You ONLY reply in VERY short sentences - one or two MAX.
+Break up every thought with a line break.
+Think: quick text, not essay.
+
 Now respond to their most recent activity (check the user activity log above) and work it into your message. Be specific about what they just clicked/read!`;
 
       const { getChatResponseStream } = await import('./chatService');
@@ -1088,6 +1097,8 @@ ${contextMarkdown}`;
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      res.setHeader('Transfer-Encoding', 'chunked');
+      res.flushHeaders(); // 🔥 CRITICAL: Send headers immediately to enable streaming
       (res as any).socket?.setNoDelay(true); // Disable Nagle's algorithm
 
       // Track the full response for analytics
@@ -1136,9 +1147,6 @@ ${contextMarkdown}`;
                 if (data.type === 'response.output_text.delta' && data.delta) {
                   fullResponse += data.delta;
                   res.write(`data: ${JSON.stringify({ type: 'delta', content: data.delta })}\n\n`);
-                  if (typeof (res as any).flush === 'function') {
-                    (res as any).flush();
-                  }
                 } else if (data.type === 'response.done') {
                   console.log('[Welcome] OpenAI sent response.done event');
                   // Track token usage
@@ -1150,9 +1158,6 @@ ${contextMarkdown}`;
                   console.error('[Welcome] OpenAI error:', data);
                   const errorMessage = data.error?.message || data.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
-                  if (typeof (res as any).flush === 'function') {
-                    (res as any).flush();
-                  }
                 }
               } catch (e) {
                 console.error('[Welcome] JSON parse error:', e, 'Line:', line);

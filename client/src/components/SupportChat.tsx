@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2, Play, Pause } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -526,6 +526,7 @@ export function SupportChat() {
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isProactiveMessagesPaused, setIsProactiveMessagesPaused] = useState(false);
   const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
   // Store pre-generated greeting for initial use
