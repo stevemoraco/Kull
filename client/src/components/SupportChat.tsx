@@ -1014,6 +1014,7 @@ export function SupportChat() {
             history: fullChatHistory,
             lastAiMessageTime: lastAiMessageTime,
             currentTime: Date.now(),
+            sessionId: currentSessionId,
           }),
         });
 
@@ -1467,6 +1468,7 @@ export function SupportChat() {
           userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
           pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
           allSessions: sessions, // Send ALL previous sessions for this user
+          sessionId: currentSessionId,
         }),
       });
 

@@ -489,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     try {
-      const { message, history, userActivity, pageVisits, allSessions } = req.body;
+      const { message, history, userActivity, pageVisits, allSessions, sessionId } = req.body;
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
@@ -699,6 +699,7 @@ ${userActivity.map((event: any, idx: number) => {
             : undefined;
 
           await storage.trackSupportQuery({
+            sessionId,
             userEmail,
             userId,
             userMessage: message,
@@ -737,7 +738,7 @@ ${userActivity.map((event: any, idx: number) => {
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context, history, lastAiMessageTime, currentTime } = req.body;
+      const { context, history, lastAiMessageTime, currentTime, sessionId } = req.body;
 
       console.log('[Welcome] Received request with history length:', history?.length || 0);
       console.log('[Welcome] Last AI message time:', lastAiMessageTime ? new Date(lastAiMessageTime).toISOString() : 'never');
@@ -1310,6 +1311,7 @@ ${contextMarkdown}`;
           }
 
           await storage.trackSupportQuery({
+            sessionId,
             userEmail,
             userId,
             userMessage: '[Welcome Greeting - No User Message]',
