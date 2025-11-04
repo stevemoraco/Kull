@@ -40,9 +40,7 @@ export default function Home() {
             className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-lg px-2 py-1 -ml-2 transition-all"
             data-testid="button-logo-home"
           >
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-black text-lg">K</span>
-            </div>
+            <img src="/kull-logo.png" alt="Kull Logo" className="w-8 h-8 rounded-lg" />
             <span className="text-xl font-black text-foreground">Kull</span>
           </button>
           <div className="flex items-center gap-4">

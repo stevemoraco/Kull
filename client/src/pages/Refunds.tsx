@@ -197,7 +197,7 @@ export default function Refunds() {
             className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-lg px-2 py-1 -mr-2 transition-all"
             data-testid="button-logo-home"
           >
-            <DollarSign className="w-5 h-5 text-primary" />
+            <img src="/kull-logo.png" alt="Kull Logo" className="w-6 h-6 rounded-lg" />
             <span className="font-bold text-lg">Kull</span>
           </button>
         </div>
