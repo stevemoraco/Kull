@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import {
@@ -447,7 +447,8 @@ export function SupportChat() {
   }, [isOpen]);
 
   // Define handleLinkClick early so it can be used in effects
-  const handleLinkClick = (url: string) => {
+  // Memoize to prevent recreation on every render
+  const handleLinkClick = useCallback((url: string) => {
     // Check if it's an internal link (starts with /)
     if (url.startsWith('/')) {
       // Check if it has a hash for scrolling
@@ -470,11 +471,16 @@ export function SupportChat() {
       // External link - open in new tab
       window.open(url, '_blank', 'noopener,noreferrer');
     }
-  };
+  }, [setLocation]);
 
   // Background greeting generation - runs every 30 seconds
+  // CRITICAL: Empty dependency array to prevent interval duplication
   useEffect(() => {
+    let isActive = true; // Prevent state updates after unmount
+
     const generateBackgroundGreeting = async () => {
+      if (!isActive) return; // Don't run if component unmounted
+
       try {
         // Detect device type
         const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
@@ -520,11 +526,16 @@ export function SupportChat() {
         }
         else if (ua.indexOf('Linux') > -1) osName = 'Linux';
 
+        const currentUser = user; // Capture user state at time of execution
+        const currentIsOpen = isOpen;
+        const currentMessages = messages;
+        const currentGreetingGenerated = greetingGenerated;
+
         const sessionContext = {
           // User info
-          userName: user?.firstName || null,
-          userEmail: user?.email || null,
-          isLoggedIn: !!user,
+          userName: currentUser?.firstName || null,
+          userEmail: currentUser?.email || null,
+          isLoggedIn: !!currentUser,
 
           // Navigation
           currentPath: window.location.pathname,
@@ -694,27 +705,27 @@ export function SupportChat() {
           }
         }
 
-        if (fullContent) {
-          if (!greetingGenerated) {
+        if (fullContent && isActive) {
+          if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
             setLatestGreeting(fullContent);
             setGreetingGenerated(true);
 
             // Show popover if chat is closed
-            if (!isOpen) {
+            if (!currentIsOpen) {
               setPopoverGreeting(fullContent);
               setShowGreetingPopover(true);
 
               // Auto-hide after 10 seconds
               setTimeout(() => {
-                setShowGreetingPopover(false);
+                if (isActive) setShowGreetingPopover(false);
               }, 10000);
             }
           } else {
             // Subsequent generations
             const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
 
-            if (isOpen && timeSinceLastUserMessage > 20000 && messages.length > 0) {
+            if (currentIsOpen && timeSinceLastUserMessage > 20000 && currentMessages.length > 0) {
               // Chat is open: add as new message to conversation
               const newMessage: Message = {
                 id: 'context-' + Date.now(),
@@ -727,14 +738,14 @@ export function SupportChat() {
 
               // Note: Welcome messages don't auto-navigate, only user chat responses do
               // No toast notifications - rely on popover when chat is closed
-            } else if (!isOpen) {
+            } else if (!currentIsOpen) {
               // Chat is closed: show popover instead
               setPopoverGreeting(fullContent);
               setShowGreetingPopover(true);
 
               // Auto-hide after 10 seconds
               setTimeout(() => {
-                setShowGreetingPopover(false);
+                if (isActive) setShowGreetingPopover(false);
               }, 10000);
             }
           }
@@ -751,11 +762,13 @@ export function SupportChat() {
     greetingTimerRef.current = setInterval(generateBackgroundGreeting, 30000);
 
     return () => {
+      isActive = false; // Mark as inactive to prevent state updates
       if (greetingTimerRef.current) {
         clearInterval(greetingTimerRef.current);
+        greetingTimerRef.current = null;
       }
     };
-  }, [user, toast, greetingGenerated, messages, handleLinkClick, setMessages, isOpen]);
+  }, []); // EMPTY ARRAY - only run once on mount, never re-create interval
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
