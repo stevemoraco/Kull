@@ -34,12 +34,13 @@ interface SupportAnalytics {
     email: string;
     count: number;
     totalCost: number;
+    conversationCount: number;
+    totalMessages: number;
     device?: string;
     browser?: string;
     city?: string;
     state?: string;
     country?: string;
-    sessionLength?: number;
   }>;
   overTime: Array<{
     date: string;
@@ -323,28 +324,23 @@ export default function Admin() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
-              Support Query Leaderboard
+              User Activity Leaderboard
             </CardTitle>
-            <CardDescription>Most active users ranked by query count</CardDescription>
+            <CardDescription>All users with conversations, messages, and costs</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoadingSupportAnalytics ? (
               <p className="text-muted-foreground">Loading support data...</p>
             ) : supportAnalytics?.queriesByEmail && supportAnalytics.queriesByEmail.length > 0 ? (
               <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
-                  <div>User / Session</div>
-                  <div className="text-right">Queries</div>
-                  <div className="text-right">Cost</div>
+                <div className="grid grid-cols-4 gap-4 pb-2 text-sm font-medium text-muted-foreground border-b">
+                  <div>User / Email</div>
+                  <div className="text-right">Conversations</div>
+                  <div className="text-right">Total Messages</div>
+                  <div className="text-right">Total Cost</div>
                 </div>
                 {supportAnalytics.queriesByEmail.map((row, idx) => {
-                  const isAnonymous = row.email === 'Anonymous' || !row.email || row.email.includes('@');
-                  
                   const getUserDisplay = () => {
-                    if (!isAnonymous && row.email && !row.email.includes('@')) {
-                      return row.email;
-                    }
-                    
                     if (row.email && row.email.includes('@')) {
                       return row.email;
                     }
@@ -355,7 +351,6 @@ export default function Admin() {
                     if (row.city) parts.push(row.city);
                     if (row.state) parts.push(row.state);
                     if (row.country) parts.push(row.country);
-                    if (row.sessionLength) parts.push(`${Math.floor(row.sessionLength / 60)}m`);
                     
                     return parts.length > 0 ? parts.join(' • ') : 'Anonymous User';
                   };
@@ -365,7 +360,7 @@ export default function Admin() {
                   return (
                     <div 
                       key={idx} 
-                      className="grid grid-cols-3 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
+                      className="grid grid-cols-4 gap-4 py-2 border-b last:border-0 cursor-pointer hover-elevate active-elevate-2 rounded-md px-2 -mx-2" 
                       data-testid={`leaderboard-row-${idx}`}
                       onClick={() => {
                         setSelectedEmail(row.email);
@@ -373,14 +368,15 @@ export default function Admin() {
                       }}
                     >
                       <div className="truncate text-primary" title={displayText}>{displayText}</div>
-                      <div className="text-right font-medium">{row.count}</div>
+                      <div className="text-right font-medium">{row.conversationCount}</div>
+                      <div className="text-right font-medium">{row.totalMessages}</div>
                       <div className="text-right font-medium">${row.totalCost.toFixed(4)}</div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="text-muted-foreground">No support queries yet</p>
+              <p className="text-muted-foreground">No user activity yet</p>
             )}
           </CardContent>
         </Card>

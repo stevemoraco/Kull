@@ -988,7 +988,8 @@ Look at what you've ALREADY SAID above. DO NOT repeat yourself.
 
 Now respond to their most recent activity (check the user activity log above) and work it into your message. Be specific about what they just clicked/read!`;
 
-      const { getChatResponseStream, getRepoContent } = await import('./chatService');
+      const { getChatResponseStream } = await import('./chatService');
+      const { getRepoContent } = await import('./fetchRepo');
 
       // Build full context with repo + session data + conversation history
       const repoContent = await getRepoContent();

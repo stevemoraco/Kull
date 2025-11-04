@@ -423,8 +423,6 @@ export function SupportChat() {
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDebugOverlay, setShowDebugOverlay] = useState(false); // Feature flagged off by default
-  const [debugActivityLog, setDebugActivityLog] = useState<string>('');
   const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
   // Store pre-generated greeting for initial use
@@ -596,47 +594,12 @@ export function SupportChat() {
       }
     };
 
-    // Update debug overlay
-    const updateDebugOverlay = () => {
-      const activity = getActivity();
-      // Show ALL events, no trimming!
-
-      const formatted = activity.map((event, idx) => {
-        const time = new Date(event.timestamp);
-        const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        if (event.type === 'click') {
-          const elementText = event.value ? ` - TEXT: "${event.value}"` : '';
-          return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\`${elementText} at ${timeStr}`;
-        } else if (event.type === 'hover') {
-          return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
-        } else if (event.type === 'input') {
-          const displayValue = event.value && event.value.length > 0 ? `"${event.value}"` : '(empty)';
-          return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
-        } else if (event.type === 'select') {
-          return `${idx + 1}. **✏️ HIGHLIGHTED TEXT**: "${event.value}" at ${timeStr}`;
-        }
-        return '';
-      }).join('\n\n');
-
-      const insights = `**Activity Insights:**
-- **Total Clicks:** ${activity.filter(e => e.type === 'click').length}
-- **Elements Hovered:** ${activity.filter(e => e.type === 'hover').length}
-- **Input Events:** ${activity.filter(e => e.type === 'input').length}
-- **Text Selections:** ${activity.filter(e => e.type === 'select').length}`;
-
-      setDebugActivityLog(`## 🔍 User Activity History (ALL ${activity.length} Events)\n\n${formatted || '- No recent activity tracked'}\n\n${insights}`);
-    };
-
     // Add event listeners
     document.addEventListener('click', handleClick, true);
     document.addEventListener('mouseover', handleMouseOver, true);
     document.addEventListener('input', handleInput, true);
     document.addEventListener('mouseup', handleTextSelect, true); // Track text selection
     document.addEventListener('keyup', handleTextSelect, true); // Track keyboard selection
-
-    // Update debug overlay every second
-    const debugInterval = setInterval(updateDebugOverlay, 1000);
 
     // Cleanup
     return () => {
@@ -646,7 +609,6 @@ export function SupportChat() {
       document.removeEventListener('mouseup', handleTextSelect, true);
       document.removeEventListener('keyup', handleTextSelect, true);
       clearTimeout(hoverTimeout);
-      clearInterval(debugInterval);
     };
   }, []);
 
@@ -930,7 +892,6 @@ export function SupportChat() {
         if (!reader) throw new Error('No response stream');
 
         let fullContent = '';
-        let cutoffDetected = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -944,21 +905,7 @@ export function SupportChat() {
               try {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === 'delta' && data.content) {
-                  if (cutoffDetected) continue;
                   fullContent += data.content;
-
-                  // Check for cutoff
-                  let cutoffIndex = fullContent.indexOf('␞');
-                  if (cutoffIndex === -1) {
-                    const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
-                    const match = fullContent.match(followUpPattern);
-                    if (match) cutoffIndex = match.index!;
-                  }
-
-                  if (cutoffIndex !== -1) {
-                    cutoffDetected = true;
-                    fullContent = fullContent.substring(0, cutoffIndex).trim();
-                  }
                 }
               } catch (e) {
                 // Skip invalid JSON
@@ -966,6 +913,8 @@ export function SupportChat() {
             }
           }
         }
+
+        console.log('[Chat] Greeting stream done. Full content:', fullContent);
 
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
@@ -975,14 +924,22 @@ export function SupportChat() {
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
 
-          // Remove metadata from displayed content
-          if (nextMessageMatch && nextMessageMatch.index !== undefined) {
-            cleanContent = fullContent.substring(0, nextMessageMatch.index).trim();
+          // Remove ALL metadata from displayed content (cut at first ␞ or FOLLOW_UP_QUESTIONS)
+          const cutoffIndex = fullContent.indexOf('␞');
+          const followUpIndex = fullContent.search(/\n\n?FOLLOW_UP_QUESTIONS:/);
+
+          if (cutoffIndex !== -1) {
+            cleanContent = fullContent.substring(0, cutoffIndex).trim();
+          } else if (followUpIndex !== -1) {
+            cleanContent = fullContent.substring(0, followUpIndex).trim();
           }
 
           // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
+            console.log('[Chat] Parsed next message time:', nextMsgSeconds, 'seconds');
+          } else {
+            console.log('[Chat] No NEXT_MESSAGE found, using default 30s');
           }
 
           // Parse and display follow-up questions
@@ -1001,11 +958,18 @@ export function SupportChat() {
             }
           }
 
+          console.log('[Chat] Generated greeting:', cleanContent.substring(0, 100));
+          console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
+          console.log('[Chat] Greeting generated?', currentGreetingGenerated);
+          console.log('[Chat] Chat open?', currentIsOpen);
+
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
             setLatestGreeting(cleanContent);
             setGreetingGenerated(true);
             setNextMessageIn(nextMsgSeconds);
+
+            console.log('[Chat] First greeting - storing and showing countdown');
 
             // Show popover if chat is closed
             if (!currentIsOpen) {
@@ -1016,6 +980,16 @@ export function SupportChat() {
               setTimeout(() => {
                 if (isActive) setShowGreetingPopover(false);
               }, 10000);
+            } else {
+              // Chat is open - add as first message
+              const newMessage: Message = {
+                id: 'context-' + Date.now(),
+                role: 'assistant',
+                content: cleanContent,
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, newMessage]);
+              lastAiMessageTimeRef.current = Date.now();
             }
           } else {
             // Subsequent generations

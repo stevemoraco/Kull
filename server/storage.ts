@@ -72,12 +72,13 @@ export interface IStorage {
       email: string; 
       count: number; 
       totalCost: number;
+      conversationCount: number;
+      totalMessages: number;
       device?: string;
       browser?: string;
       city?: string;
       state?: string;
       country?: string;
-      sessionLength?: number;
     }>;
   }>;
   getSupportQueriesOverTime(days: number): Promise<Array<{ date: string; count: number; avgCost: number }>>;
@@ -429,7 +430,18 @@ export class DatabaseStorage implements IStorage {
   async getSupportQueryStats(startDate?: Date, endDate?: Date): Promise<{
     totalQueries: number;
     totalCost: number;
-    queriesByEmail: Array<{ email: string; count: number; totalCost: number }>;
+    queriesByEmail: Array<{ 
+      email: string; 
+      count: number; 
+      totalCost: number;
+      conversationCount: number;
+      totalMessages: number;
+      device?: string;
+      browser?: string;
+      city?: string;
+      state?: string;
+      country?: string;
+    }>;
   }> {
     const conditions = [];
     if (startDate) {
@@ -439,7 +451,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(lte(supportQueries.createdAt, endDate));
     }
 
-    // Get total queries and cost
+    // Get total queries and cost from support_queries
     const totals = await db
       .select({
         totalQueries: sql<number>`count(*)::int`,
@@ -448,46 +460,79 @@ export class DatabaseStorage implements IStorage {
       .from(supportQueries)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
-    // Get queries grouped by email with metadata
+    // Get queries by email DEDUPLICATED (group only by email)
     const byEmail = await db
       .select({
         email: supportQueries.userEmail,
-        device: supportQueries.device,
-        browser: supportQueries.browser,
-        city: supportQueries.city,
-        state: supportQueries.state,
-        country: supportQueries.country,
-        sessionLength: supportQueries.sessionLength,
         count: sql<number>`count(*)::int`,
         totalCost: sql<number>`COALESCE(sum(${supportQueries.cost}::numeric), 0)::numeric`,
       })
       .from(supportQueries)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .groupBy(
-        supportQueries.userEmail,
-        supportQueries.device,
-        supportQueries.browser,
-        supportQueries.city,
-        supportQueries.state,
-        supportQueries.country,
-        supportQueries.sessionLength
-      )
+      .groupBy(supportQueries.userEmail)
       .orderBy(desc(sql`count(*)`));
+
+    // Get all chat sessions to count conversations and messages per user
+    const allSessions = await db.select().from(chatSessions);
+    
+    // Create a map of userId/email -> session stats
+    const sessionStatsByIdentifier = new Map<string, { conversationCount: number; totalMessages: number; device?: string; browser?: string; city?: string; state?: string; country?: string }>();
+    
+    allSessions.forEach(session => {
+      const identifier = session.userId || 'Anonymous';
+      const messages = JSON.parse(session.messages);
+      const existing = sessionStatsByIdentifier.get(identifier) || { conversationCount: 0, totalMessages: 0 };
+      
+      sessionStatsByIdentifier.set(identifier, {
+        conversationCount: existing.conversationCount + 1,
+        totalMessages: existing.totalMessages + messages.length,
+        device: session.device || existing.device,
+        browser: session.browser || existing.browser,
+        city: session.city || existing.city,
+        state: session.state || existing.state,
+        country: session.country || existing.country,
+      });
+    });
+
+    // Get all users to map userId to email
+    const allUsers = await db.select().from(users);
+    const userIdToEmail = new Map<string, string>();
+    const emailToUserId = new Map<string, string>();
+    allUsers.forEach(user => {
+      if (user.email) {
+        userIdToEmail.set(user.id, user.email);
+        emailToUserId.set(user.email, user.id);
+      }
+    });
 
     return {
       totalQueries: totals[0]?.totalQueries || 0,
       totalCost: Number(totals[0]?.totalCost || 0),
-      queriesByEmail: byEmail.map(row => ({
-        email: row.email || 'Anonymous',
-        device: row.device || undefined,
-        browser: row.browser || undefined,
-        city: row.city || undefined,
-        state: row.state || undefined,
-        country: row.country || undefined,
-        sessionLength: row.sessionLength || undefined,
-        count: row.count,
-        totalCost: Number(row.totalCost),
-      })),
+      queriesByEmail: byEmail.map(row => {
+        const email = row.email || 'Anonymous';
+        
+        // Try to find session stats by userId (if email is in users table)
+        const userId = emailToUserId.get(email);
+        let sessionStats = userId ? sessionStatsByIdentifier.get(userId) : undefined;
+        
+        // If not found and anonymous, try to find Anonymous sessions
+        if (!sessionStats && email === 'Anonymous') {
+          sessionStats = sessionStatsByIdentifier.get('Anonymous');
+        }
+        
+        return {
+          email,
+          count: row.count,
+          totalCost: Number(row.totalCost),
+          conversationCount: sessionStats?.conversationCount || 0,
+          totalMessages: sessionStats?.totalMessages || 0,
+          device: sessionStats?.device,
+          browser: sessionStats?.browser,
+          city: sessionStats?.city,
+          state: sessionStats?.state,
+          country: sessionStats?.country,
+        };
+      }),
     };
   }
 
