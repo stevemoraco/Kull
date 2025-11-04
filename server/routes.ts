@@ -573,36 +573,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Context required" });
       }
 
-      // Build personalized greeting prompt
-      let greetingPrompt = 'Generate a friendly, personalized welcome greeting for a user visiting the Kull website chat.';
+      // Extract IP address (check various headers for proxy/load balancer scenarios)
+      const ip = req.headers['cf-connecting-ip'] ||
+                 req.headers['x-real-ip'] ||
+                 req.headers['x-forwarded-for']?.split(',')[0] ||
+                 req.connection?.remoteAddress ||
+                 req.socket?.remoteAddress ||
+                 'unknown';
 
-      if (context.userName) {
-        greetingPrompt += `\n\nThe user's name is ${context.userName} and they are logged in.`;
-      } else if (context.isLoggedIn) {
-        greetingPrompt += '\n\nThe user is logged in but we don\'t have their name.';
-      } else {
-        greetingPrompt += '\n\nThe user is not logged in (potential new customer).';
+      // Fetch IP geolocation from multiple services
+      let ipGeoData = {
+        ipAddress: ip,
+        ipify: null as any,
+        ipapi: null as any,
+        ipwhois: null as any,
+      };
+
+      try {
+        // Service 1: ipapi.co (free, good accuracy)
+        const ipapiRes = await fetch(`https://ipapi.co/${ip}/json/`);
+        if (ipapiRes.ok) {
+          ipGeoData.ipapi = await ipapiRes.json();
+        }
+      } catch (e) {
+        console.error('[IP Geo] ipapi.co failed:', e);
       }
 
-      greetingPrompt += `\n\nCurrent page: ${context.currentPath}`;
-
-      if (context.timeOnSite > 10000) {
-        const minutes = Math.floor(context.timeOnSite / 60000);
-        greetingPrompt += `\nTime on site: ${minutes} minute${minutes !== 1 ? 's' : ''}`;
+      try {
+        // Service 2: ip-api.com (free, comprehensive)
+        const ipwhoisRes = await fetch(`http://ip-api.com/json/${ip}`);
+        if (ipwhoisRes.ok) {
+          ipGeoData.ipwhois = await ipwhoisRes.json();
+        }
+      } catch (e) {
+        console.error('[IP Geo] ip-api.com failed:', e);
       }
 
-      if (context.scrollDepth > 50) {
-        greetingPrompt += `\nThey've scrolled ${context.scrollDepth}% down the page (engaged user)`;
-      }
+      // Format time on site
+      const minutes = Math.floor(context.timeOnSite / 60000);
+      const seconds = Math.floor((context.timeOnSite % 60000) / 1000);
+      const timeOnSiteFormatted = minutes > 0
+        ? `${minutes}m ${seconds}s`
+        : `${seconds}s`;
 
-      if (context.visitedPages && context.visitedPages.length > 1) {
-        greetingPrompt += `\nPages visited: ${context.visitedPages.join(', ')}`;
-      }
+      // Build comprehensive context as markdown document
+      const contextMarkdown = `# User Session Context
 
-      greetingPrompt += '\n\nMake the greeting:\n- Warm and helpful\n- Reference their current page context naturally\n- If they\'re on pricing, mention you can help with plan questions\n- If they\'re on dashboard, offer to help with getting started\n- If they\'re a returning user (multiple pages), acknowledge that\n- Keep it conversational and under 2-3 sentences\n- Include at least 1 markdown link naturally in the greeting to a relevant page using FULL https://kullai.com URLs (NOT relative paths, NOT GitHub)\n- Insert the link wherever it fits naturally in the conversation (don\'t force it at the start)\n- Use hash anchors (#section) to link to specific sections when relevant\n- Analyze the repository to determine which pages and section IDs exist';
+## 👤 User Information
+${context.userName ? `- **Name:** ${context.userName}` : ''}
+${context.userEmail ? `- **Email:** ${context.userEmail}` : ''}
+- **Status:** ${context.isLoggedIn ? '🟢 Logged In' : '🔴 Not Logged In (Potential New Customer)'}
+
+## 🌍 Location & Network
+- **IP Address:** ${ipGeoData.ipAddress}
+
+${ipGeoData.ipapi ? `### 📍 Location Data (ipapi.co)
+- **City:** ${ipGeoData.ipapi.city || 'Unknown'}
+- **Region:** ${ipGeoData.ipapi.region || 'Unknown'}
+- **Country:** ${ipGeoData.ipapi.country_name || 'Unknown'} (${ipGeoData.ipapi.country_code || '??'})
+- **Postal Code:** ${ipGeoData.ipapi.postal || 'Unknown'}
+- **Coordinates:** ${ipGeoData.ipapi.latitude}, ${ipGeoData.ipapi.longitude}
+- **Timezone:** ${ipGeoData.ipapi.timezone || 'Unknown'}
+- **ISP:** ${ipGeoData.ipapi.org || 'Unknown'}
+- **ASN:** ${ipGeoData.ipapi.asn || 'Unknown'}
+` : ''}
+
+${ipGeoData.ipwhois ? `### 📍 Location Data (ip-api.com)
+- **City:** ${ipGeoData.ipwhois.city || 'Unknown'}
+- **Region:** ${ipGeoData.ipwhois.regionName || 'Unknown'}
+- **Country:** ${ipGeoData.ipwhois.country || 'Unknown'} (${ipGeoData.ipwhois.countryCode || '??'})
+- **Postal Code:** ${ipGeoData.ipwhois.zip || 'Unknown'}
+- **Coordinates:** ${ipGeoData.ipwhois.lat}, ${ipGeoData.ipwhois.lon}
+- **Timezone:** ${ipGeoData.ipwhois.timezone || 'Unknown'}
+- **ISP:** ${ipGeoData.ipwhois.isp || 'Unknown'}
+- **Organization:** ${ipGeoData.ipwhois.org || 'Unknown'}
+- **AS:** ${ipGeoData.ipwhois.as || 'Unknown'}
+` : ''}
+
+## 🧭 Navigation
+- **Current Page:** ${context.currentPath}
+- **Full URL:** ${context.currentUrl}
+- **Referrer:** ${context.referrer}
+${context.queryParams ? `- **Query Params:** ${context.queryParams}` : ''}
+${context.urlHash ? `- **URL Hash:** ${context.urlHash}` : ''}
+- **Visited Pages:** ${context.visitedPages?.join(' → ') || 'Just arrived'}
+- **Page Views:** ${context.visitedPages?.length || 1}
+
+## ⏱️ Time & Activity
+- **Time on Site:** ${timeOnSiteFormatted}
+- **Current Time:** ${context.timestamp}
+- **Timezone:** ${context.timezone} (UTC${context.timezoneOffset >= 0 ? '+' : ''}${-context.timezoneOffset / 60})
+- **Scroll Position:** ${context.scrollY}px (${context.scrollDepth}% down the page)
+${context.scrollDepth > 70 ? '- **🔥 Highly Engaged:** User has scrolled >70% of the page' : ''}
+${context.scrollDepth < 20 ? '- **⚠️ Early Stage:** User just started reading' : ''}
+
+## 📱 Device & Display
+- **Device Type:** ${context.isMobile ? '📱 Mobile' : context.isTablet ? '📲 Tablet' : '🖥️ Desktop'}
+- **Touch Enabled:** ${context.isTouchDevice ? 'Yes' : 'No'} (${context.maxTouchPoints} touch points)
+- **Screen:** ${context.screenWidth}×${context.screenHeight}px
+- **Viewport:** ${context.viewportWidth}×${context.viewportHeight}px
+- **Page Size:** ${context.pageWidth}×${context.pageHeight}px
+- **Pixel Ratio:** ${context.devicePixelRatio}x ${context.devicePixelRatio >= 2 ? '(Retina/High-DPI)' : ''}
+- **Color Depth:** ${context.screenColorDepth}-bit
+- **Orientation:** ${context.screenOrientation}
+
+## 💻 Browser & System
+- **Browser:** ${context.browserName} ${context.browserVersion}
+- **OS:** ${context.osName} ${context.osVersion !== 'Unknown' ? context.osVersion : ''}
+- **Platform:** ${context.platform}
+- **Language:** ${context.language}
+- **All Languages:** ${context.languages}
+- **User Agent:** \`${context.userAgent}\`
+- **Online:** ${context.onLine ? 'Yes' : 'No'}
+- **Cookies:** ${context.cookieEnabled ? 'Enabled' : 'Disabled'}
+- **Do Not Track:** ${context.doNotTrack}
+
+## 🔧 Hardware
+- **CPU Cores:** ${context.hardwareConcurrency}
+- **Device Memory:** ${context.deviceMemory !== 'unknown' ? context.deviceMemory + ' GB' : 'Unknown'}
+${context.webglVendor !== 'unknown' ? `- **GPU Vendor:** ${context.webglVendor}` : ''}
+${context.webglRenderer !== 'unknown' ? `- **GPU:** ${context.webglRenderer}` : ''}
+- **WebGL Support:** ${context.webglSupported ? 'Yes' : 'No'}
+
+## 🌐 Connection
+- **Type:** ${context.connectionType.toUpperCase()}
+- **Downlink:** ${context.connectionDownlink !== 'unknown' ? context.connectionDownlink + ' Mbps' : 'Unknown'}
+- **RTT:** ${context.connectionRtt !== 'unknown' ? context.connectionRtt + ' ms' : 'Unknown'}
+- **Data Saver:** ${context.connectionSaveData ? 'Enabled' : 'Disabled'}
+
+## ⚡ Performance
+- **Page Load:** ${context.loadTime !== 'unknown' ? context.loadTime + ' ms' : 'Unknown'}
+- **DOM Ready:** ${context.domContentLoaded !== 'unknown' ? context.domContentLoaded + ' ms' : 'Unknown'}
+
+## 💾 Storage
+- **Local Storage:** ${context.localStorageAvailable ? 'Available' : 'Blocked'}
+- **Session Storage:** ${context.sessionStorageAvailable ? 'Available' : 'Blocked'}
+
+## 🖱️ User Activity History
+${context.userActivity && context.userActivity.length > 0 ? `
+Recent interactions (last ${context.userActivity.length} events):
+
+${context.userActivity.map((event: any, idx: number) => {
+  const time = new Date(event.timestamp);
+  const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  if (event.type === 'click') {
+    return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\` at ${timeStr}`;
+  } else if (event.type === 'hover') {
+    return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
+  } else if (event.type === 'input') {
+    const displayValue = event.value && event.value.length > 0
+      ? `"${event.value}"`
+      : '(empty)';
+    return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
+  }
+  return '';
+}).join('\n')}
+
+**Activity Insights:**
+- **Total Clicks:** ${context.userActivity.filter((e: any) => e.type === 'click').length}
+- **Elements Hovered:** ${context.userActivity.filter((e: any) => e.type === 'hover').length}
+- **Input Events:** ${context.userActivity.filter((e: any) => e.type === 'input').length}
+` : '- No recent activity tracked'}
+
+---
+
+**Your Task:**
+You're Kull AI support - brilliant, playful, and occasionally roast users in a fun way. With the above context, you can see EVERYTHING about them.
+
+Be natural and conversational. Don't say "welcome" or "welcome back" - just continue the chat naturally. You might:
+- Make observations about their setup/device/location
+- Ask about their photography workflow if relevant
+- Playfully roast their browser choice, screen size, or scroll speed
+- Reference where they came from or what they're looking at
+- Be curious and ask questions
+- Always include at least 1 helpful link to https://kullai.com pages (use hash anchors #section when relevant)
+
+Keep it short (2-3 sentences), fun, and human. You have superpowers - use them wisely.`;
 
       const { getChatResponseStream } = await import('./chatService');
-      const stream = await getChatResponseStream(greetingPrompt, []);
+      const stream = await getChatResponseStream(contextMarkdown, []);
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');

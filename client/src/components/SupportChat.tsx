@@ -188,13 +188,7 @@ function parseInlineMarkdown(text: string, onLinkClick: (url: string) => void, b
   return parts;
 }
 
-// Helper to create placeholder welcome message (will be replaced by streamed greeting)
-const createPlaceholderWelcomeMessage = (): Message => ({
-  id: 'welcome-' + Date.now(),
-  role: 'assistant',
-  content: '__GENERATING_GREETING__', // Special marker for rendering
-  timestamp: new Date(),
-});
+// Removed placeholder system - greetings now appear via popovers and are appended to conversation
 
 // Helper to load sessions from localStorage
 const loadSessions = (): ChatSession[] => {
@@ -234,9 +228,9 @@ export function SupportChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loadedSessions = loadSessions();
     if (loadedSessions.length === 0) {
-      // Create initial session with empty messages - greetings will be added via popover
+      // Create initial persistent session with empty messages - greetings will be added via popover
       const initialSession: ChatSession = {
-        id: 'main-session-' + Date.now().toString(),
+        id: 'main-session-persistent', // Fixed ID for persistence across page loads
         title: 'Chat with Kull',
         messages: [],
         createdAt: new Date(),
@@ -321,6 +315,127 @@ export function SupportChat() {
     }
   }, []);
 
+  // Track user interactions (clicks, hovers, typing)
+  useEffect(() => {
+    interface ActivityEvent {
+      type: 'click' | 'hover' | 'input';
+      target: string;
+      value?: string;
+      timestamp: string;
+    }
+
+    // Get existing activity or initialize
+    const getActivity = (): ActivityEvent[] => {
+      try {
+        const stored = sessionStorage.getItem('kull-user-activity');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const saveActivity = (activity: ActivityEvent[]) => {
+      try {
+        // Keep only last 100 events
+        const trimmed = activity.slice(-100);
+        sessionStorage.setItem('kull-user-activity', JSON.stringify(trimmed));
+      } catch (e) {
+        console.error('Failed to save activity:', e);
+      }
+    };
+
+    // Track clicks
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      let targetDesc = target.tagName.toLowerCase();
+
+      // Add more context about what was clicked
+      if (target.id) targetDesc += `#${target.id}`;
+      if (target.className) {
+        const classes = target.className.toString().split(' ').slice(0, 3).join('.');
+        if (classes) targetDesc += `.${classes}`;
+      }
+      if (target.textContent) {
+        const text = target.textContent.trim().substring(0, 50);
+        if (text) targetDesc += ` "${text}"`;
+      }
+
+      const href = target.closest('a')?.getAttribute('href');
+      if (href) targetDesc += ` [href="${href}"]`;
+
+      const activity = getActivity();
+      activity.push({
+        type: 'click',
+        target: targetDesc,
+        timestamp: new Date().toISOString(),
+      });
+      saveActivity(activity);
+    };
+
+    // Track hovers (throttled to avoid spam)
+    let hoverTimeout: NodeJS.Timeout;
+    const handleMouseOver = (e: MouseEvent) => {
+      clearTimeout(hoverTimeout);
+      hoverTimeout = setTimeout(() => {
+        const target = e.target as HTMLElement;
+        let targetDesc = target.tagName.toLowerCase();
+
+        if (target.id) targetDesc += `#${target.id}`;
+        if (target.className) {
+          const classes = target.className.toString().split(' ').slice(0, 2).join('.');
+          if (classes) targetDesc += `.${classes}`;
+        }
+
+        const text = target.textContent?.trim().substring(0, 30);
+        if (text && text.length < 50) targetDesc += ` "${text}"`;
+
+        const activity = getActivity();
+        // Don't duplicate consecutive hovers on same element
+        const lastEvent = activity[activity.length - 1];
+        if (!lastEvent || lastEvent.type !== 'hover' || lastEvent.target !== targetDesc) {
+          activity.push({
+            type: 'hover',
+            target: targetDesc,
+            timestamp: new Date().toISOString(),
+          });
+          saveActivity(activity);
+        }
+      }, 500); // Only track if hover lasts 500ms
+    };
+
+    // Track typing in input fields
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+      let targetDesc = target.tagName.toLowerCase();
+
+      if (target.id) targetDesc += `#${target.id}`;
+      if (target.name) targetDesc += `[name="${target.name}"]`;
+      if (target.placeholder) targetDesc += ` placeholder="${target.placeholder}"`;
+
+      const activity = getActivity();
+      activity.push({
+        type: 'input',
+        target: targetDesc,
+        value: target.value.substring(0, 100), // Capture first 100 chars
+        timestamp: new Date().toISOString(),
+      });
+      saveActivity(activity);
+    };
+
+    // Add event listeners
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mouseover', handleMouseOver, true);
+    document.addEventListener('input', handleInput, true);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('mouseover', handleMouseOver, true);
+      document.removeEventListener('input', handleInput, true);
+      clearTimeout(hoverTimeout);
+    };
+  }, []);
+
   // Save current session ID to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('kull-current-session-id', currentSessionId);
@@ -361,14 +476,172 @@ export function SupportChat() {
   useEffect(() => {
     const generateBackgroundGreeting = async () => {
       try {
+        // Detect device type
+        const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+        const isTablet = /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768;
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        // Parse user agent for browser and OS
+        const ua = navigator.userAgent;
+        let browserName = 'Unknown';
+        let browserVersion = 'Unknown';
+        let osName = 'Unknown';
+        let osVersion = 'Unknown';
+
+        // Browser detection
+        if (ua.indexOf('Firefox') > -1) {
+          browserName = 'Firefox';
+          browserVersion = ua.match(/Firefox\/([0-9.]+)/)?.[1] || 'Unknown';
+        } else if (ua.indexOf('Edg') > -1) {
+          browserName = 'Edge';
+          browserVersion = ua.match(/Edg\/([0-9.]+)/)?.[1] || 'Unknown';
+        } else if (ua.indexOf('Chrome') > -1) {
+          browserName = 'Chrome';
+          browserVersion = ua.match(/Chrome\/([0-9.]+)/)?.[1] || 'Unknown';
+        } else if (ua.indexOf('Safari') > -1) {
+          browserName = 'Safari';
+          browserVersion = ua.match(/Version\/([0-9.]+)/)?.[1] || 'Unknown';
+        }
+
+        // OS detection
+        if (ua.indexOf('Windows NT 10.0') > -1) osName = 'Windows 10/11';
+        else if (ua.indexOf('Windows NT') > -1) osName = 'Windows';
+        else if (ua.indexOf('Mac OS X') > -1) {
+          osName = 'macOS';
+          osVersion = ua.match(/Mac OS X ([0-9_]+)/)?.[1]?.replace(/_/g, '.') || 'Unknown';
+        }
+        else if (ua.indexOf('Android') > -1) {
+          osName = 'Android';
+          osVersion = ua.match(/Android ([0-9.]+)/)?.[1] || 'Unknown';
+        }
+        else if (ua.indexOf('iPhone') > -1 || ua.indexOf('iPad') > -1) {
+          osName = ua.indexOf('iPhone') > -1 ? 'iOS (iPhone)' : 'iOS (iPad)';
+          osVersion = ua.match(/OS ([0-9_]+)/)?.[1]?.replace(/_/g, '.') || 'Unknown';
+        }
+        else if (ua.indexOf('Linux') > -1) osName = 'Linux';
+
         const sessionContext = {
+          // User info
           userName: user?.firstName || null,
           userEmail: user?.email || null,
           isLoggedIn: !!user,
+
+          // Navigation
           currentPath: window.location.pathname,
-          timeOnSite: Date.now() - (performance.timing?.navigationStart || Date.now()),
-          scrollDepth: Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100) || 0,
+          currentUrl: window.location.href,
+          referrer: document.referrer || 'Direct visit',
+          queryParams: window.location.search,
+          urlHash: window.location.hash,
           visitedPages: sessionStorage.getItem('kull-visited-pages')?.split(',') || [window.location.pathname],
+
+          // Time tracking
+          timeOnSite: Date.now() - (performance.timing?.navigationStart || Date.now()),
+          timestamp: new Date().toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezoneOffset: new Date().getTimezoneOffset(),
+
+          // Scroll behavior
+          scrollY: window.scrollY,
+          scrollX: window.scrollX,
+          scrollDepth: Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100) || 0,
+          pageHeight: document.documentElement.scrollHeight,
+          pageWidth: document.documentElement.scrollWidth,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth,
+
+          // Screen & Display
+          screenWidth: window.screen.width,
+          screenHeight: window.screen.height,
+          screenAvailWidth: window.screen.availWidth,
+          screenAvailHeight: window.screen.availHeight,
+          screenColorDepth: window.screen.colorDepth,
+          screenPixelDepth: window.screen.pixelDepth,
+          devicePixelRatio: window.devicePixelRatio,
+          screenOrientation: (window.screen.orientation?.type) || 'unknown',
+
+          // Browser & System
+          userAgent: navigator.userAgent,
+          browserName,
+          browserVersion,
+          osName,
+          osVersion,
+          platform: navigator.platform,
+          language: navigator.language,
+          languages: navigator.languages?.join(', ') || navigator.language,
+          cookieEnabled: navigator.cookieEnabled,
+          doNotTrack: navigator.doNotTrack || 'unspecified',
+          onLine: navigator.onLine,
+
+          // Device type
+          isMobile,
+          isTablet,
+          isDesktop: !isMobile && !isTablet,
+          isTouchDevice,
+          maxTouchPoints: navigator.maxTouchPoints || 0,
+
+          // Hardware
+          hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+          deviceMemory: (navigator as any).deviceMemory || 'unknown',
+
+          // Connection
+          connectionType: (navigator as any).connection?.effectiveType || 'unknown',
+          connectionDownlink: (navigator as any).connection?.downlink || 'unknown',
+          connectionRtt: (navigator as any).connection?.rtt || 'unknown',
+          connectionSaveData: (navigator as any).connection?.saveData || false,
+
+          // Performance
+          loadTime: performance.timing?.loadEventEnd - performance.timing?.navigationStart || 'unknown',
+          domContentLoaded: performance.timing?.domContentLoadedEventEnd - performance.timing?.navigationStart || 'unknown',
+
+          // Storage
+          localStorageAvailable: (() => {
+            try { return !!window.localStorage; } catch { return false; }
+          })(),
+          sessionStorageAvailable: (() => {
+            try { return !!window.sessionStorage; } catch { return false; }
+          })(),
+
+          // Media capabilities
+          webglSupported: (() => {
+            try {
+              const canvas = document.createElement('canvas');
+              return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+            } catch { return false; }
+          })(),
+          webglVendor: (() => {
+            try {
+              const canvas = document.createElement('canvas');
+              const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+              if (gl) {
+                const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
+                return debugInfo ? (gl as any).getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : 'unknown';
+              }
+            } catch { return 'unknown'; }
+          })(),
+          webglRenderer: (() => {
+            try {
+              const canvas = document.createElement('canvas');
+              const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+              if (gl) {
+                const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info');
+                return debugInfo ? (gl as any).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'unknown';
+              }
+            } catch { return 'unknown'; }
+          })(),
+
+          // Battery (if available)
+          batteryLevel: 'unknown',
+          batteryCharging: 'unknown',
+
+          // User activity tracking
+          userActivity: (() => {
+            try {
+              const stored = sessionStorage.getItem('kull-user-activity');
+              return stored ? JSON.parse(stored) : [];
+            } catch {
+              return [];
+            }
+          })(),
         };
 
         const response = await fetch('/api/chat/welcome', {
@@ -452,19 +725,8 @@ export function SupportChat() {
 
               setMessages(prev => [...prev, newMessage]);
 
-              // Show toast notification
-              const preview = fullContent.substring(0, 80) + (fullContent.length > 80 ? '...' : '');
-              toast({
-                title: 'New update from Kull',
-                description: preview,
-                duration: 5000,
-              });
-
-              // Navigate to first link in the update
-              const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
-              if (linkMatch) {
-                handleLinkClick(linkMatch[2]);
-              }
+              // Note: Welcome messages don't auto-navigate, only user chat responses do
+              // No toast notifications - rely on popover when chat is closed
             } else if (!isOpen) {
               // Chat is closed: show popover instead
               setPopoverGreeting(fullContent);
@@ -562,177 +824,10 @@ export function SupportChat() {
 
       setMessages([greetingMessage]);
 
-      // Navigate to first link in greeting
-      const linkMatch = latestGreeting.match(/\[([^\]]+)\]\(([^)]+)\)/);
-      if (linkMatch) {
-        handleLinkClick(linkMatch[2]);
-      }
+      // Note: Welcome messages don't auto-navigate, only user chat responses do
     }
-  }, [isOpen, messages.length, latestGreeting, setMessages, handleLinkClick]);
+  }, [isOpen, messages.length, latestGreeting, setMessages]);
 
-      // Use pre-generated greeting if available
-      if (latestGreeting) {
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === welcomeMessageId
-              ? { ...msg, content: latestGreeting }
-              : msg
-          )
-        );
-
-        // Navigate to first link in greeting
-        const linkMatch = latestGreeting.match(/\[([^\]]+)\]\(([^)]+)\)/);
-        if (linkMatch) {
-          handleLinkClick(linkMatch[2]);
-        }
-        return;
-      }
-
-      // Fallback: generate greeting if none available yet
-      try {
-        // Gather session context
-        const sessionContext = {
-          userName: user?.firstName || null,
-          userEmail: user?.email || null,
-          isLoggedIn: !!user,
-          currentPath: window.location.pathname,
-          timeOnSite: Date.now() - (performance.timing?.navigationStart || Date.now()), // milliseconds
-          scrollDepth: Math.round((window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100) || 0,
-          visitedPages: sessionStorage.getItem('kull-visited-pages')?.split(',') || [window.location.pathname],
-        };
-
-        const response = await fetch('/api/chat/welcome', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ context: sessionContext }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to generate greeting');
-        }
-
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) {
-          throw new Error('No response stream');
-        }
-
-        let fullContent = '';
-        let cutoffDetected = false;
-        let hasNavigated = false;
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-
-                if (data.type === 'delta' && data.content) {
-                  if (cutoffDetected) continue;
-
-                  fullContent += data.content;
-
-                  // Check for first link and navigate immediately
-                  if (!hasNavigated) {
-                    const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                    if (linkMatch) {
-                      const url = linkMatch[2];
-                      hasNavigated = true;
-                      // Navigate immediately!
-                      handleLinkClick(url);
-                    }
-                  }
-
-                  // Look for cutoff markers
-                  let cutoffIndex = -1;
-
-                  // Try to find the Unicode marker ␞
-                  cutoffIndex = fullContent.indexOf('␞');
-
-                  // Fallback: look for FOLLOW_UP_QUESTIONS text
-                  if (cutoffIndex === -1) {
-                    const followUpPattern = /\n\n?FOLLOW_UP_QUESTIONS:/;
-                    const match = fullContent.match(followUpPattern);
-                    if (match) {
-                      cutoffIndex = match.index!;
-                    }
-                  }
-
-                  if (cutoffIndex !== -1) {
-                    cutoffDetected = true;
-                    const cleanContent = fullContent.substring(0, cutoffIndex).trim();
-                    const questionsSection = fullContent.substring(cutoffIndex);
-
-                    // Extract questions
-                    const followUpMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*(.+?)$/is);
-                    if (followUpMatch) {
-                      const questionsText = followUpMatch[1];
-                      const newQuestions = questionsText
-                        .split('|')
-                        .map((q: string) => q.trim())
-                        .filter((q: string) => q.length > 0 && q.length < 200);
-
-                      if (newQuestions.length > 0) {
-                        setQuickQuestions(prev => {
-                          const combined = [...prev, ...newQuestions];
-                          return combined.slice(-8);
-                        });
-                      }
-                    }
-
-                    setMessages(prev =>
-                      prev.map(msg =>
-                        msg.id === welcomeMessageId
-                          ? { ...msg, content: cleanContent }
-                          : msg
-                      )
-                    );
-                    fullContent = cleanContent;
-
-                    // Don't update the message anymore
-                    continue;
-                  }
-
-                  // No cutoff yet, show all content
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === welcomeMessageId
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Failed to generate welcome greeting:', error);
-        // Fallback to simple greeting
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === welcomeMessageId
-              ? { ...msg, content: "Hi! I'm here to help you with Kull. Ask me anything!" }
-              : msg
-          )
-        );
-      }
-    };
-
-    applyWelcomeGreeting();
-  }, [currentSessionId, sessions, user, latestGreeting]);
 
   const sendMessage = async (messageText: string) => {
     if (!messageText.trim() || isLoading) return;
@@ -966,7 +1061,7 @@ export function SupportChat() {
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title: 'New Chat',
-      messages: [createPlaceholderWelcomeMessage()],
+      messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1006,17 +1101,14 @@ export function SupportChat() {
   };
 
   const handleResetChat = () => {
-    // Replace current session with fresh one - force new ID to trigger greeting
-    const newSessionId = Date.now().toString();
-
+    // Clear messages in current session
     setSessions(prevSessions => {
       const updated = prevSessions.map(session => {
         if (session.id === currentSessionId) {
           return {
             ...session,
-            id: newSessionId, // New ID to force greeting regeneration
             title: 'New Chat',
-            messages: [createPlaceholderWelcomeMessage()],
+            messages: [],
             updatedAt: new Date(),
           };
         }
@@ -1025,9 +1117,6 @@ export function SupportChat() {
       saveSessions(updated);
       return updated;
     });
-
-    // Switch to new session ID to trigger greeting
-    setCurrentSessionId(newSessionId);
 
     // Reset quick questions to defaults
     setQuickQuestions([
@@ -1064,27 +1153,47 @@ export function SupportChat() {
           {/* Greeting Popover */}
           {showGreetingPopover && popoverGreeting && (
             <div
-              className="fixed bottom-4 left-20 md:left-24 md:bottom-6 max-w-xs md:max-w-sm bg-card border border-border rounded-lg shadow-2xl p-4 z-[9999] animate-in slide-in-from-left-2 fade-in duration-300"
-              style={{ position: 'fixed' }}
+              className="fixed bottom-4 left-20 md:left-24 md:bottom-6 max-w-[280px] md:max-w-[320px] bg-card border border-purple-200/50 rounded-2xl p-3 md:p-4 z-[9999] animate-in slide-in-from-left-2 fade-in duration-300"
+              style={{
+                position: 'fixed',
+                boxShadow: '0 20px 60px -10px rgba(139, 92, 246, 0.3), 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.1)',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 249, 255, 0.98) 100%)',
+                backdropFilter: 'blur(12px)',
+              }}
             >
+              {/* Glow effect overlay */}
+              <div
+                className="absolute inset-0 rounded-2xl pointer-events-none"
+                style={{
+                  background: 'radial-gradient(circle at top left, rgba(139, 92, 246, 0.08) 0%, transparent 60%)',
+                }}
+              />
+
               <button
                 onClick={() => setShowGreetingPopover(false)}
-                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
                 aria-label="Close"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5" />
               </button>
-              <div className="pr-6">
-                <div className="flex items-start gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                    <MessageCircle className="w-4 h-4 text-purple-600" />
+
+              <div className="relative pr-6">
+                <div className="flex items-start gap-2.5 mb-2">
+                  <div
+                    className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
+                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+                    }}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-foreground">Kull Support</p>
-                    <p className="text-xs text-muted-foreground">Just now</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs md:text-sm font-semibold text-gray-800">Kull Support</p>
+                    <p className="text-[10px] md:text-xs text-gray-500">Just now</p>
                   </div>
                 </div>
-                <div className="text-sm text-foreground leading-relaxed">
+                <div className="text-[11px] md:text-xs text-gray-700 leading-relaxed">
                   {renderMarkdown(popoverGreeting, handleLinkClick)}
                 </div>
                 <button
@@ -1092,7 +1201,7 @@ export function SupportChat() {
                     setIsOpen(true);
                     setShowGreetingPopover(false);
                   }}
-                  className="mt-3 text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  className="mt-2.5 text-[10px] md:text-xs text-purple-600 hover:text-purple-700 font-semibold transition-colors"
                 >
                   Open chat →
                 </button>
