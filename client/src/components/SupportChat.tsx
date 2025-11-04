@@ -405,52 +405,72 @@ export function SupportChat() {
 
               if (data.type === 'delta' && data.content) {
                 fullContent += data.content;
-                // Update the assistant message with streaming content
-                setMessages(prev =>
-                  prev.map(msg =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, content: fullContent }
-                      : msg
-                  )
-                );
+
+                // Check for the special marker ␞ (U+241E) immediately
+                const markerIndex = fullContent.indexOf('␞');
+                if (markerIndex !== -1) {
+                  // Found the marker! Extract everything after it
+                  const beforeMarker = fullContent.substring(0, markerIndex).trim();
+                  const afterMarker = fullContent.substring(markerIndex);
+
+                  // Try to extract follow-up questions
+                  const followUpMatch = afterMarker.match(/␞FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+                  if (followUpMatch) {
+                    const newQuestions = followUpMatch[1]
+                      .split('|')
+                      .map((q: string) => q.trim())
+                      .filter((q: string) => q.length > 0);
+
+                    if (newQuestions.length > 0) {
+                      // Update quick questions
+                      setQuickQuestions(prev => {
+                        const combined = [...prev, ...newQuestions];
+                        return combined.slice(-8); // Keep only the last 8
+                      });
+                    }
+                  }
+
+                  // Only show content before the marker
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: beforeMarker }
+                        : msg
+                    )
+                  );
+                  fullContent = beforeMarker;
+                } else {
+                  // No marker yet, show all content
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    )
+                  );
+                }
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
               } else if (data.type === 'done') {
-                // Stream complete
+                // Stream complete - do final cleanup
+                const markerIndex = fullContent.indexOf('␞');
+                if (markerIndex !== -1) {
+                  const cleanContent = fullContent.substring(0, markerIndex).trim();
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: cleanContent }
+                        : msg
+                    )
+                  );
+                  fullContent = cleanContent;
+                }
               }
             } catch (e) {
               // Skip invalid JSON lines
             }
           }
         }
-      }
-
-      // Parse follow-up questions from final content
-      const followUpMatch = fullContent.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
-      if (followUpMatch) {
-        const newQuestions = followUpMatch[1]
-          .split('|')
-          .map((q: string) => q.trim())
-          .filter((q: string) => q.length > 0);
-
-        if (newQuestions.length > 0) {
-          // Replace old suggestions with new ones, max 8 total
-          setQuickQuestions(prev => {
-            const combined = [...prev, ...newQuestions];
-            return combined.slice(-8); // Keep only the last 8
-          });
-        }
-
-        // Remove follow-up questions marker from displayed message
-        const cleanContent = fullContent.replace(/FOLLOW_UP_QUESTIONS:\s*[^\n]+/gi, '').trim();
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: cleanContent }
-              : msg
-          )
-        );
-        fullContent = cleanContent;
       }
 
       // Auto-navigate to first link in response

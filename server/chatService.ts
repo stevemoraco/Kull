@@ -14,17 +14,17 @@ const PROMPT_PREFIX = `You are customer support for this website.
 
 Below is the complete codebase from github.com/stevemoraco/kull - use this as your source of truth.`;
 
-// Instructions after repo content - now formatted for structured output
+// Instructions after repo content
 const PROMPT_SUFFIX = `
 
 INSTRUCTIONS:
 
-You must respond with a structured JSON object containing:
-1. navigationUrl: A valid URL from the Kull AI website/docs that's relevant to the user's question (e.g., "https://kull.ai/pricing", "https://kull.ai/download", etc.)
-2. responseText: Your answer in markdown format (2-4 paragraphs, use bold, italic, lists, etc.)
-3. followUpQuestions: Exactly 4 natural follow-up questions the user might ask next (actual questions, not placeholders)
+1. EVERY response MUST start with a markdown link [text](url) - the page will auto-navigate to the first link
+2. EVERY response MUST end with the special marker "␞FOLLOW_UP_QUESTIONS:" followed by 4 natural, relevant follow-up questions separated by | (pipe character). Make these actual questions the user might want to ask next, NOT placeholders. CRITICAL: You must start this section with the exact Unicode character "␞" (it looks like ␞) immediately before the word FOLLOW_UP_QUESTIONS. Example format: "␞FOLLOW_UP_QUESTIONS: How do I install the app? | What plans are available? | Can I get a refund? | Where's the download link?"
+3. Keep responses 2-4 paragraphs
+4. Use markdown formatting (bold, italic, lists, etc)
 
-Base your answer on the codebase provided above.`;
+Answer based on the codebase above.`;
 
 
 export async function getChatResponseStream(
@@ -60,7 +60,8 @@ export async function getChatResponseStream(
 
     console.log(`[Chat] Sending request with ${instructions.length} chars of instructions (includes repo), ${input.length} messages in history`);
 
-    // Call OpenAI Responses API with structured outputs and streaming
+    // Call OpenAI Responses API with streaming
+    // TODO: Re-enable structured outputs after debugging
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -71,8 +72,9 @@ export async function getChatResponseStream(
         model: 'gpt-4o-mini',
         instructions, // High-priority instructions with full repo content
         input, // Conversation history
-        max_output_tokens: 1000, // Increased for structured output
+        max_output_tokens: 8000, // Generous limit for detailed responses
         stream: true,
+        /* Temporarily disabled - debugging streaming
         text: {
           format: {
             type: 'json_schema',
@@ -81,16 +83,18 @@ export async function getChatResponseStream(
             strict: true,
           },
         },
+        */
       }),
     });
 
     if (!response.ok || !response.body) {
       const errorText = await response.text();
-      console.error('[Chat] OpenAI API error:', errorText);
+      console.error('[Chat] OpenAI API error:', response.status, errorText);
       const errorMsg = getErrorResponse();
       return createErrorStream(errorMsg);
     }
 
+    console.log('[Chat] OpenAI response status:', response.status);
     return response.body;
   } catch (error) {
     console.error('[Chat] Error calling OpenAI:', error);

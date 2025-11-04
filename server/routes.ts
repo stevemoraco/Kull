@@ -486,12 +486,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let cost = 0;
 
       try {
+        console.log('[Chat] Starting to read stream...');
+
         while (true) {
           const { done, value } = await reader.read();
 
-          if (done) break;
+          if (done) {
+            console.log('[Chat] Stream done');
+            break;
+          }
 
           const chunk = decoder.decode(value, { stream: true });
+          console.log('[Chat] Received chunk:', chunk.substring(0, 200));
           const lines = chunk.split('\n');
 
           for (const line of lines) {
