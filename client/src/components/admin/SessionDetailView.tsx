@@ -1,11 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Copy, DollarSign, Clock, User, Bot } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import ReactMarkdown from "react-markdown";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { useToast } from "@/hooks/use-toast";
+import type { AdminSessionUpdateData } from "@shared/types/sync";
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -43,10 +46,35 @@ interface SessionDetailViewProps {
 
 export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps) {
   const [expandedPromptIndex, setExpandedPromptIndex] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: session, isLoading } = useQuery<SessionDetail>({
     queryKey: [`/api/admin/chat-sessions/${sessionId}`],
   });
+
+  // WebSocket handlers for live updates
+  const wsHandlers = useMemo(() => ({
+    onAdminSessionUpdate: (data: AdminSessionUpdateData) => {
+      // Only refetch if this update is for the currently viewed session
+      if (data.sessionId === sessionId) {
+        console.log('[SessionDetailView] Received update for current session, refetching...');
+        queryClient.invalidateQueries({
+          queryKey: [`/api/admin/chat-sessions/${sessionId}`]
+        });
+
+        // Show toast notification
+        toast({
+          title: "New message received",
+          description: data.userEmail ? `From ${data.userEmail}` : "Session updated",
+          duration: 3000,
+        });
+      }
+    }
+  }), [sessionId, queryClient, toast]);
+
+  // Connect to WebSocket with handlers
+  const { isConnected } = useWebSocket(wsHandlers);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -150,7 +178,14 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
                     </Badge>
                     {message.tokensIn && message.tokensOut && (
                       <span className="text-xs text-muted-foreground">
-                        {message.tokensIn}↓ {message.tokensOut}↑
+                        {message.cachedTokensIn && message.cachedTokensIn > 0 ? (
+                          <>
+                            📦 {message.cachedTokensIn.toLocaleString()} cached ({message.cacheHitRate}%) +{' '}
+                            {message.newTokensIn?.toLocaleString() || 0} new ↓ | {message.tokensOut.toLocaleString()} ↑
+                          </>
+                        ) : (
+                          <>{message.tokensIn.toLocaleString()}↓ {message.tokensOut.toLocaleString()}↑</>
+                        )}
                       </span>
                     )}
                     {message.model && (

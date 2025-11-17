@@ -171,7 +171,9 @@ export async function getChatResponseStream(
   model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano',
   userActivityMarkdown?: string,
   pageVisits?: any[],
-  allSessions?: any[]
+  allSessions?: any[],
+  sessionId?: string,
+  userId?: string
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -182,59 +184,69 @@ export async function getChatResponseStream(
   }
 
   try {
-    // Fetch repo content (cached per session)
+    // Fetch repo content (STATIC - highly cacheable)
     const repoContent = await fetchRepoContent();
 
-    // Build context sections using formatted markdown
-    let contextSections = '';
+    // Build STATIC system message (repo content + instructions) - goes first for caching
+    const staticInstructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
 
-    // Add user activity if provided (already formatted as markdown)
+    // Build DYNAMIC context (user-specific data) - goes at end, not cached
+    let dynamicContext = '';
+
     if (userActivityMarkdown) {
-      contextSections += userActivityMarkdown;
+      dynamicContext += `\n\n## 🎯 User Activity Context\n${userActivityMarkdown}`;
     }
 
     if (pageVisits && pageVisits.length > 0) {
-      contextSections += `\n\n## 🧭 Page Visit History\n\nUser has visited ${pageVisits.length} pages:\n${JSON.stringify(pageVisits, null, 2)}`;
+      dynamicContext += `\n\n## 🧭 Page Visit History\n\nUser has visited ${pageVisits.length} pages:\n${JSON.stringify(pageVisits, null, 2)}`;
     }
 
     if (allSessions && allSessions.length > 0) {
-      contextSections += `\n\n## 💬 Previous Chat Sessions\n\nUser's previous chat sessions (${allSessions.length} total):\n`;
+      dynamicContext += `\n\n## 💬 Previous Chat Sessions\n\nUser's previous chat sessions (${allSessions.length} total):\n`;
       allSessions.forEach((session, idx) => {
-        contextSections += `\n### Session ${idx + 1}: ${session.title}\n`;
+        dynamicContext += `\n### Session ${idx + 1}: ${session.title}\n`;
         if (session.messages) {
           const msgs = typeof session.messages === 'string' ? JSON.parse(session.messages) : session.messages;
           msgs.forEach((msg: any) => {
-            contextSections += `- **${msg.role}**: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n`;
+            dynamicContext += `- **${msg.role}**: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n`;
           });
         }
       });
     }
 
-    // Build full system message with instructions, repo content, and context
-    const systemMessage = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${contextSections}\n\n${PROMPT_SUFFIX}`;
-
-    console.log(`[Chat] System message size: ${systemMessage.length} chars (repo: ${repoContent.length}, context: ${contextSections.length})`);
-
-    // Build messages array for Chat Completions API
+    // Build messages array - static first (cacheable), then dynamic, then conversation
     const messages = [
       {
         role: 'system',
-        content: systemMessage,
+        content: staticInstructions, // CACHEABLE: repo + instructions (~150k tokens)
       },
+      // Add dynamic context as separate system message if present
+      ...(dynamicContext ? [{
+        role: 'system' as const,
+        content: dynamicContext, // NOT CACHED: user-specific data
+      }] : []),
+      // Conversation history
       ...history.map(msg => ({
-        role: msg.role === 'system' ? 'user' : msg.role, // Convert system to user for context
+        role: msg.role === 'system' ? 'user' as const : msg.role,
         content: msg.content,
       })),
       {
-        role: 'user',
+        role: 'user' as const,
         content: userMessage,
       },
     ];
 
-    console.log(`[Chat] Sending request with ${systemMessage.length} chars system message, ${messages.length} total messages`);
+    // Generate per-user prompt_cache_key for isolated caching
+    // This ensures each user gets their own cache, preventing cross-user contamination
+    const promptCacheKey = userId
+      ? `kull-user-${userId}`
+      : sessionId
+        ? `kull-session-${sessionId}`
+        : `kull-anon-${Date.now()}`;
 
-    // Call OpenAI Chat Completions API with streaming (supports stream_options)
-    console.log(`[Chat] Using model: ${model}`);
+    // Concise log with caching info
+    console.log(`[Chat] ${model} | ${messages.length} msgs | Static: ${Math.round(staticInstructions.length/1000)}k | Dynamic: ${Math.round(dynamicContext.length/1000)}k | Cache key: ${promptCacheKey.substring(0, 20)}...`);
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -242,13 +254,14 @@ export async function getChatResponseStream(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model, // Use the selected model (gpt-5-nano, gpt-5-mini, or gpt-5)
+        model,
         messages,
-        max_completion_tokens: 8000, // Generous limit for detailed responses (GPT-5 uses max_completion_tokens)
+        max_completion_tokens: 8000,
         stream: true,
         stream_options: {
-          include_usage: true, // Send usage data in final chunk
+          include_usage: true, // Include cached_tokens in usage data
         },
+        prompt_cache_key: promptCacheKey, // Per-user cache isolation
       }),
     });
 
@@ -259,7 +272,6 @@ export async function getChatResponseStream(
       return createErrorStream(errorMsg);
     }
 
-    console.log('[Chat] OpenAI response status:', response.status);
     return response.body;
   } catch (error) {
     console.error('[Chat] Error calling OpenAI:', error);

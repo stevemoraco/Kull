@@ -18,8 +18,13 @@ interface ChatUser {
   avgCostPerMessage: string;
   avgTokensIn: number;
   avgTokensOut: number;
+  avgCachedTokensIn: number;
+  avgNewTokensIn: number;
   totalTokensIn: number;
   totalTokensOut: number;
+  totalCachedTokensIn: number;
+  totalNewTokensIn: number;
+  cacheHitRate: number;
   lastActivity: string;
   location: {
     city?: string;
@@ -54,11 +59,23 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
   // Calculate global token averages from totals (not average of averages)
   const globalTotalTokensIn = users?.reduce((sum, u) => sum + u.totalTokensIn, 0) || 0;
   const globalTotalTokensOut = users?.reduce((sum, u) => sum + u.totalTokensOut, 0) || 0;
+  const globalTotalCachedTokensIn = users?.reduce((sum, u) => sum + u.totalCachedTokensIn, 0) || 0;
+  const globalTotalNewTokensIn = globalTotalTokensIn - globalTotalCachedTokensIn;
+  const globalCacheHitRate = globalTotalTokensIn > 0
+    ? Math.round((globalTotalCachedTokensIn / globalTotalTokensIn) * 100)
+    : 0;
+
   const avgTokensIn = totalMessages > 0
     ? Math.round(globalTotalTokensIn / totalMessages)
     : 0;
   const avgTokensOut = totalMessages > 0
     ? Math.round(globalTotalTokensOut / totalMessages)
+    : 0;
+  const avgCachedTokensIn = totalMessages > 0
+    ? Math.round(globalTotalCachedTokensIn / totalMessages)
+    : 0;
+  const avgNewTokensIn = totalMessages > 0
+    ? Math.round(globalTotalNewTokensIn / totalMessages)
     : 0;
 
   return (
@@ -69,6 +86,54 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
           All users with conversations, messages, and costs - click to view full chat history
         </p>
       </div>
+
+      {/* Cache Performance Summary */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            📦 Prompt Cache Performance
+          </CardTitle>
+          <CardDescription>
+            OpenAI prompt caching is reducing costs by caching static content (repo + instructions)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Cache Hit Rate</div>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{globalCacheHitRate}%</div>
+              <p className="text-xs text-muted-foreground mt-1">of input tokens served from cache</p>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">Cached Tokens</div>
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                {globalTotalCachedTokensIn.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                avg {avgCachedTokensIn.toLocaleString()}/msg
+              </p>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">New Tokens</div>
+              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                {globalTotalNewTokensIn.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                avg {avgNewTokensIn.toLocaleString()}/msg
+              </p>
+            </div>
+          </div>
+          <div className="pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              💰 <strong>Cost Savings:</strong> Cached tokens cost 90% less than new tokens, saving approximately{' '}
+              <strong className="text-green-600 dark:text-green-400">
+                ${((globalTotalCachedTokensIn / 1000000) * 0.0015 * 0.9).toFixed(2)}
+              </strong>{' '}
+              on this data set
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-5">
         <Card>
@@ -107,11 +172,13 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Tokens</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Tokens & Cache</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{avgTokensIn}↓ {avgTokensOut}↑</div>
-            <p className="text-xs text-muted-foreground">in / out per message</p>
+            <p className="text-xs text-muted-foreground">
+              📦 {avgCachedTokensIn} cached ({globalCacheHitRate}%) + {avgNewTokensIn} new
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -158,6 +225,10 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="font-medium">{user.avgTokensIn}↓ {user.avgTokensOut}↑</span> tokens avg
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">📦 {user.cacheHitRate}%</span> cache hit rate
+                      <span className="text-muted-foreground">({user.avgCachedTokensIn} cached + {user.avgNewTokensIn} new)</span>
                     </div>
                     <div className="flex items-center gap-1">
                       Last active {formatDistanceToNow(new Date(user.lastActivity), { addSuffix: true })}

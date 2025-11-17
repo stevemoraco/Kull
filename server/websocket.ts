@@ -11,6 +11,18 @@ interface AuthenticatedWebSocket extends WebSocket {
 export interface WebSocketService {
   broadcastToUser(userId: string, message: SyncMessage, excludeDeviceId?: string): void;
   sendToDevice(userId: string, deviceId: string, message: SyncMessage): void;
+  broadcastToAdmins(message: SyncMessage): void;
+}
+
+// Global singleton for WebSocket service (set during initialization)
+let globalWsService: WebSocketService | null = null;
+
+export function setGlobalWsService(service: WebSocketService) {
+  globalWsService = service;
+}
+
+export function getGlobalWsService(): WebSocketService | null {
+  return globalWsService;
 }
 
 export function setupWebSocketServer(server: Server): WebSocketService {
@@ -224,8 +236,20 @@ export function setupWebSocketServer(server: Server): WebSocketService {
     }
   }
 
-  return {
+  function broadcastToAdmins(message: SyncMessage) {
+    // Broadcast to all admin users (steve@lander.media = userId 13472548)
+    const adminUserId = '13472548'; // TODO: make this configurable
+    broadcastToUser(adminUserId, message);
+  }
+
+  const service = {
     broadcastToUser,
     sendToDevice,
+    broadcastToAdmins,
   };
+
+  // Set global singleton
+  setGlobalWsService(service);
+
+  return service;
 }

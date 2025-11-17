@@ -534,26 +534,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const globalModel = await storage.getGlobalSetting('chat_model');
         if (globalModel && ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'].includes(globalModel)) {
           preferredModel = globalModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
-          console.log(`[Chat] Using global admin setting: ${preferredModel}`);
         } else if (userId) {
           // Fall back to user preference if no global setting
           const user = await storage.getUser(userId);
           if (user?.preferredChatModel) {
             preferredModel = user.preferredChatModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
-            console.log(`[Chat] Using user preference: ${preferredModel}`);
           }
         }
       } catch (err) {
         console.error('[Chat] Error fetching model preference:', err);
       }
 
-      console.log(`[Chat] Using model: ${preferredModel} for user: ${userId || 'anonymous'}`);
-      console.log(`[Chat] Received message with: ${history?.length || 0} history messages, ${userActivity?.length || 0} activity events, ${pageVisits?.length || 0} page visits, ${allSessions?.length || 0} previous sessions`);
+      // Extract user metadata (device, browser, IP, location) - same as welcome endpoint
+      const ip = req.headers['cf-connecting-ip'] ||
+                 req.headers['x-real-ip'] ||
+                 req.headers['x-forwarded-for']?.split(',')[0] ||
+                 req.connection?.remoteAddress ||
+                 req.socket?.remoteAddress ||
+                 'unknown';
+
+      const userAgent = req.headers['user-agent'] || '';
+      let device = 'Desktop';
+      if (/mobile/i.test(userAgent)) device = 'Mobile';
+      else if (/tablet|ipad/i.test(userAgent)) device = 'Tablet';
+
+      let browser = 'Unknown';
+      if (/chrome/i.test(userAgent) && !/edg/i.test(userAgent)) browser = 'Chrome';
+      else if (/safari/i.test(userAgent) && !/chrome/i.test(userAgent)) browser = 'Safari';
+      else if (/firefox/i.test(userAgent)) browser = 'Firefox';
+      else if (/edg/i.test(userAgent)) browser = 'Edge';
+
+      const { timezone, currentPath, visitedPages, recentActivity } = req.body;
+
+      // Build user metadata context
+      const userMetadataMarkdown = `
+## 👤 User Session Metadata
+- **Device:** ${device}
+- **Browser:** ${browser}
+- **IP Address:** ${ip}
+- **Timezone:** ${timezone || 'Unknown'}
+- **Current Page:** ${currentPath || '/'}
+${visitedPages && visitedPages.length > 0 ? `- **Visited Pages:** ${visitedPages.join(' → ')}` : ''}
+${recentActivity && recentActivity.length > 0 ? `- **Recent Activity (last ${Math.min(5, recentActivity.length)} actions):**
+${recentActivity.slice(-5).map((a: any) => `  - ${a.action}: ${a.target}`).join('\n')}` : ''}
+`;
 
       // Build rich markdown context for user activity (same as welcome endpoint)
-      let userActivityMarkdown = '';
+      let userActivityMarkdown = userMetadataMarkdown;
       if (userActivity && userActivity.length > 0) {
-        userActivityMarkdown = `\n\n## 🖱️ User Activity History
+        userActivityMarkdown += `\n\n## 🖱️ User Activity History
 
 Recent interactions (last ${userActivity.length} events):
 
@@ -595,7 +624,7 @@ ${userActivity.map((event: any, idx: number) => {
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
 
-      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions);
+      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId);
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -603,22 +632,19 @@ ${userActivity.map((event: any, idx: number) => {
       let fullResponse = '';
       let tokensIn = 0;
       let tokensOut = 0;
+      let cachedTokensIn = 0;
       let cost = 0;
 
       try {
-        console.log('[Chat] Starting to read stream...');
+        // Stream processing
         let buffer = ''; // Buffer for incomplete SSE lines
 
         while (true) {
           const { done, value } = await reader.read();
 
-          if (done) {
-            console.log('[Chat] Stream done');
-            break;
-          }
+          if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          console.log('[Chat] Received chunk:', chunk.substring(0, 200));
 
           // Add to buffer and split by lines
           buffer += chunk;
@@ -632,10 +658,7 @@ ${userActivity.map((event: any, idx: number) => {
               const content = line.slice(6);
               
               // Handle [DONE] signal
-              if (content.trim() === '[DONE]') {
-                console.log('[Chat] Received [DONE] signal from OpenAI');
-                continue;
-              }
+              if (content.trim() === '[DONE]') continue;
 
               try {
                 const data = JSON.parse(content);
@@ -651,30 +674,32 @@ ${userActivity.map((event: any, idx: number) => {
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
                   }
                   
-                  // Check for finish_reason and usage data
-                  if (choice.finish_reason) {
-                    console.log(`[Chat] Stream finished with reason: ${choice.finish_reason}`);
-                  }
+                  // Check for finish_reason and usage data (silent)
                 }
                 
                 // Extract usage data (sent in final chunk with stream_options)
                 if (data.usage) {
                   tokensIn = data.usage.prompt_tokens || 0;
                   tokensOut = data.usage.completion_tokens || 0;
+                  cachedTokensIn = data.usage.prompt_tokens_details?.cached_tokens || 0;
+
                   // Calculate cost using accurate pricing for the selected model
                   const { calculateChatCost } = await import('./modelPricing');
                   cost = calculateChatCost(preferredModel, tokensIn, tokensOut);
-                  console.log(`[Chat] ✅ USAGE RECEIVED (${preferredModel}): tokensIn=${tokensIn}, tokensOut=${tokensOut}, cost=$${cost.toFixed(6)}`);
+
+                  // Log with caching info
+                  const newTokensIn = tokensIn - cachedTokensIn;
+                  const cacheHitRate = tokensIn > 0 ? Math.round((cachedTokensIn / tokensIn) * 100) : 0;
+                  console.log(`[Chat] ✓ ${preferredModel} | 📦 ${cachedTokensIn.toLocaleString()} cached (${cacheHitRate}%) + ${newTokensIn.toLocaleString()} new ↓ | ${tokensOut.toLocaleString()} ↑ | $${cost.toFixed(4)}`);
                 }
-                
+
                 // Handle error
                 if (data.error) {
                   const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
                 }
               } catch (e) {
-                // Skip invalid JSON lines - likely incomplete data between chunks
-                console.log('[Chat] Skipped line (parse error):', line.substring(0, 50));
+                // Skip invalid JSON lines (silent)
               }
             }
           }
@@ -686,14 +711,7 @@ ${userActivity.map((event: any, idx: number) => {
         const hasUnicodeMarker = fullResponse.includes('␞');
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
-          console.error('[Chat] ⚠️  RESPONSE MISSING REQUIRED METADATA!');
-          console.error('[Chat]   - Has FOLLOW_UP_QUESTIONS:', hasFollowUpQuestions);
-          console.error('[Chat]   - Has NEXT_MESSAGE:', hasNextMessage);
-          console.error('[Chat]   - Has ␞ marker:', hasUnicodeMarker);
-          console.error('[Chat]   - Response length:', fullResponse.length);
-          console.error('[Chat]   - Last 200 chars:', fullResponse.slice(-200));
-        } else {
-          console.log('[Chat] ✅ Response format validated - metadata present');
+          console.error('[Chat] ⚠️  Missing metadata - FUQ:', hasFollowUpQuestions, 'NM:', hasNextMessage);
         }
 
         // Signal completion
@@ -761,8 +779,9 @@ ${userActivity.map((event: any, idx: number) => {
             fullPrompt,
             tokensIn,
             tokensOut,
+            cachedTokensIn,
             cost: cost.toString(),
-            model: 'gpt-5-mini',
+            model: preferredModel,
             device,
             browser,
             city,
@@ -771,9 +790,25 @@ ${userActivity.map((event: any, idx: number) => {
             sessionLength,
           });
 
-          console.log(`[Chat] Streamed response: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
+          // Broadcast to admin panels for live updates
+          const { getGlobalWsService } = await import('./websocket');
+          const wsService = getGlobalWsService();
+          if (wsService && sessionId) {
+            wsService.broadcastToAdmins({
+              type: 'ADMIN_SESSION_UPDATE',
+              data: {
+                sessionId,
+                userId,
+                userEmail,
+                action: 'new_message',
+              },
+              timestamp: Date.now(),
+              deviceId: 'server',
+              userId,
+            });
+          }
         }
-        
+
         // End response after all tracking is complete
         res.end();
       } catch (streamError) {
@@ -794,16 +829,7 @@ ${userActivity.map((event: any, idx: number) => {
     try {
       const { context, history, lastAiMessageTime, currentTime, sessionId } = req.body;
 
-      console.log('[Welcome] Received request with history length:', history?.length || 0);
-      console.log('[Welcome] Last AI message time:', lastAiMessageTime ? new Date(lastAiMessageTime).toISOString() : 'never');
-      console.log('[Welcome] Current time:', new Date(currentTime).toISOString());
-
-      if (history && history.length > 0) {
-        console.log('[Welcome] Last 2 messages in history:');
-        history.slice(-2).forEach((msg: any, idx: number) => {
-          console.log(`  ${idx + 1}. ${msg.role}: ${msg.content?.substring(0, 100)}...`);
-        });
-      }
+      // Silent mode - only log errors
 
       if (!context) {
         return res.status(400).json({ message: "Context required" });
@@ -816,6 +842,27 @@ ${userActivity.map((event: any, idx: number) => {
                  req.connection?.remoteAddress ||
                  req.socket?.remoteAddress ||
                  'unknown';
+
+      // Get model preference (same logic as regular chat)
+      let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+
+      try {
+        // Check global admin setting first
+        const globalModel = await storage.getGlobalSetting('chat_model');
+        if (globalModel && ['gpt-5-nano', 'gpt-5-mini', 'gpt-5'].includes(globalModel)) {
+          preferredModel = globalModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
+        } else if (userId) {
+          // Fall back to user preference
+          const user = await storage.getUser(userId);
+          if (user?.preferredChatModel) {
+            preferredModel = user.preferredChatModel as 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5';
+          }
+        }
+      } catch (err) {
+        console.error('[Welcome] Error fetching model preference:', err);
+      }
 
       // Fetch IP geolocation from multiple services
       let ipGeoData = {
@@ -1204,7 +1251,16 @@ ${repoContent}
 ${contextMarkdown}`;
 
       // Pass empty history array since we've already included it in the prompt
-      const stream = await getChatResponseStream(fullContextMarkdown, []);
+      const stream = await getChatResponseStream(
+        fullContextMarkdown,
+        [],
+        preferredModel,
+        undefined, // userActivityMarkdown
+        undefined, // pageVisits
+        undefined, // allSessions
+        sessionId,
+        userId
+      );
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -1214,6 +1270,7 @@ ${contextMarkdown}`;
       let fullResponse = '';
       let tokensIn = 0;
       let tokensOut = 0;
+      let cachedTokensIn = 0;
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -1224,16 +1281,10 @@ ${contextMarkdown}`;
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) {
-            console.log('[Welcome] OpenAI stream reader done');
-            break;
-          }
+          if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
           serverChunkCount++;
-          if (serverChunkCount <= 3) {
-            console.log(`[Welcome] OpenAI chunk #${serverChunkCount}:`, chunk.substring(0, 200));
-          }
 
           // Add to buffer and split by lines
           buffer += chunk;
@@ -1247,18 +1298,10 @@ ${contextMarkdown}`;
               const content = line.slice(6);
               
               // Handle [DONE] signal
-              if (content.trim() === '[DONE]') {
-                console.log('[Welcome] Received [DONE] signal from OpenAI');
-                continue;
-              }
+              if (content.trim() === '[DONE]') continue;
 
               try {
                 const data = JSON.parse(content);
-
-                // Log first few events
-                if (serverChunkCount <= 3) {
-                  console.log('[Welcome] OpenAI chunk:', Object.keys(data));
-                }
 
                 // Handle Chat Completions API streaming format
                 if (data.choices && data.choices[0]) {
@@ -1270,17 +1313,14 @@ ${contextMarkdown}`;
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
                   }
                   
-                  // Check for finish_reason
-                  if (choice.finish_reason) {
-                    console.log(`[Welcome] Stream finished with reason: ${choice.finish_reason}`);
-                  }
+                  // Stream finished - no logging needed
                 }
                 
                 // Extract usage data (sent in final chunk with stream_options)
                 if (data.usage) {
                   tokensIn = data.usage.prompt_tokens || 0;
                   tokensOut = data.usage.completion_tokens || 0;
-                  console.log(`[Welcome] ✅ USAGE RECEIVED: tokensIn=${tokensIn}, tokensOut=${tokensOut}`);
+                  cachedTokensIn = data.usage.prompt_tokens_details?.cached_tokens || 0;
                 }
                 
                 // Handle error
@@ -1296,25 +1336,15 @@ ${contextMarkdown}`;
           }
         }
 
-        console.log('[Welcome] Finished reading OpenAI stream, total chunks:', serverChunkCount);
-
         // Validate response format before completing
         const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
         const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
         const hasUnicodeMarker = fullResponse.includes('␞');
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
-          console.error('[Welcome] ⚠️  RESPONSE MISSING REQUIRED METADATA!');
-          console.error('[Welcome]   - Has FOLLOW_UP_QUESTIONS:', hasFollowUpQuestions);
-          console.error('[Welcome]   - Has NEXT_MESSAGE:', hasNextMessage);
-          console.error('[Welcome]   - Has ␞ marker:', hasUnicodeMarker);
-          console.error('[Welcome]   - Response length:', fullResponse.length);
-          console.error('[Welcome]   - Last 200 chars:', fullResponse.slice(-200));
-        } else {
-          console.log('[Welcome] ✅ Response format validated - metadata present');
+          console.error('[Welcome] ⚠️  Missing metadata - FUQ:', hasFollowUpQuestions, 'NM:', hasNextMessage);
         }
 
-        console.log('[Welcome] Sending done event to client...');
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
 
         // Track welcome greeting in database
@@ -1322,8 +1352,9 @@ ${contextMarkdown}`;
         const userId = req.user?.claims?.sub;
 
         if (fullResponse) {
-          // Calculate cost for gpt-5-mini: Input $0.25/1M, Output $2.00/1M
-          const cost = (tokensIn / 1_000_000) * 0.25 + (tokensOut / 1_000_000) * 2.00;
+          // Calculate cost using model pricing
+          const { calculateChatCost } = await import('./modelPricing');
+          const cost = calculateChatCost(preferredModel, tokensIn, tokensOut);
 
           // Extract metadata
           const userAgent = req.headers['user-agent'] || '';
@@ -1373,6 +1404,7 @@ ${contextMarkdown}`;
             fullPrompt: fullContextMarkdown,
             tokensIn,
             tokensOut,
+            cachedTokensIn,
             cost: cost.toString(),
             model: preferredModel,
             device,
@@ -1383,12 +1415,26 @@ ${contextMarkdown}`;
             sessionLength: 0,
           });
 
-          console.log(`[Welcome] Tracked greeting: ${tokensIn} tokens in, ${tokensOut} tokens out, $${cost.toFixed(6)} cost`);
+          // Broadcast to admin panels for live updates
+          const { getGlobalWsService } = await import('./websocket');
+          const wsService = getGlobalWsService();
+          if (wsService && sessionId) {
+            wsService.broadcastToAdmins({
+              type: 'ADMIN_SESSION_UPDATE',
+              data: {
+                sessionId,
+                userId,
+                userEmail,
+                action: 'new_message',
+              },
+              timestamp: Date.now(),
+              deviceId: 'server',
+              userId,
+            });
+          }
         }
-        
-        // End response after all tracking is complete
+
         res.end();
-        console.log('[Welcome] Stream closed');
       } catch (streamError) {
         console.error('[Welcome] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
@@ -1460,7 +1506,6 @@ ${contextMarkdown}`;
         throw new Error(`SendGrid error: ${errorText}`);
       }
 
-      console.log(`[Chat] Sent transcript email to ${userEmail} with BCC to steve@lander.media`);
 
       res.json({ success: true, message: 'Transcript sent successfully' });
     } catch (error: any) {
@@ -1489,9 +1534,6 @@ ${contextMarkdown}`;
                        req.socket?.remoteAddress ||
                        null;
 
-      console.log(`[Chat] Received ${sessions.length} sessions to save`);
-      console.log(`[Chat] Session IDs: ${sessions.map((s: any) => `${s.id} (${s.title}, ${Array.isArray(s.messages) ? s.messages.length : 0} msgs)`).join(', ')}`);
-
       const savedSessions = [];
 
       for (const session of sessions) {
@@ -1515,7 +1557,6 @@ ${contextMarkdown}`;
         savedSessions.push(saved);
       }
 
-      console.log(`[Chat] Saved ${savedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'} from IP ${ipAddress}`);
       res.json({ success: true, count: savedSessions.length });
     } catch (error: any) {
       console.error("Error saving chat sessions:", error);
@@ -1537,7 +1578,6 @@ ${contextMarkdown}`;
         updatedAt: session.updatedAt,
       }));
 
-      console.log(`[Chat] Loaded ${formattedSessions.length} sessions for ${userId ? 'user ' + userId : 'anonymous user'}`);
       res.json(formattedSessions);
     } catch (error: any) {
       console.error("Error loading chat sessions:", error);
@@ -1551,7 +1591,6 @@ ${contextMarkdown}`;
       
       await storage.deleteChatSession(id);
       
-      console.log(`[Chat] Deleted session ${id}`);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting chat session:", error);
@@ -1660,13 +1699,11 @@ ${contextMarkdown}`;
   app.get('/api/admin/chat-users', isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const allSessions = await storage.getChatSessions();
-      console.log(`[Admin] Found ${allSessions.length} total sessions in database`);
 
       // Get all users to map userId to email/name
       const allUsers = await db
         .select()
         .from(users);
-      console.log(`[Admin] Found ${allUsers.length} registered users`);
 
       const userMap = new Map(allUsers.map(u => [u.id, u]));
 
@@ -1675,7 +1712,6 @@ ${contextMarkdown}`;
         .select()
         .from(supportQueries)
         .orderBy(desc(supportQueries.createdAt));
-      console.log(`[Admin] Found ${allQueries.length} support queries for cost tracking`);
 
       // Group sessions by user (userId or metadata composite for anonymous)
       const chatUserMap = new Map<string, any>();
@@ -1711,7 +1747,7 @@ ${contextMarkdown}`;
           displayName = parts.join(' • ');
         }
 
-        console.log(`[Admin] Processing session ${session.id}: userKey=${userKey}, messages=${messages.length}, isAnonymous=${isAnonymous}`);
+        // Silent processing - only log errors
 
         // Get user details if logged in
         const userDetails = session.userId ? userMap.get(session.userId) : null;
@@ -1728,6 +1764,10 @@ ${contextMarkdown}`;
             sessions: [],
             totalMessages: 0,
             totalCost: 0,
+            totalTokensIn: 0,
+            totalTokensOut: 0,
+            totalCachedTokensIn: 0,
+            queryCount: 0,
             lastActivity: session.updatedAt,
             location: {
               city: session.city,
@@ -1763,26 +1803,70 @@ ${contextMarkdown}`;
         const userKey = generateUserKey(session);
         sessionIdToUserKey.set(session.id, userKey);
       });
+      // Silent aggregation - only log summary
 
       // Aggregate costs and tokens per user from support queries
-      console.log(`[Admin] Aggregating costs from ${allQueries.length} queries into ${chatUserMap.size} users`);
+      let matchedBySessionId = 0;
+      let matchedByTemporal = 0;
+      let matchedByEmail = 0;
+      let matchedByComposite = 0;
+      let unmatchedQueries = 0;
       allQueries.forEach(query => {
         // Priority matching order:
         // 1. Direct sessionId match (most accurate)
-        // 2. Email match for logged-in users without userId
-        // 3. Composite key match (fallback)
+        // 2. Temporal match for logged-in users (userId + ±5min window)
+        // 3. Email match for logged-in users without userId
+        // 4. Device fingerprint match for anonymous users (fallback)
         let userKey: string;
+        let matchType: string;
 
         if (query.sessionId && sessionIdToUserKey.has(query.sessionId)) {
           // Direct sessionId match - highest priority
           userKey = sessionIdToUserKey.get(query.sessionId)!;
+          matchType = 'sessionId';
+          matchedBySessionId++;
+        } else if (query.userId) {
+          // Temporal matching for logged-in users without sessionId
+          // Find session with matching userId within ±5 minute window
+          const queryTime = new Date(query.createdAt).getTime();
+          const TIME_WINDOW = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+          const matchedSession = allSessions.find(session => {
+            if (session.userId !== query.userId) return false;
+
+            const sessionStart = new Date(session.createdAt).getTime();
+            const sessionEnd = new Date(session.updatedAt).getTime();
+
+            // Query time is within session timeframe OR within ±5min of session boundaries
+            const withinSession = queryTime >= sessionStart && queryTime <= sessionEnd;
+            const nearStart = Math.abs(queryTime - sessionStart) <= TIME_WINDOW;
+            const nearEnd = Math.abs(queryTime - sessionEnd) <= TIME_WINDOW;
+
+            return withinSession || nearStart || nearEnd;
+          });
+
+          if (matchedSession) {
+            userKey = generateUserKey(matchedSession);
+            matchType = 'temporal';
+            matchedByTemporal++;
+          } else {
+            // No temporal match found, use userId directly
+            userKey = query.userId;
+            matchType = 'userId-fallback';
+            matchedByComposite++;
+          }
         } else if (query.userEmail && !query.userId) {
           // Email match for logged-in users
           const matchedUser = Array.from(chatUserMap.values()).find(u => u.userEmail === query.userEmail);
           userKey = matchedUser?.userKey || generateUserKey(query);
+          matchType = matchedUser ? 'email' : 'composite-fallback';
+          if (matchedUser) matchedByEmail++;
+          else matchedByComposite++;
         } else {
-          // Fallback to composite key
+          // Fallback to device fingerprint for anonymous users
           userKey = generateUserKey(query);
+          matchType = 'fingerprint';
+          matchedByComposite++;
         }
 
         if (chatUserMap.has(userKey)) {
@@ -1790,29 +1874,40 @@ ${contextMarkdown}`;
           chatUser.totalCost += parseFloat(query.cost as any) || 0;
           chatUser.totalTokensIn = (chatUser.totalTokensIn || 0) + (query.tokensIn || 0);
           chatUser.totalTokensOut = (chatUser.totalTokensOut || 0) + (query.tokensOut || 0);
+          chatUser.totalCachedTokensIn = (chatUser.totalCachedTokensIn || 0) + (query.cachedTokensIn || 0);
           chatUser.queryCount = (chatUser.queryCount || 0) + 1;
         } else {
-          console.log(`[Admin] WARNING: Query userKey "${userKey}" not found in chatUserMap (available keys: ${Array.from(chatUserMap.keys()).slice(0, 5).join(', ')}...)`);
-          console.log(`[Admin] Query details - sessionId:${query.sessionId}, userId:${query.userId}, email:${query.userEmail}, device:${query.device}, browser:${query.browser}, city:${query.city}, state:${query.state}, country:${query.country}, sessionLength:${query.sessionLength}`);
+          unmatchedQueries++;
         }
       });
 
       // Convert to array and sort by last activity
       const chatUsers = Array.from(chatUserMap.values()).map(user => {
         const totalMessages = user.totalMessages || 1; // Avoid division by zero
+        const totalTokensIn = user.totalTokensIn || 0;
+        const totalCachedTokensIn = user.totalCachedTokensIn || 0;
+        const totalNewTokensIn = totalTokensIn - totalCachedTokensIn;
+        const cacheHitRate = totalTokensIn > 0 ? Math.round((totalCachedTokensIn / totalTokensIn) * 100) : 0;
+
         return {
           ...user,
           sessionCount: user.sessions.length,
           totalCost: user.totalCost.toFixed(4),
           avgCostPerMessage: (user.totalCost / totalMessages).toFixed(6),
-          avgTokensIn: Math.round((user.totalTokensIn || 0) / totalMessages),
+          avgTokensIn: Math.round(totalTokensIn / totalMessages),
           avgTokensOut: Math.round((user.totalTokensOut || 0) / totalMessages),
-          totalTokensIn: user.totalTokensIn || 0,
+          avgCachedTokensIn: Math.round(totalCachedTokensIn / totalMessages),
+          avgNewTokensIn: Math.round(totalNewTokensIn / totalMessages),
+          totalTokensIn,
           totalTokensOut: user.totalTokensOut || 0,
+          totalCachedTokensIn,
+          totalNewTokensIn,
+          cacheHitRate,
         };
       }).sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
 
-      console.log(`[Admin] Retrieved ${chatUsers.length} unique chat users with cost data`);
+      // Summary log - concise
+      console.log(`[Admin] Chat Users: ${chatUsers.length} users, ${allSessions.length} sessions, ${allQueries.length} queries`);
       res.json(chatUsers);
     } catch (error: any) {
       console.error("Error getting chat users:", error);
@@ -1849,17 +1944,23 @@ ${contextMarkdown}`;
         const lastTimestamp = messages.length > 0 ? new Date(messages[messages.length - 1].timestamp) : new Date(session.updatedAt);
         const durationMinutes = Math.round((lastTimestamp.getTime() - firstTimestamp.getTime()) / 60000);
 
-        // Calculate cost for this session by matching queries within time range
-        const sessionCost = allQueries
-          .filter(q => {
-            const queryTime = new Date(q.createdAt);
-            const matchesUser = q.userId === session.userId ||
-                               (session.userEmail && q.userEmail === session.userEmail);
-            const withinTimeRange = queryTime >= new Date(session.createdAt) &&
-                                   queryTime <= new Date(session.updatedAt);
-            return matchesUser && withinTimeRange;
-          })
-          .reduce((sum, q) => sum + (parseFloat(q.cost as any) || 0), 0);
+        // Calculate cost and token stats for this session by matching queries within time range
+        const matchingQueries = allQueries.filter(q => {
+          const queryTime = new Date(q.createdAt);
+          const matchesUser = q.userId === session.userId ||
+                             (session.userEmail && q.userEmail === session.userEmail);
+          const withinTimeRange = queryTime >= new Date(session.createdAt) &&
+                                 queryTime <= new Date(session.updatedAt);
+          return matchesUser && withinTimeRange;
+        });
+
+        const sessionCost = matchingQueries.reduce((sum, q) => sum + (parseFloat(q.cost as any) || 0), 0);
+        const sessionTokensIn = matchingQueries.reduce((sum, q) => sum + (q.tokensIn || 0), 0);
+        const sessionCachedTokensIn = matchingQueries.reduce((sum, q) => sum + (q.cachedTokensIn || 0), 0);
+        const sessionNewTokensIn = sessionTokensIn - sessionCachedTokensIn;
+        const sessionCacheHitRate = sessionTokensIn > 0
+          ? Math.round((sessionCachedTokensIn / sessionTokensIn) * 100)
+          : 0;
 
         return {
           id: session.id,
@@ -1872,6 +1973,10 @@ ${contextMarkdown}`;
           assistantMessageCount: assistantMessages.length,
           durationMinutes,
           totalCost: sessionCost.toFixed(4),
+          totalTokensIn: sessionTokensIn,
+          totalCachedTokensIn: sessionCachedTokensIn,
+          totalNewTokensIn: sessionNewTokensIn,
+          cacheHitRate: sessionCacheHitRate,
           device: session.device,
           browser: session.browser,
           city: session.city,
@@ -1969,10 +2074,18 @@ ${contextMarkdown}`;
           });
 
           if (matchingQuery) {
+            const tokensIn = matchingQuery.tokensIn || 0;
+            const cachedTokensIn = matchingQuery.cachedTokensIn || 0;
+            const newTokensIn = tokensIn - cachedTokensIn;
+            const cacheHitRate = tokensIn > 0 ? Math.round((cachedTokensIn / tokensIn) * 100) : 0;
+
             return {
               ...msg,
-              tokensIn: matchingQuery.tokensIn,
+              tokensIn,
               tokensOut: matchingQuery.tokensOut,
+              cachedTokensIn,
+              newTokensIn,
+              cacheHitRate,
               cost: matchingQuery.cost,
               model: matchingQuery.model,
               fullPrompt: matchingQuery.fullPrompt,
@@ -1984,15 +2097,32 @@ ${contextMarkdown}`;
         return msg;
       });
 
-      // Calculate total cost for session
+      // Calculate total cost and token stats for session
       const totalCost = enrichedMessages
         .filter((m: any) => m.cost)
         .reduce((sum: number, m: any) => sum + (parseFloat(m.cost as any) || 0), 0);
+
+      const totalTokensIn = enrichedMessages
+        .filter((m: any) => m.tokensIn)
+        .reduce((sum: number, m: any) => sum + (m.tokensIn || 0), 0);
+
+      const totalCachedTokensIn = enrichedMessages
+        .filter((m: any) => m.cachedTokensIn)
+        .reduce((sum: number, m: any) => sum + (m.cachedTokensIn || 0), 0);
+
+      const totalNewTokensIn = totalTokensIn - totalCachedTokensIn;
+      const sessionCacheHitRate = totalTokensIn > 0
+        ? Math.round((totalCachedTokensIn / totalTokensIn) * 100)
+        : 0;
 
       res.json({
         ...session,
         messages: enrichedMessages,
         totalCost: totalCost.toFixed(4),
+        totalTokensIn,
+        totalCachedTokensIn,
+        totalNewTokensIn,
+        cacheHitRate: sessionCacheHitRate,
       });
     } catch (error: any) {
       console.error("Error getting chat session details:", error);

@@ -496,7 +496,10 @@ export class DatabaseStorage implements IStorage {
   async trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery> {
     const [newQuery] = await db
       .insert(supportQueries)
-      .values(query)
+      .values({
+        ...query,
+        cachedTokensIn: query.cachedTokensIn ?? 0, // Ensure default value for cached tokens
+      })
       .returning();
     return newQuery;
   }
@@ -642,8 +645,6 @@ export class DatabaseStorage implements IStorage {
 
   // Chat session operations
   async saveChatSession(session: InsertChatSession): Promise<ChatSession> {
-    console.log(`[Storage] Saving session ${session.id}: title="${session.title}", userId=${session.userId}, messages=${session.messages.length} chars`);
-
     const [savedSession] = await db
       .insert(chatSessions)
       .values(session)
@@ -657,28 +658,22 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
 
-    console.log(`[Storage] Successfully saved session ${savedSession.id} to database`);
     return savedSession;
   }
 
   async getChatSessions(userId?: string): Promise<ChatSession[]> {
-    let sessions;
     if (userId) {
-      sessions = await db
+      return await db
         .select()
         .from(chatSessions)
         .where(eq(chatSessions.userId, userId))
         .orderBy(desc(chatSessions.updatedAt));
-      console.log(`[Storage] Retrieved ${sessions.length} sessions for user ${userId}`);
     } else {
-      // Return all sessions (for anonymous users, admin, etc.)
-      sessions = await db
+      return await db
         .select()
         .from(chatSessions)
         .orderBy(desc(chatSessions.updatedAt));
-      console.log(`[Storage] Retrieved ${sessions.length} total sessions from database`);
     }
-    return sessions;
   }
 
   async deleteChatSession(sessionId: string): Promise<void> {
@@ -709,7 +704,6 @@ export class DatabaseStorage implements IStorage {
         isNull(chatSessions.userId)
       ));
 
-    console.log(`[Storage] Associated ${anonymousSessions.length} anonymous sessions with user ${userId}`);
     return anonymousSessions.length;
   }
 

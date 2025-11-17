@@ -125,6 +125,7 @@ export const supportQueries = pgTable("support_queries", {
   fullPrompt: text("full_prompt"), // Complete prompt sent to model for debugging
   tokensIn: integer("tokens_in").notNull().default(0),
   tokensOut: integer("tokens_out").notNull().default(0),
+  cachedTokensIn: integer("cached_tokens_in").notNull().default(0), // Cached prompt tokens (from OpenAI prompt caching)
   cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default("0"), // Cost in USD
   model: varchar("model").notNull().default("gpt-4o-mini"),
   // Anonymous user metadata for tracking

@@ -39,8 +39,28 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+
+      // Only log response body for specific cases
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const jsonStr = JSON.stringify(capturedJsonResponse);
+
+        // Skip logging body for admin endpoints with large responses
+        if (path.includes('/api/admin/chat-users') ||
+            path.includes('/api/admin/chat-sessions') ||
+            path.includes('/api/admin/analytics')) {
+          // Just log the size for large admin responses
+          if (jsonStr.length > 200) {
+            logLine += ` :: [${jsonStr.length} bytes]`;
+          } else {
+            logLine += ` :: ${jsonStr}`;
+          }
+        } else if (jsonStr.length > 500) {
+          // Truncate other large responses
+          logLine += ` :: ${jsonStr.substring(0, 500)}... [truncated]`;
+        } else {
+          // Log full response for small responses
+          logLine += ` :: ${jsonStr}`;
+        }
       }
 
       log(logLine);

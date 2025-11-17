@@ -132,6 +132,9 @@ class WebSocketService {
       case 'DEVICE_DISCONNECTED':
         this.handlers.onDeviceDisconnected?.(message.data);
         break;
+      case 'ADMIN_SESSION_UPDATE':
+        this.handlers.onAdminSessionUpdate?.(message.data);
+        break;
       case 'PONG':
         // Keepalive response received
         console.log('[WS Client] Pong received');

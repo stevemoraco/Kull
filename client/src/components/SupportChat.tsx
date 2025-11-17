@@ -1473,6 +1473,13 @@ export function SupportChat() {
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
+      // Create an AbortController with 60 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.error('[Chat] Request timeout after 60 seconds');
+      }, 60000);
+
       const response = await fetch('/api/chat/message', {
         method: 'POST',
         headers: {
@@ -1487,7 +1494,10 @@ export function SupportChat() {
           sessionId: currentSessionId,
           sessionStartTime, // For accurate session length calculation
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error('Failed to get response');
@@ -1508,13 +1518,35 @@ export function SupportChat() {
 
       console.log('[Chat] Starting to read response stream for message:', assistantMessageId);
 
+      // Add stream timeout - if no data received for 30 seconds, abort
+      let streamTimeoutId: NodeJS.Timeout | null = null;
+      const resetStreamTimeout = () => {
+        if (streamTimeoutId) clearTimeout(streamTimeoutId);
+        streamTimeoutId = setTimeout(() => {
+          console.error('[Chat] Stream timeout - no data received for 30 seconds');
+          reader.cancel();
+          throw new Error('Stream timeout - no response from server');
+        }, 30000);
+      };
+      resetStreamTimeout();
+
       while (true) {
         const { done, value } = await reader.read();
 
+        // Reset timeout on each chunk received
+        if (streamTimeoutId) {
+          clearTimeout(streamTimeoutId);
+          streamTimeoutId = null;
+        }
+
         if (done) {
           console.log('[Chat] Stream done. Total content length:', fullContent.length);
+          if (streamTimeoutId) clearTimeout(streamTimeoutId);
           break;
         }
+
+        // Reset timeout on each chunk - stream is still alive
+        resetStreamTimeout();
 
         const chunk = decoder.decode(value, { stream: true });
 
@@ -1720,11 +1752,20 @@ export function SupportChat() {
           handleLinkClick(url);
         }, 500);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Chat] Error in sendMessage:', error);
+
+      // Determine error message based on error type
+      let errorDescription = 'Failed to send message. Please try again.';
+      if (error.name === 'AbortError') {
+        errorDescription = 'Request timed out. The server took too long to respond.';
+      } else if (error.message?.includes('timeout')) {
+        errorDescription = 'No response from server. Please check your connection and try again.';
+      }
+
       toast({
         title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        description: errorDescription,
         variant: 'destructive',
       });
       // Remove the failed assistant message
@@ -1793,22 +1834,25 @@ export function SupportChat() {
   };
 
   const handleResetChat = () => {
-    // Clear messages in current session
+    // Create a brand NEW session instead of clearing current one
+    const newSessionId = String(Date.now());
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: 'New Chat',
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     setSessions(prevSessions => {
-      const updated = prevSessions.map(session => {
-        if (session.id === currentSessionId) {
-          return {
-            ...session,
-            title: 'New Chat',
-            messages: [],
-            updatedAt: new Date(),
-          };
-        }
-        return session;
-      });
+      // Add new session to the list
+      const updated = [...prevSessions, newSession];
       saveSessions(updated);
       return updated;
     });
+
+    // Switch to the new session
+    setCurrentSessionId(newSessionId);
 
     // Reset quick questions to defaults
     setQuickQuestions([
@@ -1819,8 +1863,8 @@ export function SupportChat() {
     ]);
 
     toast({
-      title: 'Chat Reset',
-      description: 'Your conversation has been cleared.',
+      title: 'New Chat Started',
+      description: 'Previous conversation has been saved. Starting fresh!',
     });
   };
 
