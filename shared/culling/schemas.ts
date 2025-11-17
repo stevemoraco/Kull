@@ -44,6 +44,24 @@ export const PhotographerProfileSchema = z.object({
 
 export type PhotographerProfile = z.infer<typeof PhotographerProfileSchema>;
 
+export const ImageIptcMetadataSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  people: z.array(z.string()).optional(),
+  clientName: z.string().optional(),
+  eventName: z.string().optional(),
+  location: z
+    .object({
+      city: z.string().optional(),
+      state: z.string().optional(),
+      country: z.string().optional(),
+    })
+    .optional(),
+});
+
+export type ImageIptcMetadata = z.infer<typeof ImageIptcMetadataSchema>;
+
 export const ImageMetadataSchema = z.object({
   id: z.string().uuid().optional(),
   filename: z.string(),
@@ -80,6 +98,7 @@ export const ImageMetadataSchema = z.object({
     .optional(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  iptc: ImageIptcMetadataSchema.optional(),
 });
 
 export type ImageMetadata = z.infer<typeof ImageMetadataSchema>;

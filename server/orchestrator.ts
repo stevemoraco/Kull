@@ -1,15 +1,26 @@
 import { getProvider } from "@shared";
+import type { ImageMetadata } from "@shared/culling";
+import { telemetryStore } from "./services/batchTelemetry";
 
 export type SubmitBatchFn = (args: {
   providerId: string;
-  images: { id: string; url?: string; b64?: string }[];
+  images: BatchImagePayload[];
   prompt: string;
 }) => Promise<{ ok: boolean; retryAfterMs?: number; ratings?: any[] }>;
+
+export type BatchImagePayload = {
+  id: string;
+  url?: string;
+  b64?: string;
+  filename?: string;
+  metadata?: ImageMetadata;
+  tags?: string[];
+};
 
 export async function runBatches(args: {
   providerId: string;
   imageIds: string[];
-  toPayload: (id: string) => Promise<{ id: string; url?: string; b64?: string }>;
+  toPayload: (id: string) => Promise<BatchImagePayload>;
   prompt: string;
   submit: SubmitBatchFn;
   concurrency?: number;
@@ -29,15 +40,58 @@ export async function runBatches(args: {
   const allRatings: any[] = [];
 
   const runOne = async (ids: string[]) => {
+    const batchId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const payload = await Promise.all(ids.map(args.toPayload));
+    telemetryStore.record({
+      type: "scheduled",
+      providerId: args.providerId,
+      batchId,
+      total: payload.length,
+      createdAt: Date.now(),
+    });
     let attempt = 0;
+    let startedAt: number | undefined;
     while (attempt <= (args.maxRetries ?? 5)) {
+      if (attempt === 0) {
+        startedAt = Date.now();
+        telemetryStore.record({
+          type: "started",
+          providerId: args.providerId,
+          batchId,
+          startedAt,
+        });
+      }
       const res = await args.submit({ providerId: args.providerId, images: payload, prompt: args.prompt });
-      if (res.ok) { if (Array.isArray(res.ratings)) allRatings.push(...res.ratings); return; }
+      if (res.ok) {
+        if (Array.isArray(res.ratings)) allRatings.push(...res.ratings);
+        const completedAt = Date.now();
+        telemetryStore.record({
+          type: "completed",
+          providerId: args.providerId,
+          batchId,
+          completedAt,
+          tookMs: startedAt ? completedAt - startedAt : 0,
+        });
+        return;
+      }
       const backoff = res.retryAfterMs ?? (2 ** attempt) * 1000 + Math.floor(Math.random() * 500);
+      telemetryStore.record({
+        type: "rate_limit",
+        providerId: args.providerId,
+        batchId,
+        retryAfterMs: backoff,
+        observedAt: Date.now(),
+      });
       await new Promise((r) => setTimeout(r, backoff));
       attempt += 1;
     }
+    telemetryStore.record({
+      type: "failed",
+      providerId: args.providerId,
+      batchId,
+      failedAt: Date.now(),
+      error: "Batch failed after retries",
+    });
     throw new Error("Batch failed after retries");
   };
 

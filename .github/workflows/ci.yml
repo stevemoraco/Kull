@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Lint
+        run: npm run lint
+      - name: Type Check
+        run: npm run check
+      - name: Unit Tests
+        run: npm run test:unit
+      - name: Native Tests (macOS)
+        run: npm run test:native:mac
+      - name: Native Tests (iOS shared)
+        run: npm run test:native:mobile
+      - name: Build
+        run: npm run build
+      - name: E2E Tests
+        run: npm run test:e2e

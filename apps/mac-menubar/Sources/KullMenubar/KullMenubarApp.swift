@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AppKit
 
 @main
 struct KullMenubarApp: App {
@@ -22,6 +23,7 @@ struct KullMenubarApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var watcher = FolderWatcher()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -29,15 +31,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item.button?.action = #selector(toggleMainWindow)
         item.button?.target = self
         self.statusItem = item
+
+        // Begin watching bookmarked folders to suggest runs
+        let urls = BookmarkStore.shared.resolveAll()
+        watcher.watch(urls: urls) { [weak self] url in
+            self?.suggestRun(for: url)
+        }
     }
 
     @objc private func toggleMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows {
-            if window.title == "Kull" { window.makeKeyAndOrderFront(nil); return }
+        if let target = NSApp.windows.first(where: { $0.title == "Kull" }) {
+            target.makeKeyAndOrderFront(nil)
+        } else {
+            NSApp.windows.first?.makeKeyAndOrderFront(nil)
         }
-        let scene = NSApp.connectedScenes.first as? NSWindowScene
-        scene?.windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    private func suggestRun(for url: URL) {
+        let alert = NSAlert()
+        alert.messageText = "New files detected"
+        alert.informativeText = "Kull detected changes in \(url.lastPathComponent). Run a new cull?"
+        alert.addButton(withTitle: "Run")
+        alert.addButton(withTitle: "Dismiss")
+        NSApp.activate(ignoringOtherApps: true)
+        let resp = alert.runModal()
+        if resp == .alertFirstButtonReturn {
+            // Open main window and present run sheet
+            toggleMainWindow()
+            // The run sheet will be triggered manually by the user; future: deep-link state.
+        }
     }
 }
 
@@ -52,7 +75,7 @@ final class CreditSummaryViewModel: ObservableObject {
         guard let url = URL(string: "/api/kull/credits/summary", relativeTo: baseURL()) else { return }
         loading = true
         URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
-            .map(\.$data)
+            .map(\.data)
             .decode(type: CreditSummary.self, decoder: JSONDecoder())
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] _ in self?.loading = false }, receiveValue: { [weak self] cs in
@@ -67,12 +90,6 @@ final class CreditSummaryViewModel: ObservableObject {
         // assumes same host during development
         return URL(string: "http://localhost:5000")!
     }
-}
-
-struct CreditSummary: Codable {
-    let balance: Int
-    let planDisplayName: String
-    let estimatedShootsRemaining: Double
 }
 
 struct MainWindow: View {

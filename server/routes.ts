@@ -11,12 +11,18 @@ import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
 import { getProviderConfig } from "@shared/culling/providers";
 import Stripe from "stripe";
-import { GenerateReportSchema, generateNarrative, summarize } from "./report";
-import { sendEmail } from "./emailService";
-import { emailTemplatesReport } from "./emailTemplatesReport";
+import { GenerateReportSchema } from "./report";
 import { writeSidecars } from "./xmpWriter";
-import { runBatches } from "./orchestrator";
-import { submitOpenAIBatch } from "./providers/openai";
+import { ExifGeoContextService, type ParseResult } from "./services/exifGeo";
+import path from "path";
+import fs from "fs/promises";
+import { Buffer } from "node:buffer";
+import { runOrchestratedCulling } from "./services/batchOrchestrator";
+import type { BatchImagePayload } from "./orchestrator";
+import { buildShootReport, type ShootReport } from "./services/reportBuilder";
+import { initiateDeviceLink, approveDeviceLink, claimDeviceLink } from "./services/deviceLink";
+import { telemetryStore } from "./services/batchTelemetry";
+import { emitShootCompletedNotification } from "./services/reportNotifications";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -42,6 +48,10 @@ const STRIPE_PRICES = {
   },
 };
 
+const exifGeoService = new ExifGeoContextService({
+  mapboxToken: process.env.MAPBOX_ACCESS_TOKEN,
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -56,6 +66,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post('/api/device/link/initiate', async (req, res) => {
+    try {
+      const schema = z.object({ deviceName: z.string().max(120).optional() });
+      const { deviceName } = schema.parse(req.body ?? {});
+      const link = initiateDeviceLink(deviceName);
+      res.json({
+        code: link.code,
+        pollToken: link.pollToken,
+        expiresAt: new Date(link.expiresAt).toISOString(),
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid link initiation payload', issues: error.flatten() });
+      }
+      console.error('device link initiate error', error);
+      res.status(500).json({ message: 'Failed to initiate device link' });
+    }
+  });
+
+  app.post('/api/device/link/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({ code: z.string().min(4), deviceName: z.string().max(120).optional() });
+      const { code, deviceName } = schema.parse(req.body ?? {});
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      const approved = approveDeviceLink(code, {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+      }, deviceName);
+      if (!approved) {
+        return res.status(400).json({ message: 'Invalid or expired device code' });
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid device approval payload', issues: error.flatten() });
+      }
+      console.error('device link approve error', error);
+      res.status(500).json({ message: 'Failed to approve device link' });
+    }
+  });
+
+  app.post('/api/device/link/status', async (req: any, res) => {
+    try {
+      const schema = z.object({ pollToken: z.string().min(8) });
+      const { pollToken } = schema.parse(req.body ?? {});
+      const result = claimDeviceLink(pollToken);
+      if (result.status === 'pending' && result.record) {
+        return res.json({
+          status: 'pending',
+          expiresAt: new Date(result.record.expiresAt).toISOString(),
+        });
+      }
+      if (result.status === 'approved' && result.record && result.record.user) {
+        const snapshot = result.record.user;
+        const deviceUser = {
+          deviceSession: true,
+          claims: {
+            sub: snapshot.id,
+            email: snapshot.email,
+            first_name: snapshot.firstName,
+            last_name: snapshot.lastName,
+          },
+          profile: snapshot,
+        };
+
+        return req.login(deviceUser as any, (err) => {
+          if (err) {
+            console.error('device link login failed', err);
+            return res.status(500).json({ message: 'Failed to issue session' });
+          }
+          return res.json({
+            status: 'approved',
+            deviceName: result.record?.deviceName,
+            user: {
+              id: snapshot.id,
+              email: snapshot.email,
+              firstName: snapshot.firstName,
+              lastName: snapshot.lastName,
+              profileImageUrl: snapshot.profileImageUrl,
+            },
+          });
+        });
+      }
+      if (result.status === 'expired') {
+        return res.status(410).json({ status: 'expired' });
+      }
+      return res.status(404).json({ status: 'invalid' });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid poll payload', issues: error.flatten() });
+      }
+      console.error('device link status error', error);
+      res.status(500).json({ message: 'Failed to check device link status' });
     }
   });
 
@@ -802,34 +918,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Run OpenAI batch (server-side) with image URLs
+  app.get('/api/kull/batch/telemetry', isAuthenticated, (_req, res) => {
+    try {
+      const providers = telemetryStore.snapshots();
+      const now = new Date().toISOString();
+      const response = providers.map((provider) => {
+        const completed = provider.recentBatches.filter((batch) => batch.status === "completed" && batch.tookMs);
+        const avgTookMs = completed.length
+          ? Math.round(completed.reduce((sum, batch) => sum + (batch.tookMs ?? 0), 0) / completed.length)
+          : null;
+        return {
+          providerId: provider.providerId,
+          recentBatches: provider.recentBatches,
+          rateLimit: provider.rateLimit,
+          metrics: {
+            averageCompletionMs: avgTookMs,
+            running: provider.recentBatches.filter((batch) => batch.status === "running").length,
+            failed: provider.recentBatches.filter((batch) => batch.status === "failed").length,
+          },
+        };
+      });
+      res.json({ generatedAt: now, providers: response });
+    } catch (error) {
+      console.error('telemetry error', error);
+      res.status(500).json({ message: 'Failed to load batch telemetry' });
+    }
+  });
+
+  // Run OpenAI batch (server-side) with image URLs/base64 input
   app.post('/api/kull/run/openai', isAuthenticated, async (req: any, res) => {
     try {
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) return res.status(500).json({ message: 'Missing OPENAI_API_KEY' });
+      const imageSchema = z
+        .object({
+          id: z.string().min(1),
+          url: z.string().url().optional(),
+          b64: z.string().min(1).optional(),
+          filename: z.string().optional(),
+          relativePath: z.string().optional(),
+        })
+        .superRefine((value, ctx) => {
+          if (!value.url && !value.b64) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: 'Each image must include either a url or b64 payload',
+              path: ['url'],
+            });
+          }
+        });
       const bodySchema = z.object({
         model: z.string().min(1),
-        images: z.array(z.object({ id: z.string().min(1), url: z.string().url() })),
+        images: z.array(imageSchema).min(1),
         prompt: z.string().min(1),
+        baseDir: z.string().optional(),
+        report: z.boolean().optional(),
+        providerOrder: z.array(ProviderIdSchema).optional(),
+        allowFallback: z.boolean().optional(),
+        shootName: z.string().min(1).optional(),
+        previewBaseUrl: z.string().url().optional(),
+        heroLimit: z.number().int().positive().max(50).optional(),
       });
-      const { model, images, prompt } = bodySchema.parse(req.body);
-
-      const ratings = await runBatches({
-        providerId: 'openai-gpt-5',
-        imageIds: images.map((i: any) => i.id),
-        toPayload: async (id) => {
-          const match = images.find((x: any) => x.id === id);
-          return { id, url: match?.url };
-        },
+      const {
+        model,
+        images,
         prompt,
-        submit: async ({ images }) => {
-          const resp = await submitOpenAIBatch({ apiKey, model, images, prompt });
-          return resp;
+        baseDir,
+        report,
+        providerOrder,
+        allowFallback,
+        shootName,
+        previewBaseUrl,
+        heroLimit,
+      } = bodySchema.parse(req.body);
+      const userId = req.user.claims.sub;
+
+      const metadataCache = new Map<string, ParseResult | null>();
+
+      const resolveLocalPath = (image: z.infer<typeof imageSchema>) => {
+        if (!baseDir) return undefined;
+        const candidate = image.relativePath ?? image.filename ?? image.id;
+        if (!candidate) return undefined;
+        return path.isAbsolute(candidate) ? candidate : path.join(baseDir, candidate);
+      };
+
+      const loadMetadata = async (image: z.infer<typeof imageSchema>): Promise<ParseResult | null> => {
+        if (metadataCache.has(image.id)) return metadataCache.get(image.id) ?? null;
+        try {
+          let buffer: Buffer | undefined;
+          if (image.b64) {
+            buffer = Buffer.from(image.b64, "base64");
+          } else {
+            const localPath = resolveLocalPath(image);
+            if (localPath) {
+              try {
+                buffer = await fs.readFile(localPath);
+              } catch {
+                // continue to remote fetch below
+              }
+            }
+            if (!buffer && image.url) {
+              try {
+                const resp = await fetch(image.url);
+                if (resp.ok) {
+                  const arr = await resp.arrayBuffer();
+                  buffer = Buffer.from(arr);
+                }
+              } catch (err) {
+                console.warn('failed to download image for EXIF', err);
+              }
+            }
+          }
+          if (!buffer) {
+            metadataCache.set(image.id, null);
+            return null;
+          }
+          const fallbackName =
+            image.filename ??
+            (image.relativePath ? path.basename(image.relativePath) : undefined);
+          const parsed = await exifGeoService.extractFromBuffer(buffer, { filename: fallbackName });
+          metadataCache.set(image.id, parsed);
+          return parsed;
+        } catch (err) {
+          console.warn('metadata extraction failed', err);
+          metadataCache.set(image.id, null);
+          return null;
+        }
+      };
+
+      const preparedImages: BatchImagePayload[] = [];
+      for (const image of images) {
+        const meta = await loadMetadata(image);
+        const filename =
+          image.filename ??
+          (image.relativePath ? path.basename(image.relativePath) : undefined);
+        preparedImages.push({
+          id: image.id,
+          url: image.url,
+          b64: image.b64,
+          filename,
+          metadata: meta?.metadata,
+          tags: meta?.tags,
+        });
+      }
+
+      const orchestrated = await runOrchestratedCulling(storage, {
+        userId,
+        prompt,
+        images: preparedImages,
+        providerOrder,
+        allowFallback,
+        providerOptions: {
+          "openai-gpt-5": { apiKey, model },
         },
-        concurrency: 3,
-        maxRetries: 5,
       });
-      res.json({ ok: true, ratings });
+
+      const { ratings, creditsCharged, providerId: providerUsed, attempts } = orchestrated;
+      let user: Awaited<ReturnType<typeof storage.getUser>> | undefined;
+      try {
+        user = await storage.getUser(userId);
+      } catch (error) {
+        console.warn("failed to load user for notifications", error);
+      }
+      // optionally write XMP sidecars if baseDir provided
+      let sidecars: any[] = [];
+      if (baseDir) {
+        sidecars = await writeSidecars(baseDir, ratings.map((r: any) => ({
+          imageId: r.imageId || r.filename || '',
+          filename: r.filename,
+          starRating: r.starRating,
+          colorLabel: r.colorLabel,
+          title: r.title,
+          description: r.description,
+          tags: r.tags,
+        })));
+      }
+      let reportPayload: ShootReport | undefined;
+      if (report) {
+        const payloadRatings = ratings.map((r: any) => ({
+          imageId: r.imageId || '',
+          filename: r.filename,
+          starRating: r.starRating,
+          colorLabel: r.colorLabel,
+          title: r.title,
+          description: r.description,
+          tags: r.tags,
+        }));
+        reportPayload = await buildShootReport({
+          shootName: shootName ?? 'Kull Run',
+          ratings: payloadRatings,
+          heroLimit,
+          previewBaseUrl,
+          apiKey,
+        });
+        emitShootCompletedNotification(user, reportPayload);
+      }
+
+      const estimatedCostUSD = creditsCharged;
+      res.json({
+        ok: true,
+        providerId: providerUsed,
+        ratings,
+        sidecars,
+        estimatedCostUSD,
+        attempts,
+        report: report ? reportPayload : undefined,
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid run payload', issues: error.flatten() });
@@ -842,31 +1136,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate shoot report narrative
   app.post('/api/kull/report/generate', isAuthenticated, async (req: any, res) => {
     try {
-      const { shootName, ratings } = GenerateReportSchema.parse(req.body);
+      const parsed = GenerateReportSchema.parse(req.body);
       const apiKey = process.env.OPENAI_API_KEY;
-      const narrative = await generateNarrative({ shootName, ratings }, apiKey);
-      const stats = summarize(ratings);
-      const payload = {
-        shootName,
-        narrative,
-        stats,
-      };
-      // Optionally email the report to the user
+      const reportPayload = await buildShootReport({
+        shootName: parsed.shootName,
+        ratings: parsed.ratings,
+        heroLimit: parsed.heroLimit,
+        previewBaseUrl: parsed.previewBaseUrl,
+        apiKey,
+      });
+      let user: Awaited<ReturnType<typeof storage.getUser>> | undefined;
       try {
-        const userId = req.user.claims.sub;
-        const user = await storage.getUser(userId);
-        if (user?.email) {
-          const tpl = emailTemplatesReport.shootReport(shootName, narrative, {
-            totalImages: stats.totalImages,
-            heroCount: stats.heroCount,
-            keeperCount: stats.keeperCount,
-          });
-          await sendEmail(user.email, tpl.subject, tpl.html, tpl.text);
-        }
-      } catch (e) {
-        console.warn('report email failed', e);
+        user = await storage.getUser(req.user.claims.sub);
+      } catch (error) {
+        console.warn("failed to load user for notifications", error);
       }
-      res.json(payload);
+      emitShootCompletedNotification(user, reportPayload);
+      res.json(reportPayload);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: 'Invalid report payload', issues: error.flatten() });
@@ -944,12 +1230,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const emailTemplate = emailTemplates.referralInvitation(referrerName, referrerEmail, referredEmail);
         
-        await sendEmail(
-          referredEmail,
-          emailTemplate.subject,
-          emailTemplate.html,
-          emailTemplate.text
-        );
+        await sendEmail({
+          to: referredEmail,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text,
+        });
       } catch (emailError) {
         console.error("Failed to send referral email:", emailError);
         // Don't fail the referral creation if email fails
@@ -977,43 +1263,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/transcribe', isAuthenticated, async (req: any, res) => {
     try {
       const multer = require('multer');
+      const FormData = require('form-data');
       const upload = multer({ storage: multer.memoryStorage() });
-      
+
       upload.single('audio')(req, res, async (err: any) => {
-        if (err) {
-          return res.status(400).json({ message: "Failed to upload audio file" });
-        }
+        if (err) return res.status(400).json({ message: "Failed to upload audio file" });
+        if (!req.file) return res.status(400).json({ message: "No audio file provided" });
+        if (!process.env.OPENAI_API_KEY) return res.status(500).json({ message: 'Missing OPENAI_API_KEY' });
 
-        if (!req.file) {
-          return res.status(400).json({ message: "No audio file provided" });
-        }
-
-        const formData = new FormData();
-        const audioBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
-        formData.append('file', audioBlob, 'audio.webm');
-        formData.append('model', 'whisper-1');
+        const form = new FormData();
+        form.append('file', req.file.buffer, { filename: req.file.originalname || 'audio.webm', contentType: req.file.mimetype });
+        form.append('model', 'whisper-1');
 
         const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            ...form.getHeaders(),
           },
-          body: formData,
-        });
+          body: form as any,
+        } as any);
 
-        if (!response.ok) {
-          throw new Error('OpenAI transcription failed');
-        }
-
+        if (!response.ok) throw new Error('OpenAI transcription failed');
         const data = await response.json();
         res.json({ text: data.text });
       });
     } catch (error: any) {
       console.error("Error transcribing audio:", error);
-      res.status(500).json({ 
-        message: "Failed to transcribe audio",
-        detail: error.message 
-      });
+      res.status(500).json({ message: "Failed to transcribe audio", detail: error.message });
     }
   });
 

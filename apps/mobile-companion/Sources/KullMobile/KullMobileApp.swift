@@ -1,3 +1,6 @@
+import Foundation
+
+#if canImport(UIKit)
 import SwiftUI
 import Combine
 
@@ -19,7 +22,7 @@ final class MobileCredits: ObservableObject {
     func refresh() {
         guard let url = URL(string: "http://localhost:5000/api/kull/credits/summary") else { return }
         URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
-            .map(\.$data)
+            .map(\.data)
             .decode(type: CreditSummary.self, decoder: JSONDecoder())
             .replaceError(with: CreditSummary(balance: 0, planDisplayName: "—", estimatedShootsRemaining: 0))
             .receive(on: DispatchQueue.main)
@@ -30,8 +33,6 @@ final class MobileCredits: ObservableObject {
             }.store(in: &cancellables)
     }
 }
-
-struct CreditSummary: Codable { let balance: Int; let planDisplayName: String; let estimatedShootsRemaining: Double }
 
 struct HomeView: View {
     @StateObject var credits = MobileCredits()
@@ -53,10 +54,8 @@ struct HomeView: View {
                     HStack { Text("ETA"); Spacer(); Text("—") }
                 }
                 Section {
-                    NavigationLink(isActive: $showingFolders) { FoldersView() } label: {
-                        Button("Folders") { showingFolders = true }
-                    }
-                    Button("Prompt Marketplace") { showingPrompts = true }
+                    NavigationLink(isActive: $showingFolders) { FoldersView() } label: { Button("Folders") { showingFolders = true } }
+                    NavigationLink(isActive: $showingPrompts) { MarketplaceView() } label: { Button("Prompt Marketplace") { showingPrompts = true } }
                 }
             }
             .navigationTitle("Kull")
@@ -64,3 +63,13 @@ struct HomeView: View {
         }
     }
 }
+#endif
+
+#if !canImport(UIKit)
+@main
+enum UnsupportedPlatformApp {
+    static func main() {
+        fatalError("KullMobileApp requires UIKit.")
+    }
+}
+#endif

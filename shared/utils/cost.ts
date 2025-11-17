@@ -1,12 +1,12 @@
-import { PROVIDERS } from "../culling/providers";
+import { getProvider, listProviders } from "../culling/providers";
 
 export const estimateCostForImages = (
   providerId: string,
   imageCount: number,
 ): number => {
-  const p = PROVIDERS.find((x) => x.id === providerId);
-  if (!p) return 0;
-  const per1k = p.estimatedCostPer1kImages;
+  const provider = getProvider(providerId);
+  if (!provider) return 0;
+  const per1k = provider.estimatedCostPer1kImages;
   return (per1k / 1000) * imageCount;
 };
 
@@ -14,6 +14,6 @@ export const estimateCostForImages = (
 export const estimateCreditsForImages = estimateCostForImages;
 
 export const sortProvidersByCost = () =>
-  [...PROVIDERS].sort(
+  listProviders().slice().sort(
     (a, b) => a.estimatedCostPer1kImages - b.estimatedCostPer1kImages,
   );

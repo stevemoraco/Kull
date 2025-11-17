@@ -62,6 +62,19 @@ Each preset exposes independent toggles for Title, Description, and Tag generati
 - **Anthropic Claude** – Haiku 4.5, Sonnet 4.5, Opus 4.1 with batch/image/structured APIs.
 - **OpenAI** – GPT-5, GPT-5-Codex, GPT-Image, Responses API, streaming, models endpoint.
 
+### Desktop Auth Handshake
+
+- The desktop app calls `POST /api/device/link/initiate` to obtain a short verification code and poll token, then opens the hosted approval page with that code.
+- After the user authenticates in the browser, the approval flow invokes `POST /api/device/link/approve` so the server can tie the code to the signed-in account.
+- The desktop app polls `POST /api/device/link/status`; when the link is approved the response upgrades the poll request into a full session cookie, so future API calls reuse the same authenticated middleware as the web app.
+- Device sessions are tagged internally and bypass the OIDC refresh-token flow, so revoking a desktop login is as simple as signing out or expiring the server session.
+
+### iOS Companion App Snapshot
+
+- The SwiftUI client talks to the same REST endpoints (`/api/auth/user`, `/api/kull/credits/summary`, `/api/kull/folders`, `/api/prompts`) via a lightweight `KullAPIClient`.
+- Tabs include Dashboard (credits/plan summary), Folders (remote catalog synced from the menubar app), Marketplace (prompt search), and Profile (session refresh & logout).
+- View models are fully async/await with unit coverage, and the package builds cleanly under `swift test` so we can iterate without Xcode.
+
 All official docs are mirrored under `api-docs/` for offline development, including responses, batch, streaming, structured outputs, and pricing for every provider.
 
 ## Getting Started (Web/API)
@@ -75,6 +88,8 @@ npm start          # Run the bundled API in production mode
 ```
 
 Environment variables (e.g., `DATABASE_URL`, provider keys) live in the standard `.env` files referenced by the backend. The desktop and mobile apps will pull signed tokens from the API to access AI providers without shipping secrets.
+
+- `MAPBOX_ACCESS_TOKEN` (optional) lets the EXIF pipeline resolve GPS coordinates to human-readable addresses and nearby venues for tagging. Without it, GPS enrichment simply returns empty results.
 
 ## Native App Bootstrapping
 

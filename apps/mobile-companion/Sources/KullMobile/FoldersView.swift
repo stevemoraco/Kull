@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import SwiftUI
 
 struct FolderItem: Identifiable, Decodable { let id: String; let name: String }
@@ -7,18 +8,29 @@ struct FolderResponse: Decodable { let folderCatalog: FolderCatalog }
 struct FoldersView: View {
     @State private var folders: [FolderItem] = []
     @State private var loading = false
+    @State private var selected: FolderItem? = nil
+    @State private var showingRun = false
 
     var body: some View {
         List {
             Section(header: Text("Mac Folders")) {
                 if loading { ProgressView() }
                 ForEach(folders) { f in
-                    HStack { Text(f.name); Spacer(); Button("Run with…") { /* open run modal */ } }
+                    HStack {
+                        Text(f.name)
+                        Spacer()
+                        Button("Run with…") { selected = f; showingRun = true }
+                    }
                 }
             }
         }
         .navigationTitle("Folders")
         .onAppear { Task { await load() } }
+        .background(
+            NavigationLink(isActive: $showingRun) {
+                RunWithView(folderName: selected?.name ?? "Folder", images: [])
+            } label: { EmptyView() }
+        )
     }
 
     private func load() async {
@@ -34,4 +46,4 @@ struct FoldersView: View {
         }
     }
 }
-
+#endif

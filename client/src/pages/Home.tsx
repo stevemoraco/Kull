@@ -4,7 +4,8 @@ import { UrgencyBanner } from "@/components/UrgencyBanner";
 import { PricingSection } from "@/components/PricingSection";
 import { ReferralForm } from "@/components/ReferralForm";
 import { Button } from "@/components/ui/button";
-import { Download, Smartphone, LogOut, Gift, Clock } from "lucide-react";
+import { Download, Smartphone, LogOut, Gift, Clock, Sparkles } from "lucide-react";
+import { Link } from "wouter";
 import { Footer } from "@/components/Footer";
 import type { User } from "@shared/schema";
 
@@ -40,6 +41,12 @@ export default function Home() {
             <span className="text-xl font-black text-foreground">Kull AI</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/prompts">
+              <Button variant="ghost" size="sm" className="hidden md:inline-flex">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Prompt Marketplace
+              </Button>
+            </Link>
             <span className="text-sm text-muted-foreground" data-testid="text-user-email">
               {typedUser?.email}
             </span>
@@ -82,6 +89,13 @@ export default function Home() {
               : "Choose a plan to continue using Kull AI after your trial ends."
             }
           </p>
+          <div className="mt-6 flex justify-center">
+            <Link href="/prompts">
+              <Button variant="outline" size="lg" className="gap-2" data-testid="button-marketplace">
+                <Sparkles className="h-5 w-5" /> Explore the Prompt Marketplace
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Download section (if subscribed) */}

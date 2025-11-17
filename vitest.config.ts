@@ -11,7 +11,12 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./client/src/setupTests.ts"],
-     exclude: ["tests/**", "**/node_modules/**"],
+     exclude: ["tests/e2e/**", "**/node_modules/**"],
+     include: [
+      "client/src/__tests__/**/*.test.tsx",
+      "shared/__tests__/**/*.test.ts",
+      "tests/unit/**/*.test.ts",
+     ],
     coverage: {
       reporter: ["text", "html"],
       exclude: [

@@ -1,11 +1,14 @@
 import Foundation
+import Dispatch
+import Darwin
 
 final class FolderWatcher {
     private var sources: [DispatchSourceFileSystemObject] = []
 
     func watch(urls: [URL], onChange: @escaping (URL) -> Void) {
         for url in urls {
-            guard let fd = open(url.path, O_EVTONLY) else { continue }
+            let fd = open(url.path, O_EVTONLY)
+            guard fd != -1 else { continue }
             let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .delete, .extend], queue: .main)
             src.setEventHandler { onChange(url) }
             src.setCancelHandler { close(fd) }

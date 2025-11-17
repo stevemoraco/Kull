@@ -14,6 +14,7 @@ import Terms from "@/pages/Terms";
 import Refunds from "@/pages/Refunds";
 import Support from "@/pages/Support";
 import Contact from "@/pages/Contact";
+import Marketplace from "@/pages/Marketplace";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -34,6 +35,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/checkout" component={Checkout} />
+          <Route path="/prompts" component={Marketplace} />
         </>
       )}
       <Route component={NotFound} />

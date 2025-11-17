@@ -9,6 +9,7 @@ struct RunSheetView: View {
     @State private var includeTags = true
     @State private var promptText = "Standard culling: 1★ reject, 2★ duplicates, 3★ usable, 4★ keeper, 5★ hero."
     @StateObject private var runner = RunController()
+    @StateObject private var modelsVM = ModelsViewModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -17,10 +18,18 @@ struct RunSheetView: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading) {
                     Text("Model").font(.caption).foregroundStyle(.secondary)
-                    Picker("Model", selection: $selectedModel) {
-                        Text("Apple Intelligence (Offline)").tag("apple-intelligence")
-                        Text("OpenAI GPT‑5").tag("openai-gpt-5")
-                    }.pickerStyle(.radioGroup)
+                    if modelsVM.models.isEmpty {
+                        Picker("Model", selection: $selectedModel) {
+                            Text("Apple Intelligence (Offline)").tag("apple-intelligence")
+                            Text("OpenAI GPT‑5").tag("openai-gpt-5")
+                        }.pickerStyle(.radioGroup)
+                    } else {
+                        Picker("Model", selection: $selectedModel) {
+                            ForEach(modelsVM.models) { m in
+                                Text("\(m.displayName) — $\(Int(m.estimatedCostPer1kImages))/1K").tag(m.id)
+                            }
+                        }.pickerStyle(.radioGroup)
+                    }
                 }
                 VStack(alignment: .leading) {
                     Text("Preset").font(.caption).foregroundStyle(.secondary)
@@ -35,7 +44,11 @@ struct RunSheetView: View {
                 }
             }
 
-            Text("Custom Prompt (optional)").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("Custom Prompt (optional)").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("🎙 Transcribe…") { TranscriptionHelper().transcribe(currentText: { self.promptText }) { self.promptText = $0 } }
+            }
             TextEditor(text: $promptText)
                 .font(.system(.body, design: .monospaced))
                 .border(.quaternary)
@@ -52,6 +65,7 @@ struct RunSheetView: View {
             }
         }
         .padding(20)
+        .task { await modelsVM.load() }
     }
 
     private func startRun() async {
@@ -61,4 +75,3 @@ struct RunSheetView: View {
         await runner.run(folder: folder, prompt: fullPrompt)
     }
 }
-
