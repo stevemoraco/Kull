@@ -1,6 +1,11 @@
 import Foundation
 import Combine
+#if canImport(AppKit)
 import AppKit
+#endif
+#if canImport(UIKit)
+import UIKit
+#endif
 import OSLog
 
 @MainActor
@@ -38,7 +43,7 @@ final class AuthViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
-    @Published private(set) var creditSummary: CreditSummaryPayload?
+    @Published private(set) var creditSummary: CreditSummary?
 
     private let api: KullAPIClient
     private let syncCoordinator: SyncCoordinator
@@ -118,7 +123,11 @@ final class AuthViewModel: ObservableObject {
         components.queryItems = [URLQueryItem(name: "code", value: linkingState.code)]
         if let url = components.url {
             Logger.auth.info("Opening device approval page in browser")
+            #if os(macOS)
             NSWorkspace.shared.open(url)
+            #else
+            UIApplication.shared.open(url)
+            #endif
         }
     }
 

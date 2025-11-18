@@ -7,6 +7,10 @@
 //
 
 import Foundation
+import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Operation Types
 
@@ -285,8 +289,10 @@ final class OfflineOperationQueue: ObservableObject {
     private func getDeviceName() -> String {
         #if os(macOS)
         return Host.current().localizedName ?? "Mac"
-        #else
+        #elseif os(iOS)
         return UIDevice.current.name
+        #else
+        return "Unknown Device"
         #endif
     }
 

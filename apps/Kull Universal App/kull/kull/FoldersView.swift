@@ -26,11 +26,12 @@ struct FoldersView: View {
         }
         .navigationTitle("Folders")
         .onAppear { Task { await load() } }
-        .background(
-            NavigationLink(isActive: $showingRun) {
-                RunWithView(folderName: selected?.name ?? "Folder", images: [])
-            } label: { EmptyView() }
-        )
+        .sheet(isPresented: $showingRun) {
+            if let folder = selected {
+                Text("Running \(folder.name)")
+                    .padding()
+            }
+        }
     }
 
     private func load() async {

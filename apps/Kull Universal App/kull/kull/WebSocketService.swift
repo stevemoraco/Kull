@@ -60,7 +60,8 @@ final class WebSocketService: ObservableObject {
     }
 
     deinit {
-        disconnect()
+        // Note: Can't call disconnect() from deinit as it's a @MainActor method
+        // The webSocketTask will be automatically cleaned up when this object is deallocated
         NotificationCenter.default.removeObserver(self)
     }
 

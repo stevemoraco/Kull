@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import Combine
 
 enum AIProvider: String, Codable, CaseIterable, Identifiable {
     case appleIntelligence = "apple"
@@ -313,10 +314,10 @@ class CloudAIService: ObservableObject {
         // Convert RatingItem to PhotoRating
         let photoRating = PhotoRating(
             starRating: rating.star,
-            colorLabel: rating.color,
+            colorLabel: rating.color ?? "",
             keepReject: rating.star >= 3 ? "keep" : "reject",
-            tags: rating.tags,
-            description: rating.description,
+            tags: rating.tags ?? [],
+            description: rating.description ?? "",
             technicalQuality: TechnicalQuality(
                 sharpness: 0.8,
                 exposure: 0.8,
@@ -324,7 +325,7 @@ class CloudAIService: ObservableObject {
                 overallScore: Double(rating.star) / 5.0
             ),
             subjectAnalysis: SubjectAnalysis(
-                primarySubject: rating.title,
+                primarySubject: rating.title ?? "Unknown",
                 emotion: "neutral",
                 eyesOpen: true,
                 smiling: false,

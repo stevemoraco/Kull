@@ -29,7 +29,7 @@ struct DeviceLinkStatusResponse: Decodable {
     let tokens: DeviceTokens?
 }
 
-struct RemoteUser: Decodable {
+struct RemoteUser: Codable {
     let id: String
     let email: String?
     let firstName: String?
@@ -44,11 +44,7 @@ struct RemoteUser: Decodable {
     }
 }
 
-struct CreditSummaryPayload: Decodable {
-    let balance: Int
-    let planDisplayName: String
-    let estimatedShootsRemaining: Double
-}
+// CreditSummary is now imported from Generated/SharedSchemas.swift
 
 struct ProviderCapability: Decodable, Identifiable {
     let id: String
@@ -70,24 +66,29 @@ enum APIError: Error {
 final class KullAPIClient {
     static let shared = KullAPIClient()
 
-    private let baseURL: URL
+    private let customBaseURL: URL?
     private let session: URLSession
     private let jsonDecoder: JSONDecoder
 
     init(baseURL: URL? = nil, session: URLSession = .shared) {
-        self.baseURL = baseURL ?? EnvironmentConfig.shared.apiBaseURL
+        self.customBaseURL = baseURL
         self.session = session
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         self.jsonDecoder = decoder
     }
 
+    private var baseURL: URL {
+        customBaseURL ?? EnvironmentConfig.shared.apiBaseURL
+    }
+
     private func makeURL(_ path: String) -> URL {
+        let currentBaseURL = baseURL
         if path.hasPrefix("http") {
-            return URL(string: path) ?? baseURL
+            return URL(string: path) ?? currentBaseURL
         }
         let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        return baseURL.appendingPathComponent(trimmed)
+        return currentBaseURL.appendingPathComponent(trimmed)
     }
 
     private func makeRequest(path: String, method: String = "GET", body: Data? = nil, contentType: String? = "application/json") -> URLRequest {
@@ -201,7 +202,7 @@ final class KullAPIClient {
         Logger.auth.info("Logout request completed")
     }
 
-    func fetchCreditSummary() async throws -> CreditSummaryPayload {
+    func fetchCreditSummary() async throws -> CreditSummary {
         let request = makeRequest(path: "/api/kull/credits/summary")
         return try await perform(request)
     }

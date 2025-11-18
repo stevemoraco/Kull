@@ -1,5 +1,7 @@
 import SwiftUI
-import AppKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct AuthView: View {
     @EnvironmentObject var auth: AuthViewModel
@@ -37,7 +39,11 @@ struct AuthView: View {
             HStack {
                 Spacer()
                 Button("Sign In…") {
-                    let deviceName = Host.current().localizedName
+                    #if os(macOS)
+                    let deviceName = Host.current().localizedName ?? "Mac"
+                    #else
+                    let deviceName = UIDevice.current.name
+                    #endif
                     auth.startLink(deviceName: deviceName)
                 }
                 .buttonStyle(.borderedProminent)
@@ -56,7 +62,11 @@ struct AuthView: View {
                 Text(state.code)
                     .font(.system(size: 36, weight: .semibold, design: .monospaced))
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .windowBackgroundColor)))
+                    #if os(macOS)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .controlBackgroundColor)))
+                    #else
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
+                    #endif
                 VStack(alignment: .leading) {
                     Text("Expires in \(state.secondsRemaining) s")
                         .foregroundStyle(state.secondsRemaining < 10 ? .red : .secondary)

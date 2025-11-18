@@ -38,35 +38,41 @@ import { initiateDeviceLink, approveDeviceLink, claimDeviceLink } from "./servic
 import { telemetryStore } from "./services/batchTelemetry";
 import { emitShootCompletedNotification } from "./services/reportNotifications";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2025-10-29.clover",
-});
-
-// Stripe Price configuration
-const STRIPE_PRICES = {
-  professional: {
-    annual: process.env.STRIPE_PROFESSIONAL_ANNUAL_PRICE_ID,
-    monthly: process.env.STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID,
-    annualAmount: 99 * 12 * 100, // $1,188 in cents
-    monthlyAmount: 99 * 100, // $99 in cents
-  },
-  studio: {
-    annual: process.env.STRIPE_STUDIO_ANNUAL_PRICE_ID,
-    monthly: process.env.STRIPE_STUDIO_MONTHLY_PRICE_ID,
-    annualAmount: 499 * 12 * 100, // $5,988 in cents
-    monthlyAmount: 499 * 100, // $499 in cents
-  },
-};
-
-const exifGeoService = new ExifGeoContextService({
-  mapboxToken: process.env.MAPBOX_ACCESS_TOKEN,
-});
+// Initialize these lazily inside registerRoutes to ensure dotenv has loaded
+let stripe: Stripe;
+let STRIPE_PRICES: any;
+let exifGeoService: ExifGeoContextService;
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize Stripe and other services that depend on environment variables
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+  }
+
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-10-29.clover",
+  });
+
+  // Stripe Price configuration
+  STRIPE_PRICES = {
+    professional: {
+      annual: process.env.STRIPE_PROFESSIONAL_ANNUAL_PRICE_ID,
+      monthly: process.env.STRIPE_PROFESSIONAL_MONTHLY_PRICE_ID,
+      annualAmount: 99 * 12 * 100, // $1,188 in cents
+      monthlyAmount: 99 * 100, // $99 in cents
+    },
+    studio: {
+      annual: process.env.STRIPE_STUDIO_ANNUAL_PRICE_ID,
+      monthly: process.env.STRIPE_STUDIO_MONTHLY_PRICE_ID,
+      annualAmount: 499 * 12 * 100, // $5,988 in cents
+      monthlyAmount: 499 * 100, // $499 in cents
+    },
+  };
+
+  exifGeoService = new ExifGeoContextService({
+    mapboxToken: process.env.MAPBOX_ACCESS_TOKEN,
+  });
+
   // Auth middleware
   await setupAuth(app);
   

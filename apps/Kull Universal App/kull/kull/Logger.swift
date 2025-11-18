@@ -142,7 +142,7 @@ class PerformanceTimer {
 
     func stop() {
         let duration = CFAbsoluteTimeGetCurrent() - startTime
-        logger.info("⏱️ Completed: \(operation) in \(String(format: "%.3f", duration))s")
+        logger.info("⏱️ Completed: \(self.operation) in \(String(format: "%.3f", duration))s")
     }
 
     deinit {

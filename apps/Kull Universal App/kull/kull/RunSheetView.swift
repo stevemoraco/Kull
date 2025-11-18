@@ -31,8 +31,12 @@ struct RunSheetView: View {
                             }.tag(mode)
                         }
                     }
+                    #if os(macOS)
                     .pickerStyle(.radioGroup)
-                    .onChange(of: selectedMode) { _ in
+                    #else
+                    .pickerStyle(.menu)
+                    #endif
+                    .onChange(of: selectedMode) { _, _ in
                         updateCostEstimate()
                     }
                 }
@@ -50,9 +54,13 @@ struct RunSheetView: View {
                                 Text(provider.displayName).tag(provider)
                             }
                         }
+                        #if os(macOS)
                         .pickerStyle(.radioGroup)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
                         .disabled(selectedMode == .local)
-                        .onChange(of: selectedProvider) { _ in
+                        .onChange(of: selectedProvider) { _, _ in
                             updateCostEstimate()
                         }
                     } else {
@@ -65,9 +73,13 @@ struct RunSheetView: View {
                                 }.tag(AIProvider(rawValue: provider.id) ?? .openaiGPT5Nano)
                             }
                         }
+                        #if os(macOS)
                         .pickerStyle(.radioGroup)
+                        #else
+                        .pickerStyle(.menu)
+                        #endif
                         .disabled(selectedMode == .local)
-                        .onChange(of: selectedProvider) { _ in
+                        .onChange(of: selectedProvider) { _, _ in
                             updateCostEstimate()
                         }
                     }
@@ -112,9 +124,11 @@ struct RunSheetView: View {
             HStack {
                 Text("Custom Prompt (optional)").font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                #if os(macOS)
                 Button("🎙 Transcribe…") {
                     TranscriptionHelper().transcribe(currentText: { self.promptText }) { self.promptText = $0 }
                 }
+                #endif
             }
             TextEditor(text: $promptText)
                 .font(.system(.body, design: .monospaced))

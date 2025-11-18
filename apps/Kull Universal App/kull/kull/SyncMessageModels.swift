@@ -57,7 +57,6 @@ struct GenericSyncMessage: Codable {
 
     enum CodingKeys: String, CodingKey {
         case type
-        case data
         case timestamp
         case deviceId
         case userId

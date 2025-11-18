@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 export enum Environment {
   Development = 'development',
   Staging = 'staging',
@@ -85,7 +87,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
 function getClientBaseURL(env: Environment): string {
   switch (env) {
     case Environment.Development:
-      return 'http://localhost:5000';
+      return process.env.CLIENT_BASE_URL || `http://localhost:${process.env.PORT || '5001'}`;
     case Environment.Staging:
       return 'https://staging.kullai.com';
     case Environment.Production:
@@ -96,7 +98,7 @@ function getClientBaseURL(env: Environment): string {
 function getClientWSURL(env: Environment): string {
   switch (env) {
     case Environment.Development:
-      return 'ws://localhost:5000';
+      return process.env.CLIENT_WS_URL || `ws://localhost:${process.env.PORT || '5001'}`;
     case Environment.Staging:
       return 'wss://staging.kullai.com';
     case Environment.Production:

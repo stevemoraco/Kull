@@ -45,7 +45,7 @@ final class RunController: ObservableObject {
             try await processEconomyBatch(images, provider, prompt)
         }
 
-        logger.info("Culling completed: processed=\(processed), cost=$\(String(format: "%.2f", currentCost))")
+        logger.info("Culling completed: processed=\(self.processed), cost=$\(String(format: "%.2f", self.currentCost))")
     }
 
     // MARK: - Legacy method for backward compatibility

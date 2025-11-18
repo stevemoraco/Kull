@@ -48,14 +48,14 @@ final class AppleIntelligenceService {
         let analyses = try images.map(analyze)
 
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, iOS 26.0, *) {
             if let json = try? await runLanguageModel(over: analyses, userPrompt: prompt) {
                 return Data(json.utf8)
             } else {
                 logger.warning("Falling back to heuristic output – unable to decode model response.")
             }
         } else {
-            logger.info("FoundationModels unavailable on this macOS version; using heuristics.")
+            logger.info("FoundationModels unavailable on this OS version; using heuristics.")
         }
         #else
         logger.info("FoundationModels framework not present; using heuristics.")
@@ -70,7 +70,7 @@ final class AppleIntelligenceService {
     // Enhanced path: accept per-image context (EXIF + geocode) and build a structured instruction
     func processWithContext(images: [(url: URL, context: AIImageContext)], prompt: String) async throws -> Data {
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, iOS 26.0, *) {
             let model = SystemLanguageModel.default
             guard case .available = model.availability else { throw AppleIntelligenceError.notAvailable }
             var inst = "You are Kull. Rate images 1-5 stars, assign optional Lightroom color labels, and produce concise titles/descriptions and up to 8 tags. Respond strictly as JSON: {\\\"ratings\\\":[{\\\"filename\\\":string,\\\"star\\\":number,\\\"color\\\":string,\\\"title\\\":string,\\\"description\\\":string,\\\"tags\\\":[string]}]}\n"
@@ -258,7 +258,7 @@ final class AppleIntelligenceService {
     }
 
     #if canImport(FoundationModels)
-    @available(macOS 26.0, *)
+    @available(macOS 26.0, iOS 26.0, *)
     private func runLanguageModel(over analyses: [Analysis], userPrompt: String) async throws -> String? {
         guard !analyses.isEmpty else {
             return "{\"ratings\":[]}"

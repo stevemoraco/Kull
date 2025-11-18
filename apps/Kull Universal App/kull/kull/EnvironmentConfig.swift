@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 enum Environment: String, CaseIterable, Identifiable {
     case development = "Development"
@@ -63,12 +64,9 @@ class EnvironmentConfig: ObservableObject {
            let env = Environment(rawValue: saved) {
             self.current = env
         } else {
-            // Default based on build configuration
-            #if DEBUG
-            self.current = .development
-            #else
+            // Default to production for all builds
+            // Users can switch to development mode via settings if needed
             self.current = .production
-            #endif
         }
     }
 

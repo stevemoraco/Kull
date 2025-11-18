@@ -276,7 +276,7 @@ struct SettingsView: View {
 
 #if !os(macOS)
 struct LogViewerView: View {
-    @Environment(\.dismiss) private var dismiss
+    @SwiftUI.Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationView {

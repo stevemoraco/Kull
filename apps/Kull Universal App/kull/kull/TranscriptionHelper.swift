@@ -1,8 +1,11 @@
 import Foundation
+#if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
+#endif
 
 final class TranscriptionHelper {
+    #if os(macOS)
     func transcribe(currentText: @escaping () -> String, update: @escaping (String) -> Void) {
         let panel = NSOpenPanel()
         if #available(macOS 12.0, *) {
@@ -50,5 +53,10 @@ final class TranscriptionHelper {
         }
         return ""
     }
+    #else
+    // iOS stub - transcription not available on iOS
+    func transcribe(currentText: @escaping () -> String, update: @escaping (String) -> Void) {
+        // No-op on iOS
+    }
+    #endif
 }
-

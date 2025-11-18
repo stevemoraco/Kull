@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import OSLog
+import Combine
 
 /// User-facing error that should be shown in the UI
 /// ONLY critical user-facing errors are shown - network/API errors are logged only
