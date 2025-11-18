@@ -311,6 +311,156 @@ batchRouter.post('/cancel/:jobId', async (req: Request, res: Response) => {
 });
 
 /**
+ * Helper: Get provider adapter by ID
+ */
+function getProviderAdapter(providerId: ProviderId): any {
+  // Import adapters
+  const { OpenAIAdapter } = require('../ai/providers/OpenAIAdapter');
+  const { AnthropicAdapter } = require('../ai/providers/AnthropicAdapter');
+  const { GoogleAdapter } = require('../ai/providers/GoogleAdapter');
+
+  if (providerId === 'openai-gpt-5' || providerId.startsWith('openai-')) {
+    return new OpenAIAdapter();
+  } else if (providerId.startsWith('claude-')) {
+    return new AnthropicAdapter();
+  } else if (providerId.startsWith('gemini-')) {
+    return new GoogleAdapter();
+  } else {
+    throw new Error(`Unsupported provider: ${providerId}`);
+  }
+}
+
+/**
+ * Helper: Get default system prompt for photo rating
+ */
+function getDefaultSystemPrompt(): string {
+  return `You are an expert professional photographer with decades of experience in photo culling and selection. Your task is to rate photographs with exceptional accuracy and insight.
+
+Rate each image across multiple technical and artistic dimensions on a 1-1000 scale:
+- 1-200: Poor quality
+- 201-400: Below average
+- 401-600: Average
+- 601-800: Good quality
+- 801-1000: Excellent/exceptional
+
+Focus on:
+1. Technical quality (focus, exposure, composition, lighting)
+2. Subject analysis (emotion, expression, moment timing)
+3. Overall artistic merit
+
+CRITICAL: These are RAW images - exposure and white balance are fully correctable. Rate exposure quality based on whether detail is retained, not current brightness. Focus accuracy and moment timing cannot be fixed in post-production - prioritize these heavily.`;
+}
+
+/**
+ * Helper: Poll batch job for completion
+ */
+async function pollBatchCompletion(
+  userId: string,
+  jobId: string,
+  shootId: string,
+  adapter: any,
+  providerBatchId: string
+): Promise<void> {
+  const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
+  const MAX_POLL_TIME_MS = 24 * 60 * 60 * 1000; // 24 hours max
+  const startTime = Date.now();
+
+  console.log(`[BatchAPI] Starting batch polling for job ${jobId} (provider: ${providerBatchId})`);
+
+  while (Date.now() - startTime < MAX_POLL_TIME_MS) {
+    try {
+      // Check batch status
+      const status = await adapter.checkBatchStatus(providerBatchId);
+
+      // Update database with progress
+      await db
+        .update(batchJobs)
+        .set({
+          processedImages: status.processedImages,
+        })
+        .where(eq(batchJobs.id, jobId));
+
+      // Broadcast progress via WebSocket
+      const wsService = getGlobalWsService();
+      if (wsService) {
+        wsService.broadcastToUser(userId, {
+          type: 'SHOOT_PROGRESS',
+          data: {
+            shootId,
+            status: 'processing',
+            processedCount: status.processedImages,
+            totalCount: status.totalImages,
+            provider: adapter.getProviderName(),
+            eta: undefined
+          },
+          timestamp: Date.now(),
+          deviceId: 'server',
+          userId
+        });
+      }
+
+      // Check if completed
+      if (status.status === 'completed') {
+        console.log(`[BatchAPI] Batch ${providerBatchId} completed, retrieving results`);
+
+        // Retrieve results
+        const ratings = await adapter.retrieveBatchResults(providerBatchId);
+
+        // Update database with results
+        await db
+          .update(batchJobs)
+          .set({
+            status: 'completed',
+            processedImages: ratings.length,
+            results: ratings,
+            completedAt: new Date(),
+          })
+          .where(eq(batchJobs.id, jobId));
+
+        // Broadcast completion
+        if (wsService) {
+          wsService.broadcastToUser(userId, {
+            type: 'SHOOT_PROGRESS',
+            data: {
+              shootId,
+              status: 'completed',
+              processedCount: ratings.length,
+              totalCount: status.totalImages,
+              provider: adapter.getProviderName(),
+              eta: 0
+            },
+            timestamp: Date.now(),
+            deviceId: 'server',
+            userId
+          });
+        }
+
+        console.log(`[BatchAPI] Batch ${jobId} completed: ${ratings.length} results`);
+        return;
+      }
+
+      // Check if failed
+      if (status.status === 'failed') {
+        throw new Error(status.error || 'Batch job failed');
+      }
+
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+    } catch (error: any) {
+      console.error(`[BatchAPI] Polling error for job ${jobId}:`, error);
+      await updateJobStatus(jobId, 'failed', error.message);
+      throw error;
+    }
+  }
+
+  // Timeout reached
+  const timeoutError = 'Batch processing timeout (24 hours exceeded)';
+  await updateJobStatus(jobId, 'failed', timeoutError);
+  throw new Error(timeoutError);
+}
+
+/**
  * Helper: Process in fast mode (ultra-high concurrency)
  */
 async function processFastMode(
@@ -384,6 +534,7 @@ async function processFastMode(
 
 /**
  * Helper: Process in economy mode (provider batch API)
+ * Uses provider batch APIs for 50% discount on processing cost
  */
 async function processEconomyMode(
   userId: string,
@@ -391,17 +542,46 @@ async function processEconomyMode(
   data: ProcessBatchRequest
 ): Promise<void> {
   try {
-    // TODO: Implement provider batch API calls
-    // For now, just mark as pending and log
-    console.log(`[BatchAPI] Economy mode not yet implemented for job ${jobId}`);
+    // Get the appropriate provider adapter
+    const adapter = getProviderAdapter(data.providerId as ProviderId);
 
+    if (!adapter.supportsBatch()) {
+      throw new Error(`Provider ${data.providerId} does not support batch API`);
+    }
+
+    console.log(`[BatchAPI] Submitting economy mode batch to ${data.providerId} for job ${jobId}`);
+
+    // Convert images to ImageInput format
+    const images = data.images.map(img => ({
+      data: img.b64 ? Buffer.from(img.b64, 'base64') : Buffer.alloc(0), // Will be handled by adapter
+      format: (img.filename?.split('.').pop()?.toLowerCase() as any) || 'jpeg',
+      filename: img.filename || img.id,
+      metadata: img.metadata
+    }));
+
+    // Submit batch to provider
+    const batchJob = await adapter.submitBatch({
+      images,
+      systemPrompt: data.systemPrompt || getDefaultSystemPrompt(),
+      userPrompt: data.prompt
+    });
+
+    // Store provider batch job ID in database
     await db
       .update(batchJobs)
       .set({
-        status: 'pending',
-        error: 'Economy mode not yet implemented',
+        status: 'processing',
+        providerJobId: batchJob.jobId,
       })
       .where(eq(batchJobs.id, jobId));
+
+    console.log(`[BatchAPI] Batch submitted to provider: ${batchJob.jobId}`);
+
+    // Start polling for batch completion
+    pollBatchCompletion(userId, jobId, data.shootId, adapter, batchJob.jobId).catch(error => {
+      console.error('[BatchAPI] Batch polling error:', error);
+      updateJobStatus(jobId, 'failed', error.message);
+    });
 
   } catch (error: any) {
     console.error('[BatchAPI] Economy mode error:', error);
@@ -414,10 +594,12 @@ async function processEconomyMode(
  * Helper: Check if provider supports economy mode
  */
 function supportsEconomyMode(providerId: ProviderId): boolean {
-  // Only OpenAI and Anthropic support batch APIs
+  // OpenAI, Anthropic, and Google support batch APIs
   return (
     providerId === 'openai-gpt-5' ||
-    providerId.startsWith('claude-')
+    providerId.startsWith('openai-') ||
+    providerId.startsWith('claude-') ||
+    providerId.startsWith('gemini-')
   );
 }
 

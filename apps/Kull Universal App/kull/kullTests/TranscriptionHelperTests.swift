@@ -29,14 +29,10 @@ final class TranscriptionHelperTests: XCTestCase {
 
     // MARK: - Platform Tests
 
-    #if os(macOS)
     func testTranscribeMethodExists() {
         // Verify transcribe method exists and can be called
-        var called = false
         let currentText = { return "Current text" }
-        let update = { (newText: String) in
-            called = true
-        }
+        let update = { (newText: String) in }
 
         // Note: This will show a file picker in actual tests
         // For automated tests, we just verify the method exists
@@ -75,6 +71,54 @@ final class TranscriptionHelperTests: XCTestCase {
         XCTAssertNotNil(simpleUpdate)
     }
 
+    // MARK: - iOS/macOS Compatibility Tests
+
+    #if os(iOS)
+    func testIOSFileAccessServiceIntegration() {
+        // Verify FileAccessService is available on iOS
+        XCTAssertNotNil(FileAccessService.shared)
+        XCTAssertNotNil(FileAccessService.shared.selectAudioFile)
+    }
+
+    func testiOSSecurityScopedResourceHandling() {
+        // Test that iOS-specific security scoped resource handling exists
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("test.m4a")
+
+        // Create a temporary file
+        try? "test".write(to: tempURL, atomically: true, encoding: .utf8)
+
+        // Test security-scoped access methods
+        XCTAssertNotNil(FileAccessService.shared.resumeAccess)
+        XCTAssertNotNil(FileAccessService.shared.stopAccess)
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tempURL)
+    }
+    #endif
+
+    #if os(macOS)
+    func testMacOSFileAccessServiceIntegration() {
+        // Verify FileAccessService is available on macOS
+        XCTAssertNotNil(FileAccessService.shared)
+        XCTAssertNotNil(FileAccessService.shared.selectAudioFile)
+    }
+
+    func testMacOSDirectFileAccess() {
+        // macOS has direct file access
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("test.m4a")
+
+        // Create a temporary file
+        try? "test".write(to: tempURL, atomically: true, encoding: .utf8)
+
+        // Should be able to read directly
+        let data = try? Data(contentsOf: tempURL)
+        XCTAssertNotNil(data)
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tempURL)
+    }
+    #endif
+
     // MARK: - Multipart Form Data Tests
 
     func testMultipartBoundaryGeneration() {
@@ -90,8 +134,8 @@ final class TranscriptionHelperTests: XCTestCase {
         var body = Data()
 
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"audio\"; filename=\"test.mp3\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"test.mp3\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/mpeg\r\n\r\n".data(using: .utf8)!)
         body.append("test data".data(using: .utf8)!)
         body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
@@ -119,7 +163,7 @@ final class TranscriptionHelperTests: XCTestCase {
 
     // MARK: - JSON Response Tests
 
-    func testJSONResponseParsing() throws {
+    func testTranscriptionResponseDecoding() throws {
         let json = """
         {
             "text": "This is a transcribed text"
@@ -127,13 +171,12 @@ final class TranscriptionHelperTests: XCTestCase {
         """
 
         let data = json.data(using: .utf8)!
-        let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let decoded = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
 
-        XCTAssertNotNil(parsed)
-        XCTAssertEqual(parsed?["text"] as? String, "This is a transcribed text")
+        XCTAssertEqual(decoded.text, "This is a transcribed text")
     }
 
-    func testJSONResponseWithEmptyText() throws {
+    func testTranscriptionResponseWithEmptyText() throws {
         let json = """
         {
             "text": ""
@@ -141,24 +184,39 @@ final class TranscriptionHelperTests: XCTestCase {
         """
 
         let data = json.data(using: .utf8)!
-        let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let decoded = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
 
-        XCTAssertNotNil(parsed)
-        XCTAssertEqual(parsed?["text"] as? String, "")
+        XCTAssertEqual(decoded.text, "")
     }
 
-    func testJSONResponseWithMissingText() throws {
-        let json = """
-        {
-            "status": "success"
-        }
-        """
+    // MARK: - Error Handling Tests
 
-        let data = json.data(using: .utf8)!
-        let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    func testTranscriptionErrorAccessDenied() {
+        let error = TranscriptionError.accessDenied
+        XCTAssertNotNil(error.errorDescription)
+        XCTAssertTrue(error.errorDescription!.contains("access"))
+    }
 
-        XCTAssertNotNil(parsed)
-        XCTAssertNil(parsed?["text"])
+    func testTranscriptionErrorAuthenticationFailed() {
+        let error = TranscriptionError.authenticationFailed
+        XCTAssertNotNil(error.errorDescription)
+        XCTAssertTrue(error.errorDescription!.contains("Authentication"))
+    }
+
+    func testTranscriptionErrorUploadFailed() {
+        let error = TranscriptionError.uploadFailed(statusCode: 500)
+        XCTAssertNotNil(error.errorDescription)
+        XCTAssertTrue(error.errorDescription!.contains("500"))
+    }
+
+    func testTranscriptionErrorInvalidURL() {
+        let error = TranscriptionError.invalidURL
+        XCTAssertNotNil(error.errorDescription)
+    }
+
+    func testTranscriptionErrorInvalidResponse() {
+        let error = TranscriptionError.invalidResponse
+        XCTAssertNotNil(error.errorDescription)
     }
 
     // MARK: - Text Combination Tests
@@ -189,20 +247,6 @@ final class TranscriptionHelperTests: XCTestCase {
         XCTAssertFalse(combined.hasPrefix(" "))
         XCTAssertFalse(combined.hasSuffix(" "))
     }
-
-    #else
-    // iOS Tests
-    func testTranscribeIsNoOpOniOS() {
-        let currentText = { return "Text" }
-        let update: (String) -> Void = { _ in }
-
-        // On iOS, transcribe should be a no-op
-        sut.transcribe(currentText: currentText, update: update)
-
-        // Should complete without error
-        XCTAssertNotNil(sut)
-    }
-    #endif
 
     // MARK: - Performance Tests
 

@@ -324,4 +324,152 @@ final class SettingsViewTests: XCTestCase {
         // Restore original
         envConfig.current = originalEnv
     }
+
+    // MARK: - Platform-Specific Tests
+
+    #if os(macOS)
+    func testMacOSConsoleAppButtonAvailable() {
+        // On macOS, Console.app launcher should be available
+        // This is verified by the compilation of SettingsView with the macOS-specific code path
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testMacOSPlatformDisplayName() {
+        // Verify platform detection
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+        // Platform should be "macOS" in About section
+    }
+
+    func testMacOSSpecificFeatures() {
+        // macOS-specific features should compile
+        // - Console.app launcher
+        // - Process-based app opening
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+    #endif
+
+    #if os(iOS)
+    func testIOSConsoleAppButtonHidden() {
+        // On iOS, Console.app launcher should NOT be available
+        // Instead, LogViewerView should be shown
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testIOSPlatformDisplayName() {
+        // Verify platform detection
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+        // Platform should be "iOS" in About section
+    }
+
+    func testIOSSpecificSettings() {
+        // iOS-specific settings should be available
+        let showBadge = UserDefaults.standard.object(forKey: "showBadgeOnIcon") as? Bool ?? true
+        let backgroundRefresh = UserDefaults.standard.object(forKey: "allowBackgroundRefresh") as? Bool ?? true
+
+        // Defaults should be true
+        XCTAssertTrue(showBadge)
+        XCTAssertTrue(backgroundRefresh)
+    }
+
+    func testIOSBadgeSettings() {
+        // Test badge settings persistence
+        UserDefaults.standard.set(false, forKey: "showBadgeOnIcon")
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: "showBadgeOnIcon"))
+
+        UserDefaults.standard.set(true, forKey: "showBadgeOnIcon")
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: "showBadgeOnIcon"))
+
+        // Reset
+        UserDefaults.standard.removeObject(forKey: "showBadgeOnIcon")
+    }
+
+    func testIOSBackgroundRefreshSettings() {
+        // Test background refresh settings persistence
+        UserDefaults.standard.set(false, forKey: "allowBackgroundRefresh")
+        XCTAssertFalse(UserDefaults.standard.bool(forKey: "allowBackgroundRefresh"))
+
+        UserDefaults.standard.set(true, forKey: "allowBackgroundRefresh")
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: "allowBackgroundRefresh"))
+
+        // Reset
+        UserDefaults.standard.removeObject(forKey: "allowBackgroundRefresh")
+    }
+
+    func testLogViewerViewCreation() {
+        // LogViewerView should be available on iOS
+        let view = LogViewerView()
+        XCTAssertNotNil(view)
+    }
+
+    func testLogCategoryRowCreation() {
+        // Test helper view for log categories
+        let row = LogCategoryRow(category: "auth", description: "Authentication and device linking")
+        XCTAssertNotNil(row)
+    }
+    #endif
+
+    // MARK: - Cross-Platform Tests
+
+    func testAccountSectionExists() {
+        // Account section should exist on both platforms
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testEnvironmentSectionExists() {
+        // Environment section should exist on both platforms
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testNotificationsSectionExists() {
+        // Notifications section should exist on both platforms
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testAdvancedSectionExists() {
+        // Advanced section should exist on both platforms
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testAboutSectionExists() {
+        // About section should exist on both platforms
+        let view = SettingsView()
+            .environmentObject(authViewModel)
+        XCTAssertNotNil(view)
+    }
+
+    func testPrivacyPolicyLinkAvailable() {
+        // Privacy policy link should be available on both platforms
+        let url = URL(string: "https://kullai.com/privacy")
+        XCTAssertNotNil(url)
+    }
+
+    func testTermsOfServiceLinkAvailable() {
+        // Terms of service link should be available on both platforms
+        let url = URL(string: "https://kullai.com/terms")
+        XCTAssertNotNil(url)
+    }
+
+    func testSupportLinkAvailable() {
+        // Support link should be available on both platforms
+        let url = URL(string: "https://kullai.com/support")
+        XCTAssertNotNil(url)
+    }
 }

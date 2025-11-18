@@ -141,48 +141,38 @@ export class GoogleAdapter extends BaseProviderAdapter {
   async submitBatch(request: BatchImageRequest): Promise<BatchJob> {
     const responseSchema = this.getResponseSchema();
 
-    // Create JSONL content with all images
-    const jsonlLines = request.images.map((image, index) => {
+    // Build inline requests (Google supports up to 20MB inline)
+    const inlineRequests = request.images.map((image, index) => {
       const base64Image = this.imageToBase64(image);
       const mimeType = this.getMimeType(image.format);
 
-      const batchRequest = {
-        contents: [
-          {
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Image
+      return {
+        key: `image-${index}-${image.filename}`,
+        request: {
+          contents: [
+            {
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Image
+                  }
+                },
+                {
+                  text: `${request.systemPrompt}\n\n${request.userPrompt}\n\nREMINDER: These are RAW images - exposure and white balance are fully correctable in post-production. Rate exposure quality based on whether detail is retained, not current brightness. Focus accuracy and moment timing cannot be fixed - prioritize these heavily.`
                 }
-              },
-              {
-                text: `${request.systemPrompt}\n\n${request.userPrompt}\n\nREMINDER: These are RAW images - exposure and white balance are fully correctable in post-production. Rate exposure quality based on whether detail is retained, not current brightness. Focus accuracy and moment timing cannot be fixed - prioritize these heavily.`
-              }
-            ]
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema
           }
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema
         }
       };
-
-      // Each JSONL line needs a unique key and the request object
-      return JSON.stringify({
-        key: `image-${index}-${image.filename}`,
-        request: batchRequest
-      });
     });
 
-    const jsonlContent = jsonlLines.join('\n');
-    const jsonlBuffer = Buffer.from(jsonlContent, 'utf-8');
-
-    // Step 1: Upload JSONL file using resumable upload
-    const uploadUrl = await this.initiateResumableUpload(jsonlBuffer.length);
-    const fileUri = await this.uploadFileContent(uploadUrl, jsonlBuffer);
-
-    // Step 2: Submit batch job with the uploaded file
+    // Submit batch job using inline requests
     const batchUrl = `${this.baseURL}/models/${this.modelName}:batchGenerateContent`;
 
     const batchResponse = await fetch(batchUrl, {
@@ -193,10 +183,8 @@ export class GoogleAdapter extends BaseProviderAdapter {
       },
       body: JSON.stringify({
         batch: {
-          display_name: `kull-batch-${Date.now()}`,
-          input_config: {
-            file_name: fileUri
-          }
+          displayName: `kull-batch-${Date.now()}`,
+          requests: inlineRequests
         }
       })
     });
@@ -225,59 +213,6 @@ export class GoogleAdapter extends BaseProviderAdapter {
       createdAt: new Date(),
       estimatedCompletionTime
     };
-  }
-
-  /**
-   * Initiate resumable upload and get upload URL
-   */
-  private async initiateResumableUpload(fileSize: number): Promise<string> {
-    const uploadUrl = `${this.baseURL.replace('/v1beta', '')}/upload/v1beta/files`;
-
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Protocol': 'resumable',
-        'X-Goog-Upload-Command': 'start',
-        'X-Goog-Upload-Header-Content-Length': fileSize.toString(),
-        'X-Goog-Upload-Header-Content-Type': 'application/x-ndjson',
-        'x-goog-api-key': this.apiKey
-      }
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to initiate resumable upload: ${response.status} ${error}`);
-    }
-
-    const uploadSessionUrl = response.headers.get('X-Goog-Upload-URL');
-    if (!uploadSessionUrl) {
-      throw new Error('No upload URL returned from Google API');
-    }
-
-    return uploadSessionUrl;
-  }
-
-  /**
-   * Upload file content using resumable upload URL
-   */
-  private async uploadFileContent(uploadUrl: string, content: Buffer): Promise<string> {
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Length': content.length.toString(),
-        'X-Goog-Upload-Offset': '0',
-        'X-Goog-Upload-Command': 'upload, finalize'
-      },
-      body: content
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to upload file content: ${response.status} ${error}`);
-    }
-
-    const fileData = await response.json();
-    return fileData.file.uri || fileData.file.name;
   }
 
   /**
@@ -312,9 +247,11 @@ export class GoogleAdapter extends BaseProviderAdapter {
 
     const jobData = await response.json();
 
-    // Calculate progress from metadata if available
-    const totalTasks = jobData.metadata?.totalTaskCount || 0;
-    const completedTasks = jobData.metadata?.completedTaskCount || 0;
+    // Calculate progress from stats if available
+    const totalTasks = parseInt(jobData.batchStats?.requestCount || '0');
+    const successfulTasks = parseInt(jobData.batchStats?.successfulRequestCount || '0');
+    const failedTasks = parseInt(jobData.batchStats?.failedRequestCount || '0');
+    const completedTasks = successfulTasks + failedTasks;
 
     const status: BatchJobStatus = {
       jobId: jobData.name,
@@ -322,9 +259,9 @@ export class GoogleAdapter extends BaseProviderAdapter {
       totalImages: totalTasks,
       processedImages: completedTasks,
       createdAt: new Date(jobData.createTime),
-      estimatedCompletionTime: jobData.metadata?.estimatedCompletionTime
-        ? new Date(jobData.metadata.estimatedCompletionTime)
-        : undefined
+      estimatedCompletionTime: jobData.endTime
+        ? new Date(jobData.endTime)
+        : new Date(Date.now() + 24 * 60 * 60 * 1000) // Default 24h estimate
     };
 
     // Add error if job failed
@@ -332,12 +269,8 @@ export class GoogleAdapter extends BaseProviderAdapter {
       status.error = jobData.error.message || 'Batch job failed';
     }
 
-    // Store output file URI for retrieval
-    if (jobData.state === 'JOB_STATE_SUCCEEDED' && jobData.metadata?.outputFileUri) {
-      // Store in a Map or similar - for now we'll include it in error field as metadata
-      // In production, you'd want a more robust storage mechanism
-      (status as any).outputFileUri = jobData.metadata.outputFileUri;
-    }
+    // Store the complete job data for retrieval (includes inline responses)
+    (status as any)._jobData = jobData;
 
     return status;
   }
@@ -352,15 +285,74 @@ export class GoogleAdapter extends BaseProviderAdapter {
       );
     }
 
-    // Get output file URI from status
-    const outputFileUri = (status as any).outputFileUri;
-    if (!outputFileUri) {
-      throw new Error('No output file URI found in completed batch job');
+    // Get job data from status (contains inline responses)
+    const jobData = (status as any)._jobData;
+    if (!jobData) {
+      throw new Error('No job data found in batch status');
     }
 
+    // Handle inline responses (most common for our use case)
+    if (jobData.dest?.inlinedResponses?.inlinedResponses) {
+      return this.parseInlineResponses(jobData.dest.inlinedResponses.inlinedResponses);
+    }
+
+    // Handle file-based responses (for very large batches)
+    if (jobData.dest?.responsesFile) {
+      return this.parseFileResponses(jobData.dest.responsesFile);
+    }
+
+    throw new Error('No results found in completed batch job');
+  }
+
+  /**
+   * Parse inline batch responses
+   */
+  private parseInlineResponses(inlinedResponses: any[]): PhotoRating[] {
+    const results: PhotoRating[] = [];
+
+    for (const item of inlinedResponses) {
+      try {
+        // Check if this is an error response
+        if (item.error) {
+          console.error(`Error in batch result:`, item.error);
+          continue;
+        }
+
+        // Extract the response content
+        const response = item.response;
+        if (!response?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          console.error(`No content in batch result for key ${item.metadata?.key}`);
+          continue;
+        }
+
+        const content = response.candidates[0].content.parts[0].text;
+        const ratingData = JSON.parse(content);
+
+        // Extract filename from metadata key (format: "image-{index}-{filename}")
+        const key = item.metadata?.key || '';
+        const keyParts = key.split('-');
+        const filename = keyParts.slice(2).join('-'); // Handle filenames with hyphens
+
+        ratingData.imageId = filename;
+        ratingData.filename = filename;
+
+        const rating = this.validateRating(ratingData);
+        results.push(rating);
+      } catch (err) {
+        console.error(`Failed to parse inline batch result:`, err);
+        continue;
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Parse file-based batch responses
+   */
+  private async parseFileResponses(fileId: string): Promise<PhotoRating[]> {
     // Download results file
-    // The outputFileUri format is typically "files/{fileId}"
-    const downloadUrl = `${this.baseURL.replace('/v1beta', '')}/download/v1beta/${outputFileUri}?alt=media`;
+    const downloadUrl = `${this.baseURL.replace('/v1beta', '')}/download/v1beta/${fileId}?alt=media`;
 
     const response = await fetch(downloadUrl, {
       method: 'GET',

@@ -31,10 +31,29 @@ final class RunController: ObservableObject {
             notifier.notifyCompletion(processed: processed, total: total)
         }
 
-        let images = try enumerateImages(in: folderURL)
+        // Platform-specific routing
+        #if os(iOS)
+        try await processPhotosIOS(folder: folderURL, provider: provider, mode: mode, prompt: prompt)
+        #else
+        try await processPhotosMacOS(folder: folderURL, provider: provider, mode: mode, prompt: prompt)
+        #endif
+
+        logger.info("Culling completed: processed=\(self.processed), cost=$\(String(format: "%.2f", self.currentCost))")
+    }
+
+    // MARK: - macOS Processing
+
+    #if os(macOS)
+    private func processPhotosMacOS(
+        folder: URL,
+        provider: AIProvider,
+        mode: ProcessingMode,
+        prompt: String
+    ) async throws {
+        let images = try enumerateImages(in: folder)
         total = images.count
 
-        logger.info("Found \(images.count) images to process")
+        logger.info("Found \(images.count) images to process on macOS")
 
         switch mode {
         case .local:
@@ -44,9 +63,8 @@ final class RunController: ObservableObject {
         case .economy:
             try await processEconomyBatch(images, provider, prompt)
         }
-
-        logger.info("Culling completed: processed=\(self.processed), cost=$\(String(format: "%.2f", self.currentCost))")
     }
+    #endif
 
     // MARK: - Legacy method for backward compatibility
 
@@ -63,8 +81,9 @@ final class RunController: ObservableObject {
         }
     }
 
-    // MARK: - Private Processing Methods
+    // MARK: - Private Processing Methods (macOS)
 
+    #if os(macOS)
     private func enumerateImages(in folder: URL) throws -> [URL] {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: folder, includingPropertiesForKeys: nil) else {
@@ -231,4 +250,5 @@ final class RunController: ObservableObject {
 
         processed = ratings.count
     }
+    #endif
 }

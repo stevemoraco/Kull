@@ -8,6 +8,10 @@
 import Foundation
 import SwiftUI
 import OSLog
+#if os(iOS)
+import UserNotifications
+import UIKit
+#endif
 
 /// Settings view for environment switching, notification preferences, and app info
 struct SettingsView: View {
@@ -21,11 +25,19 @@ struct SettingsView: View {
     @State private var showingClearCacheConfirmation = false
     @State private var cacheCleared = false
 
+    #if os(iOS)
+    @AppStorage("showBadgeOnIcon") private var showBadgeOnIcon = true
+    @AppStorage("allowBackgroundRefresh") private var allowBackgroundRefresh = true
+    #endif
+
     var body: some View {
         Form {
             accountSection
             environmentSection
             notificationsSection
+            #if os(iOS)
+            iosSettingsSection
+            #endif
             advancedSection
             aboutSection
         }
@@ -121,6 +133,29 @@ struct SettingsView: View {
                 }
         }
     }
+
+    // MARK: - iOS Settings Section
+
+    #if os(iOS)
+    private var iosSettingsSection: some View {
+        Section("iOS Settings") {
+            Toggle("Show badge on app icon", isOn: $showBadgeOnIcon)
+                .onChange(of: showBadgeOnIcon) { _, newValue in
+                    Logger.settings.logSettingsChange("showBadgeOnIcon", String(newValue))
+                    updateBadgeSettings(newValue)
+                }
+
+            Toggle("Allow background refresh", isOn: $allowBackgroundRefresh)
+                .onChange(of: allowBackgroundRefresh) { _, newValue in
+                    Logger.settings.logSettingsChange("allowBackgroundRefresh", String(newValue))
+                }
+
+            Text("Background refresh allows the app to check for processing updates when not in use.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    #endif
 
     // MARK: - Advanced Section
 
@@ -241,6 +276,24 @@ struct SettingsView: View {
     }
     #endif
 
+    #if os(iOS)
+    private func updateBadgeSettings(_ enabled: Bool) {
+        if enabled {
+            // Request notification permission for badge (non-intrusive)
+            UNUserNotificationCenter.current().requestAuthorization(options: [.badge]) { granted, error in
+                if let error = error {
+                    Logger.errors.error("Failed to request badge authorization: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            // Clear badge
+            Task { @MainActor in
+                UIApplication.shared.applicationIconBadgeNumber = 0
+            }
+        }
+    }
+    #endif
+
     private func clearCache() {
         Logger.settings.notice("User initiated cache clear")
 
@@ -281,32 +334,131 @@ struct LogViewerView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("To view detailed logs, connect your device to a Mac and use Console.app")
-                        .padding()
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 16) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Viewing Logs on iOS", systemImage: "doc.text.magnifyingglass")
+                            .font(.headline)
 
-                    Text("Filter by subsystem: media.lander.kull")
-                        .font(.system(.caption, design: .monospaced))
-                        .padding(.horizontal)
-
-                    Text("Available categories:")
-                        .font(.headline)
-                        .padding(.horizontal)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("• auth - Authentication and device linking")
-                        Text("• sync - WebSocket real-time sync")
-                        Text("• api - API requests and responses")
-                        Text("• processing - AI photo processing")
-                        Text("• errors - All application errors")
-                        Text("• keychain - Secure credential storage")
-                        Text("• settings - Settings changes")
-                        Text("• ui - User interface interactions")
+                        Text("Kull uses Apple's native OSLog system for secure, efficient logging. All logs are stored system-wide and can be viewed using developer tools.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundColor(.secondary)
                     .padding(.horizontal)
+                    .padding(.top)
+
+                    Divider()
+
+                    // Console.app Instructions
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Using Console.app (Mac)", systemImage: "desktopcomputer")
+                            .font(.headline)
+
+                        Text("For detailed, real-time log viewing:")
+                            .font(.subheadline)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top) {
+                                Text("1.")
+                                    .fontWeight(.medium)
+                                Text("Connect your device to a Mac via USB or WiFi")
+                            }
+                            HStack(alignment: .top) {
+                                Text("2.")
+                                    .fontWeight(.medium)
+                                Text("Open Console.app (in /Applications/Utilities/)")
+                            }
+                            HStack(alignment: .top) {
+                                Text("3.")
+                                    .fontWeight(.medium)
+                                Text("Select your device from the sidebar")
+                            }
+                            HStack(alignment: .top) {
+                                Text("4.")
+                                    .fontWeight(.medium)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Filter logs by subsystem:")
+                                    Text("media.lander.kull")
+                                        .font(.system(.caption, design: .monospaced))
+                                        .padding(4)
+                                        .background(Color.secondary.opacity(0.1))
+                                        .cornerRadius(4)
+                                }
+                            }
+                        }
+                        .font(.caption)
+                    }
+                    .padding(.horizontal)
+
+                    Divider()
+
+                    // Xcode Console Instructions
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Using Xcode Console", systemImage: "hammer")
+                            .font(.headline)
+
+                        Text("When running from Xcode:")
+                            .font(.subheadline)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .top) {
+                                Text("1.")
+                                    .fontWeight(.medium)
+                                Text("Run the app from Xcode")
+                            }
+                            HStack(alignment: .top) {
+                                Text("2.")
+                                    .fontWeight(.medium)
+                                Text("Open the debug console (Cmd+Shift+Y)")
+                            }
+                            HStack(alignment: .top) {
+                                Text("3.")
+                                    .fontWeight(.medium)
+                                Text("View real-time logs in the output panel")
+                            }
+                        }
+                        .font(.caption)
+                    }
+                    .padding(.horizontal)
+
+                    Divider()
+
+                    // Log Categories
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Available Log Categories", systemImage: "list.bullet.rectangle")
+                            .font(.headline)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            LogCategoryRow(category: "auth", description: "Authentication and device linking")
+                            LogCategoryRow(category: "sync", description: "WebSocket real-time sync")
+                            LogCategoryRow(category: "api", description: "API requests and responses")
+                            LogCategoryRow(category: "processing", description: "AI photo processing")
+                            LogCategoryRow(category: "errors", description: "All application errors")
+                            LogCategoryRow(category: "keychain", description: "Secure credential storage")
+                            LogCategoryRow(category: "settings", description: "Settings changes")
+                            LogCategoryRow(category: "ui", description: "User interface interactions")
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    Divider()
+
+                    // Tips
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Pro Tips", systemImage: "lightbulb")
+                            .font(.headline)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("• Enable 'Debug logging' in Advanced settings for more detailed logs")
+                            Text("• Logs persist across app restarts")
+                            Text("• Filter by category in Console.app for focused debugging")
+                            Text("• Screenshots of Console.app logs can be shared with support")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -319,6 +471,26 @@ struct LogViewerView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+// Helper view for log category rows
+struct LogCategoryRow: View {
+    let category: String
+    let description: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(category)
+                .font(.system(.caption, design: .monospaced))
+                .fontWeight(.medium)
+                .foregroundColor(.blue)
+                .frame(width: 80, alignment: .leading)
+
+            Text(description)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
 }

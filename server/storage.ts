@@ -12,6 +12,8 @@ import {
   promptVotes,
   creditTransactions,
   deviceSessions,
+  deviceTokens,
+  notificationPreferences,
   shootReports,
   shootProgress,
   globalSettings,
@@ -41,6 +43,10 @@ import {
   type InsertCreditTransaction,
   type DeviceSession,
   type InsertDeviceSession,
+  type DeviceToken,
+  type InsertDeviceToken,
+  type NotificationPreference,
+  type InsertNotificationPreference,
   type ShootReport,
   type InsertShootReport,
   type ShootProgress,
@@ -1501,6 +1507,97 @@ export class DatabaseStorage implements IStorage {
 
   async getAllGlobalSettings(): Promise<GlobalSetting[]> {
     return db.select().from(globalSettings);
+  }
+
+  // Device token operations for push notifications
+  async upsertDeviceToken(data: {
+    userId: string;
+    deviceId: string;
+    deviceToken: string;
+    platform: 'ios' | 'android';
+    updatedAt: Date;
+  }): Promise<string> {
+    const [token] = await db
+      .insert(deviceTokens)
+      .values({
+        userId: data.userId,
+        deviceId: data.deviceId,
+        deviceToken: data.deviceToken,
+        platform: data.platform,
+        isActive: true,
+        updatedAt: data.updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [deviceTokens.userId, deviceTokens.deviceId],
+        set: {
+          deviceToken: data.deviceToken,
+          platform: data.platform,
+          isActive: true,
+          updatedAt: data.updatedAt,
+        },
+      })
+      .returning();
+    return token.id;
+  }
+
+  async getDeviceTokens(userId: string): Promise<DeviceToken[]> {
+    return db
+      .select()
+      .from(deviceTokens)
+      .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.isActive, true)));
+  }
+
+  async getDeviceToken(userId: string, deviceId: string): Promise<DeviceToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(deviceTokens)
+      .where(
+        and(
+          eq(deviceTokens.userId, userId),
+          eq(deviceTokens.deviceId, deviceId),
+          eq(deviceTokens.isActive, true)
+        )
+      );
+    return token;
+  }
+
+  async deleteDeviceToken(userId: string, deviceId: string): Promise<void> {
+    await db
+      .update(deviceTokens)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.deviceId, deviceId)));
+  }
+
+  // Notification preferences operations
+  async updateNotificationPreferences(userId: string, preferences: Partial<{
+    shootComplete: boolean;
+    deviceConnection: boolean;
+    creditLow: boolean;
+    batchComplete: boolean;
+    shootFailed: boolean;
+  }>): Promise<void> {
+    await db
+      .insert(notificationPreferences)
+      .values({
+        userId,
+        ...preferences,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: notificationPreferences.userId,
+        set: {
+          ...preferences,
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreference | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return prefs;
   }
 }
 

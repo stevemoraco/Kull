@@ -11,9 +11,20 @@ final class BookmarkStore {
 
     func save(url: URL) throws {
         #if os(macOS)
-        let data = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-        #else
-        let data = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        // macOS: Use security-scoped bookmarks for persistent access
+        let data = try url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        #elseif os(iOS)
+        // iOS: Use minimal bookmarks (iOS sandbox restrictions)
+        // Security-scoped resources work differently on iOS
+        let data = try url.bookmarkData(
+            options: .minimalBookmark,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
         #endif
         var current = store
         current[url.path] = data
@@ -24,12 +35,28 @@ final class BookmarkStore {
         store.compactMap { (path, data) in
             var isStale = false
             #if os(macOS)
-            if let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+            // macOS: Resolve security-scoped bookmark and start accessing
+            if let url = try? URL(
+                resolvingBookmarkData: data,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ) {
+                // Start accessing the security-scoped resource
                 _ = url.startAccessingSecurityScopedResource()
                 return url
             }
-            #else
-            if let url = try? URL(resolvingBookmarkData: data, options: [], relativeTo: nil, bookmarkDataIsStale: &isStale) {
+            #elseif os(iOS)
+            // iOS: Resolve minimal bookmark
+            if let url = try? URL(
+                resolvingBookmarkData: data,
+                options: [],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ) {
+                // iOS: Start accessing security-scoped resource
+                // (Required even for minimal bookmarks when accessing user-selected folders)
+                _ = url.startAccessingSecurityScopedResource()
                 return url
             }
             #endif

@@ -533,10 +533,23 @@ struct HomeView: View {
     }
 }
 
-// iOS AppDelegate for lifecycle management
-final class AppDelegate: NSObject, UIApplicationDelegate {
+// iOS AppDelegate for lifecycle management and push notifications
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         Logger.app.info("Kull iOS app launched")
+
+        // Set notification delegate
+        UNUserNotificationCenter.current().delegate = self
+
+        // Request notification permissions
+        Task {
+            do {
+                try await NotificationService.shared.requestPermissions()
+            } catch {
+                Logger.errors.error("Failed to request notification permissions: \(error)")
+            }
+        }
+
         return true
     }
 
@@ -544,6 +557,48 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // Handle deep links for authentication callback
         Logger.app.info("Received deep link: \(url.absoluteString)")
         return true
+    }
+
+    // MARK: - Remote Notifications
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        NotificationService.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Logger.errors.error("Failed to register for remote notifications: \(error)")
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    // Handle notifications when app is in foreground
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        Logger.app.info("Received notification while app in foreground")
+        NotificationService.shared.handleNotification(notification.request.content.userInfo)
+
+        // Show banner, sound, and badge even when app is in foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+
+    // Handle notification tap (app opened from notification)
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Logger.app.info("User tapped notification")
+        NotificationService.shared.handleNotification(response.notification.request.content.userInfo)
+        completionHandler()
     }
 }
 

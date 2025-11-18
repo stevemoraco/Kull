@@ -152,6 +152,25 @@ struct RunSheetView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                } else if runner.processed > 0 && runner.processed == runner.total {
+                    // Show completion message
+                    VStack(alignment: .leading, spacing: 4) {
+                        #if os(macOS)
+                        Text("✓ Complete! XMP files written next to your photos.")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Text("Open Lightroom to import with ratings.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        #else
+                        Text("✓ Complete! XMP files ready to save.")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Text("Use the share sheet to save XMP files back to your photo library.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        #endif
+                    }
                 }
                 Spacer()
                 Button("Run") { Task { await startRun() } }
@@ -181,6 +200,11 @@ struct RunSheetView: View {
         }
 
         // Count images in folder
+        let validExtensions = ["cr3", "nef", "arw", "orf", "raf", "dng", "jpg", "jpeg", "png", "heic"]
+        var count = 0
+
+        #if os(macOS)
+        // macOS: Use enumerator for recursive folder traversal
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: folder, includingPropertiesForKeys: nil) else {
             estimatedImageCount = 0
@@ -188,14 +212,26 @@ struct RunSheetView: View {
             return
         }
 
-        let validExtensions = ["cr3", "nef", "arw", "orf", "raf", "dng", "jpg", "jpeg", "png", "heic"]
-        var count = 0
-
         while let url = enumerator.nextObject() as? URL {
             if validExtensions.contains(url.pathExtension.lowercased()) {
                 count += 1
             }
         }
+        #else
+        // iOS: Use contentsOfDirectory (user selected folder from UIDocumentPicker)
+        do {
+            let files = try FileManager.default.contentsOfDirectory(
+                at: folder,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            )
+            count = files.filter { validExtensions.contains($0.pathExtension.lowercased()) }.count
+        } catch {
+            estimatedImageCount = 0
+            estimatedCost = 0.0
+            return
+        }
+        #endif
 
         estimatedImageCount = count
 

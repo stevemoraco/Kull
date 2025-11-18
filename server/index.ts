@@ -10,6 +10,8 @@ import { refreshRepoCache } from "./fetchRepo";
 import { setupWebSocketServer } from "./websocket";
 import { createSyncRouter } from "./routes/sync";
 import { bootstrapNotificationAdapters } from "./services/bootstrapNotifications";
+import transcribeRouter from "./routes/transcribe";
+import notificationsRouter from "./routes/notifications";
 
 const app = express();
 
@@ -95,6 +97,14 @@ app.use((req, res, next) => {
   // Register Stripe webhook routes (before other middleware)
   app.use('/api/stripe', stripeWebhooksRouter);
   log('[Stripe] Stripe webhook routes registered at /api/stripe');
+
+  // Register transcribe routes
+  app.use('/api', transcribeRouter);
+  log('[Transcribe] Transcribe routes registered at /api/transcribe');
+
+  // Register notifications routes
+  app.use('/api', notificationsRouter);
+  log('[Notifications] Notification routes registered at /api/notifications');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

@@ -106,7 +106,7 @@ describe('GoogleAdapter', () => {
   });
 
   describe('Batch Submission', () => {
-    it('should create valid JSONL format', async () => {
+    it('should create valid inline request format', async () => {
       const images = [testImage];
       const request: BatchImageRequest = {
         images,
@@ -114,39 +114,31 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Rate this image'
       };
 
-      // Mock successful file upload flow
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url' })
+      // Mock successful batch submission with inline requests
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'batches/test-batch-123',
+          state: 'JOB_STATE_PENDING',
+          createTime: new Date().toISOString(),
+          batchStats: { requestCount: '1' }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/test-123' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/job-123',
-            state: 'JOB_STATE_PENDING',
-            createTime: new Date().toISOString()
-          })
-        });
+      });
 
       await adapter.submitBatch(request);
 
-      // Check that upload was called with JSONL content
-      const uploadCall = (global.fetch as any).mock.calls[1];
-      const uploadedContent = uploadCall[1].body.toString();
+      // Check that batch was submitted with inline requests
+      const batchCall = (global.fetch as any).mock.calls[0];
+      expect(batchCall[0]).toContain(':batchGenerateContent');
 
-      // Parse the JSONL line
-      const jsonlLine = JSON.parse(uploadedContent);
-      expect(jsonlLine.key).toMatch(/^image-0-/);
-      expect(jsonlLine.request.contents).toBeDefined();
-      expect(jsonlLine.request.generationConfig.responseMimeType).toBe('application/json');
+      const requestBody = JSON.parse(batchCall[1].body);
+      expect(requestBody.batch.requests).toHaveLength(1);
+      expect(requestBody.batch.requests[0].key).toBe('image-0-test-image.jpg');
+      expect(requestBody.batch.requests[0].request.contents).toBeDefined();
+      expect(requestBody.batch.requests[0].request.generationConfig.responseMimeType).toBe('application/json');
     });
 
-    it('should upload file correctly using resumable upload', async () => {
+    it('should submit batch using inline requests correctly', async () => {
       const images = [testImage];
       const request: BatchImageRequest = {
         images,
@@ -154,36 +146,27 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Rate this'
       };
 
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url/session-123' })
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'batches/batch-789',
+          state: 'JOB_STATE_PENDING',
+          createTime: new Date().toISOString(),
+          batchStats: { requestCount: '1' }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/uploaded-456' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/batch-789',
-            state: 'JOB_STATE_PENDING',
-            createTime: new Date().toISOString()
-          })
-        });
+      });
 
       await adapter.submitBatch(request);
 
-      // Verify initiate upload call
-      const initiateCall = (global.fetch as any).mock.calls[0];
-      expect(initiateCall[0]).toContain('/upload/v1beta/files');
-      expect(initiateCall[1].headers['X-Goog-Upload-Protocol']).toBe('resumable');
-      expect(initiateCall[1].headers['X-Goog-Upload-Command']).toBe('start');
+      // Verify batch submission call
+      const batchCall = (global.fetch as any).mock.calls[0];
+      expect(batchCall[0]).toContain(':batchGenerateContent');
+      expect(batchCall[1].headers['Content-Type']).toBe('application/json');
+      expect(batchCall[1].headers['x-goog-api-key']).toBeDefined();
 
-      // Verify file upload call
-      const uploadCall = (global.fetch as any).mock.calls[1];
-      expect(uploadCall[0]).toBe('https://upload.url/session-123');
-      expect(uploadCall[1].headers['X-Goog-Upload-Command']).toBe('upload, finalize');
+      const body = JSON.parse(batchCall[1].body);
+      expect(body.batch.displayName).toMatch(/^kull-batch-/);
+      expect(body.batch.requests).toHaveLength(1);
     });
 
     it('should return batch job with correct structure', async () => {
@@ -194,29 +177,21 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Rate'
       };
 
-      const expectedJobName = 'projects/my-project/jobs/batch-12345';
+      const expectedJobName = 'batches/batch-12345';
       const expectedCreateTime = '2025-01-15T10:00:00Z';
 
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url' })
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: expectedJobName,
+          state: 'JOB_STATE_PENDING',
+          createTime: expectedCreateTime,
+          batchStats: { requestCount: '2' },
+          metadata: {
+            estimatedCompletionTime: '2025-01-16T10:00:00Z'
+          }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/test' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: expectedJobName,
-            state: 'JOB_STATE_PENDING',
-            createTime: expectedCreateTime,
-            metadata: {
-              estimatedCompletionTime: '2025-01-16T10:00:00Z'
-            }
-          })
-        });
+      });
 
       const result = await adapter.submitBatch(request);
 
@@ -228,7 +203,7 @@ describe('GoogleAdapter', () => {
       expect(result.estimatedCompletionTime).toBeInstanceOf(Date);
     });
 
-    it('should handle upload errors', async () => {
+    it('should handle batch submission errors', async () => {
       const request: BatchImageRequest = {
         images: [testImage],
         systemPrompt: 'Test',
@@ -242,24 +217,7 @@ describe('GoogleAdapter', () => {
       });
 
       await expect(adapter.submitBatch(request)).rejects.toThrow(
-        'Failed to initiate resumable upload: 403'
-      );
-    });
-
-    it('should handle missing upload URL', async () => {
-      const request: BatchImageRequest = {
-        images: [testImage],
-        systemPrompt: 'Test',
-        userPrompt: 'Rate'
-      };
-
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        headers: new Headers() // No X-Goog-Upload-URL header
-      });
-
-      await expect(adapter.submitBatch(request)).rejects.toThrow(
-        'No upload URL returned from Google API'
+        'Google Batch API submission failed: 403'
       );
     });
 
@@ -275,32 +233,23 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Rate'
       };
 
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url' })
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'batches/large-batch-job',
+          state: 'JOB_STATE_PENDING',
+          createTime: new Date().toISOString(),
+          batchStats: { requestCount: '1200' }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/large-batch' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/large-batch-job',
-            state: 'JOB_STATE_PENDING',
-            createTime: new Date().toISOString()
-          })
-        });
+      });
 
       const result = await adapter.submitBatch(request);
       expect(result.totalImages).toBe(1200);
 
-      // Verify JSONL has all images
-      const uploadCall = (global.fetch as any).mock.calls[1];
-      const uploadedContent = uploadCall[1].body.toString();
-      const lines = uploadedContent.split('\n');
-      expect(lines.length).toBe(1200);
+      // Verify all images included in inline requests
+      const batchCall = (global.fetch as any).mock.calls[0];
+      const body = JSON.parse(batchCall[1].body);
+      expect(body.batch.requests).toHaveLength(1200);
     });
 
     it('should include RAW image reminder in prompts', async () => {
@@ -310,30 +259,21 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Analyze quality'
       };
 
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url' })
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'batches/job',
+          state: 'JOB_STATE_PENDING',
+          createTime: new Date().toISOString(),
+          batchStats: { requestCount: '1' }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/test' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/job',
-            state: 'JOB_STATE_PENDING',
-            createTime: new Date().toISOString()
-          })
-        });
+      });
 
       await adapter.submitBatch(request);
 
-      const uploadCall = (global.fetch as any).mock.calls[1];
-      const uploadedContent = uploadCall[1].body.toString();
-      const jsonlLine = JSON.parse(uploadedContent);
-      const textPart = jsonlLine.request.contents[0].parts[1].text;
+      const batchCall = (global.fetch as any).mock.calls[0];
+      const body = JSON.parse(batchCall[1].body);
+      const textPart = body.batch.requests[0].request.contents[0].parts[1].text;
 
       expect(textPart).toContain('RAW images');
       expect(textPart).toContain('exposure and white balance are fully correctable');
@@ -384,20 +324,22 @@ describe('GoogleAdapter', () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          name: 'projects/test/jobs/job-123',
+          name: 'batches/batch-123',
           state: 'JOB_STATE_RUNNING',
           createTime: '2025-01-15T10:00:00Z',
-          metadata: {
-            totalTaskCount: 100,
-            completedTaskCount: 47
+          batchStats: {
+            requestCount: '100',
+            successfulRequestCount: '35',
+            failedRequestCount: '12',
+            pendingRequestCount: '53'
           }
         })
       });
 
-      const result = await adapter.checkBatchStatus('projects/test/jobs/job-123');
+      const result = await adapter.checkBatchStatus('batches/batch-123');
 
       expect(result.totalImages).toBe(100);
-      expect(result.processedImages).toBe(47);
+      expect(result.processedImages).toBe(47); // successful + failed
       expect(result.status).toBe('processing');
     });
 
@@ -421,25 +363,33 @@ describe('GoogleAdapter', () => {
       expect(result.error).toBe('Invalid API key');
     });
 
-    it('should store output file URI when completed', async () => {
+    it('should store job data when completed', async () => {
+      const mockJobData = {
+        name: 'batches/batch-123',
+        state: 'JOB_STATE_SUCCEEDED',
+        createTime: new Date().toISOString(),
+        batchStats: {
+          requestCount: '10',
+          successfulRequestCount: '10',
+          failedRequestCount: '0'
+        },
+        dest: {
+          inlinedResponses: {
+            inlinedResponses: []
+          }
+        }
+      };
+
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          name: 'projects/test/jobs/job-123',
-          state: 'JOB_STATE_SUCCEEDED',
-          createTime: new Date().toISOString(),
-          metadata: {
-            totalTaskCount: 10,
-            completedTaskCount: 10,
-            outputFileUri: 'files/output-results-789'
-          }
-        })
+        json: async () => mockJobData
       });
 
-      const result = await adapter.checkBatchStatus('projects/test/jobs/job-123');
+      const result = await adapter.checkBatchStatus('batches/batch-123');
 
       expect(result.status).toBe('completed');
-      expect((result as any).outputFileUri).toBe('files/output-results-789');
+      expect((result as any)._jobData).toBeDefined();
+      expect((result as any)._jobData.dest).toBeDefined();
     });
   });
 
@@ -460,112 +410,129 @@ describe('GoogleAdapter', () => {
       ).rejects.toThrow('is not complete');
     });
 
-    it('should throw error if no output file URI', async () => {
+    it('should throw error if no results found', async () => {
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          name: 'projects/test/jobs/job-123',
+          name: 'batches/batch-123',
           state: 'JOB_STATE_SUCCEEDED',
           createTime: new Date().toISOString(),
-          metadata: {
-            // No outputFileUri
+          batchStats: { requestCount: '0' },
+          dest: {
+            // No inlinedResponses or responsesFile
           }
         })
       });
 
       await expect(
-        adapter.retrieveBatchResults('projects/test/jobs/job-123')
-      ).rejects.toThrow('No output file URI found');
+        adapter.retrieveBatchResults('batches/batch-123')
+      ).rejects.toThrow('No results found');
     });
 
-    it('should parse JSONL results correctly', async () => {
-      // Mock status check
+    it('should parse inline results correctly', async () => {
+      // Mock status check with inline responses
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          name: 'projects/test/jobs/job-123',
+          name: 'batches/batch-123',
           state: 'JOB_STATE_SUCCEEDED',
           createTime: new Date().toISOString(),
-          metadata: {
-            outputFileUri: 'files/results-456'
+          batchStats: {
+            requestCount: '2',
+            successfulRequestCount: '2'
+          },
+          dest: {
+            inlinedResponses: {
+              inlinedResponses: [
+                {
+                  metadata: { key: 'image-0-photo1.jpg' },
+                  response: {
+                    candidates: [{
+                      content: {
+                        parts: [{
+                          text: JSON.stringify({
+                            starRating: 5,
+                            colorLabel: 'green',
+                            keepReject: 'keep',
+                            description: 'Beautiful sunset',
+                            tags: ['landscape', 'sunset'],
+                            technicalQuality: {
+                              focusAccuracy: 950,
+                              exposureQuality: 900,
+                              compositionScore: 880,
+                              lightingQuality: 920,
+                              colorHarmony: 890,
+                              noiseLevel: 940,
+                              sharpnessDetail: 960,
+                              dynamicRange: 900,
+                              overallTechnical: 920
+                            },
+                            subjectAnalysis: {
+                              primarySubject: 'Landscape',
+                              emotionIntensity: 800,
+                              eyesOpen: true,
+                              eyeContact: false,
+                              genuineExpression: 750,
+                              facialSharpness: 700,
+                              bodyLanguage: 720,
+                              momentTiming: 850,
+                              storyTelling: 880,
+                              uniqueness: 860
+                            }
+                          })
+                        }]
+                      }
+                    }]
+                  }
+                },
+                {
+                  metadata: { key: 'image-1-photo2.jpg' },
+                  response: {
+                    candidates: [{
+                      content: {
+                        parts: [{
+                          text: JSON.stringify({
+                            starRating: 3,
+                            colorLabel: 'none',
+                            keepReject: 'maybe',
+                            description: 'Average shot',
+                            tags: ['portrait'],
+                            technicalQuality: {
+                              focusAccuracy: 600,
+                              exposureQuality: 550,
+                              compositionScore: 600,
+                              lightingQuality: 570,
+                              colorHarmony: 580,
+                              noiseLevel: 560,
+                              sharpnessDetail: 590,
+                              dynamicRange: 570,
+                              overallTechnical: 575
+                            },
+                            subjectAnalysis: {
+                              primarySubject: 'Person',
+                              emotionIntensity: 500,
+                              eyesOpen: true,
+                              eyeContact: true,
+                              genuineExpression: 520,
+                              facialSharpness: 480,
+                              bodyLanguage: 510,
+                              momentTiming: 490,
+                              storyTelling: 530,
+                              uniqueness: 500
+                            }
+                          })
+                        }]
+                      }
+                    }]
+                  }
+                }
+              ]
+            }
           }
         })
       });
 
-      // Mock results download
-      const jsonlResults = [
-        {
-          key: 'image-0-photo1.jpg',
-          response: {
-            candidates: [{
-              content: {
-                parts: [{
-                  text: JSON.stringify({
-                    starRating: 5,
-                    colorLabel: 'green',
-                    keepReject: 'keep',
-                    description: 'Beautiful sunset',
-                    tags: ['landscape', 'sunset'],
-                    technicalQuality: {
-                      focusAccuracy: 950,
-                      exposureQuality: 900,
-                      sharpness: 0.95,
-                      exposure: 0.90,
-                      composition: 0.88,
-                      overallScore: 0.91
-                    },
-                    subjectAnalysis: {
-                      primarySubject: 'Landscape',
-                      emotionIntensity: 800,
-                      eyesOpen: true,
-                      smiling: false,
-                      inFocus: true
-                    }
-                  })
-                }]
-              }
-            }]
-          }
-        },
-        {
-          key: 'image-1-photo2.jpg',
-          response: {
-            candidates: [{
-              content: {
-                parts: [{
-                  text: JSON.stringify({
-                    starRating: 3,
-                    colorLabel: 'none',
-                    keepReject: 'maybe',
-                    description: 'Average shot',
-                    tags: ['portrait'],
-                    technicalQuality: {
-                      focusAccuracy: 600,
-                      sharpness: 0.6,
-                      exposure: 0.5,
-                      composition: 0.6,
-                      overallScore: 0.57
-                    },
-                    subjectAnalysis: {
-                      primarySubject: 'Person',
-                      eyesOpen: true,
-                      smiling: true,
-                      inFocus: true
-                    }
-                  })
-                }]
-              }
-            }]
-          }
-        }
-      ].map(r => JSON.stringify(r)).join('\n');
-
-      (global.fetch as any).mockResolvedValueOnce({
-        ok: true,
-        text: async () => jsonlResults
-      });
-
-      const results = await adapter.retrieveBatchResults('projects/test/jobs/job-123');
+      const results = await adapter.retrieveBatchResults('batches/batch-123');
 
       expect(results).toHaveLength(2);
       expect(results[0].filename).toBe('photo1.jpg');
