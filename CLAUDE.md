@@ -148,6 +148,135 @@ Kull profit: $2.00
 - Do NOT use "credits" language—just show dollar amounts from their annual subscription
 
 **Batch API discount:**
+- Economy mode uses batch APIs: 50% off provider cost
+- Still charge 2x markup on the discounted price
+
+---
+
+## AI Processing Architecture
+
+### Image Processing Model: 1 Image = 1 API Call
+
+**CRITICAL**: Each image gets its own individual API call. Do NOT batch multiple images into a single API request.
+
+**Correct approach:**
+```typescript
+// Fire 1,247 individual API calls concurrently
+const promises = images.map(image =>
+  provider.processSingleImage({ image, prompt })
+);
+await Promise.allSettled(promises); // All fire simultaneously
+```
+
+**Optional context images** (if affordable):
+- May include 2-3 nearby images for temporal context
+- Example: "This is image 47 of a wedding ceremony sequence"
+- Only if token budget allows (not required)
+
+**Why 1:1 architecture:**
+- Maximize parallelization (30k requests/min)
+- Independent retries per image (one failure doesn't block batch)
+- Real-time progress updates (WebSocket after each image)
+- Simpler error handling and cost tracking
+
+### Structured Rating Output (CRITICAL)
+
+**AI must return detailed numerical ratings across multiple dimensions:**
+
+```typescript
+interface PhotoRating {
+  // Core metadata
+  imageId: string;
+  filename: string;
+
+  // Lightroom-compatible (primary outputs)
+  starRating: 1 | 2 | 3 | 4 | 5;  // Final composite score
+  colorLabel: 'red' | 'yellow' | 'green' | 'blue' | 'purple' | 'none';
+  keepReject: 'keep' | 'reject' | 'maybe';
+
+  // Detailed quality metrics (1-1000 scale for slider adjustments)
+  technicalQuality: {
+    focusAccuracy: number;        // 1-1000: Tack-sharp (1000) to blurry (1)
+    exposureQuality: number;      // 1-1000: Proper exposure (remind: RAW = fixable)
+    compositionScore: number;     // 1-1000: Rule of thirds, framing, balance
+    lightingQuality: number;      // 1-1000: Direction, quality, mood
+    colorHarmony: number;         // 1-1000: Color balance, saturation
+    noiseLevel: number;           // 1-1000: Clean (1000) to noisy (1) (inverted)
+    sharpnessDetail: number;      // 1-1000: Edge definition, detail retention
+    dynamicRange: number;         // 1-1000: Highlight/shadow detail
+    overallTechnical: number;     // 1-1000: Composite technical score
+  };
+
+  // Subject & moment analysis (1-1000 scale)
+  subjectAnalysis: {
+    primarySubject: string;       // "Bride", "Groom", "Couple", "Family", etc.
+    emotionIntensity: number;     // 1-1000: Peak emotion capture
+    eyesOpen: boolean;            // Critical for portraits
+    eyeContact: boolean;          // Looking at camera vs candid
+    genuineExpression: number;    // 1-1000: Natural vs posed/fake
+    facialSharpness: number;      // 1-1000: Face in focus (critical)
+    bodyLanguage: number;         // 1-1000: Natural, confident posture
+    momentTiming: number;         // 1-1000: Peak action/decisive moment
+    storyTelling: number;         // 1-1000: Narrative strength
+    uniqueness: number;           // 1-1000: Novel vs duplicate/similar
+  };
+
+  // Context & metadata
+  tags: string[];                 // ["ceremony", "kiss", "emotional", "hero"]
+  description: string;            // Natural language: "Bride laughing during vows..."
+  similarityGroup?: string;       // Group ID for near-duplicate detection
+  shootContext?: {
+    eventType: string;            // "wedding", "portrait", "corporate", etc.
+    shootPhase: string;           // "ceremony", "reception", "prep", etc.
+    timeOfDay: string;            // "golden-hour", "midday", "evening"
+    location: string;             // "indoor", "outdoor", "church", etc.
+  };
+}
+```
+
+**Why detailed ratings:**
+- **Post-processing adjustments**: Users can tweak sliders after AI finishes
+  - "Make focus more important" → boost focusAccuracy weight
+  - "More loose selections" → lower all thresholds
+  - "Only peak moments" → filter emotionIntensity > 900
+- **Re-ranking without re-processing**: Change criteria, recalculate stars instantly
+- **Learning user preferences**: Track which ratings users agree/disagree with
+- **Transparency**: Users see why AI chose 5 stars vs 3 stars
+
+**Prompt reminders for LLM:**
+- "These are RAW images - exposure and white balance are fully correctable in post"
+- "Rate exposure quality on whether detail is retained, not current brightness"
+- "Focus and moment timing cannot be fixed - prioritize these heavily"
+
+### Post-Processing Rating Adjustment UI
+
+Before "Export to Lightroom", user can adjust:
+
+```typescript
+interface RatingWeights {
+  focusAccuracy: number;        // 0.0-2.0 multiplier (default 1.0)
+  emotionIntensity: number;     // 0.0-2.0 multiplier
+  compositionScore: number;     // 0.0-2.0 multiplier
+  momentTiming: number;         // 0.0-2.0 multiplier
+  // ... all other metrics
+
+  strictnessLevel: number;      // 0.0-1.0: Looser (more 5-stars) to Stricter
+}
+
+// Recalculate stars based on new weights
+function recalculateStars(rating: PhotoRating, weights: RatingWeights): 1|2|3|4|5 {
+  const weightedScore =
+    (rating.technicalQuality.focusAccuracy * weights.focusAccuracy) +
+    (rating.subjectAnalysis.emotionIntensity * weights.emotionIntensity) +
+    // ... all dimensions
+
+  // Apply strictness to threshold
+  const threshold = getThreshold(weights.strictnessLevel);
+  return scoreToStars(weightedScore, threshold);
+}
+```
+
+**Batch API discount:**
 - Provider cost: 50% off (e.g., $0.001 per image)
 - User cost: Still 2x ($0.002 per image)
 - User saves 50%, we maintain 50% margin
