@@ -84,7 +84,22 @@ final class CreditSummaryViewModel: ObservableObject {
     @Published var planDisplayName: String = "—"
     @Published var estimatedShootsRemaining: Double = 0
     @Published var loading = false
+    @Published var usingCachedData = false
     private var cancellables: Set<AnyCancellable> = []
+
+    init() {
+        // Load cached data on init
+        loadCachedData()
+    }
+
+    private func loadCachedData() {
+        if let cached = CacheManager.shared.getCachedCreditSummary() {
+            self.balance = cached.balance
+            self.planDisplayName = cached.planDisplayName
+            self.estimatedShootsRemaining = cached.estimatedShootsRemaining
+            self.usingCachedData = true
+        }
+    }
 
     func refresh() {
         let baseURL = EnvironmentConfig.shared.apiBaseURL
@@ -94,10 +109,20 @@ final class CreditSummaryViewModel: ObservableObject {
             .map(\.data)
             .decode(type: CreditSummary.self, decoder: JSONDecoder())
             .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] _ in self?.loading = false }, receiveValue: { [weak self] cs in
+            .sink(receiveCompletion: { [weak self] completion in
+                self?.loading = false
+                if case .failure = completion {
+                    // Failed to fetch, use cached data
+                    self?.loadCachedData()
+                }
+            }, receiveValue: { [weak self] cs in
                 self?.balance = cs.balance
                 self?.planDisplayName = cs.planDisplayName
                 self?.estimatedShootsRemaining = cs.estimatedShootsRemaining
+                self?.usingCachedData = false
+
+                // Cache the fresh data
+                CacheManager.shared.cacheCreditSummary(cs)
             })
             .store(in: &cancellables)
     }
@@ -105,6 +130,10 @@ final class CreditSummaryViewModel: ObservableObject {
 
 struct MainWindow: View {
     @EnvironmentObject var credits: CreditSummaryViewModel
+    @StateObject private var webSocket = WebSocketService.shared
+    @StateObject private var syncCoordinator = SyncCoordinator.shared
+    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var operationQueue = OfflineOperationQueue.shared
     @State private var showingRunSheet = false
     @State private var selectedFolder: URL? = nil
 
@@ -114,13 +143,87 @@ struct MainWindow: View {
                 Text("Kull")
                     .font(.system(size: 22, weight: .bold))
                 Spacer()
+
+                // Network and sync status
+                HStack(spacing: 12) {
+                    // Network status
+                    HStack(spacing: 4) {
+                        Image(systemName: networkMonitor.isConnected ? "wifi" : "wifi.slash")
+                            .foregroundColor(networkMonitor.isConnected ? .green : .orange)
+                        Text(networkMonitor.connectionDescription)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .help(networkMonitor.isConnected ? "Network connected" : "Offline - operations will sync when online")
+
+                    // WebSocket connection status
+                    HStack(spacing: 4) {
+                        Image(systemName: webSocket.isConnected ? "bolt.fill" : "exclamationmark.triangle.fill")
+                            .foregroundColor(webSocket.isConnected ? .green : .orange)
+                        Text(webSocket.isConnected ? "Synced" : connectionStateText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .help(webSocket.isConnected ? "Real-time sync active" : "Sync unavailable - check connection")
+
+                    // Pending operations indicator
+                    if operationQueue.pendingOperationsCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundColor(.blue)
+                            Text("\(operationQueue.pendingOperationsCount) pending")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .help("Operations queued for sync")
+                    }
+                }
+
                 Button("Refresh Credits") { credits.refresh() }
+            }
+
+            // Offline banner
+            if !networkMonitor.isConnected {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Offline Mode")
+                            .font(.headline)
+                        Text("Changes will sync automatically when connection is restored")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    if operationQueue.pendingOperationsCount > 0 {
+                        Text("\(operationQueue.pendingOperationsCount) operations queued")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color.orange.opacity(0.15))
+                .cornerRadius(8)
+            }
+
+            // Syncing indicator
+            if operationQueue.isSyncing {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Syncing operations...")
+                        .font(.subheadline)
+                    Spacer()
+                }
+                .padding()
+                .background(Color.blue.opacity(0.15))
+                .cornerRadius(8)
             }
             HStack(spacing: 24) {
                 VStack(alignment: .leading) {
                     Text("Credits Available")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text("\(credits.balance)")
+                    Text("\(syncCoordinator.creditBalance > 0 ? syncCoordinator.creditBalance : credits.balance)")
                         .font(.title3)
                 }
                 VStack(alignment: .leading) {
@@ -136,6 +239,33 @@ struct MainWindow: View {
                         .font(.title3)
                 }
                 Spacer()
+            }
+
+            // Active shoot progress
+            if syncCoordinator.isAnyShooting {
+                GroupBox(label: Text("Active Shoots").font(.headline)) {
+                    VStack(spacing: 8) {
+                        ForEach(Array(syncCoordinator.activeShootProgress.values), id: \.shootId) { progress in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("Shoot: \(progress.shootId.prefix(8))")
+                                        .font(.caption)
+                                    Spacer()
+                                    Text("\(progress.processedCount)/\(progress.totalCount)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                ProgressView(value: progress.progress)
+                                if let eta = progress.eta {
+                                    Text("ETA: \(Int(eta))s")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(8)
+                }
             }
             GroupBox(label: Text("Start a new cull")) {
                 VStack(alignment: .center, spacing: 12) {
@@ -174,6 +304,21 @@ struct MainWindow: View {
             }
         }
     }
+
+    private var connectionStateText: String {
+        switch webSocket.connectionState {
+        case .disconnected:
+            return "Offline"
+        case .connecting:
+            return "Connecting..."
+        case .connected:
+            return "Connected"
+        case .reconnecting(let attempt):
+            return "Reconnecting (\(attempt))..."
+        case .failed(let error):
+            return "Failed"
+        }
+    }
 }
 
 #else
@@ -201,7 +346,22 @@ final class MobileCredits: ObservableObject {
     @Published var balance: Int = 0
     @Published var plan: String = "—"
     @Published var shootsLeft: Double = 0
+    @Published var usingCachedData = false
     private var cancellables: Set<AnyCancellable> = []
+
+    init() {
+        // Load cached data on init
+        loadCachedData()
+    }
+
+    private func loadCachedData() {
+        if let cached = CacheManager.shared.getCachedCreditSummary() {
+            self.balance = cached.balance
+            self.plan = cached.planDisplayName
+            self.shootsLeft = cached.estimatedShootsRemaining
+            self.usingCachedData = true
+        }
+    }
 
     func refresh() {
         let baseURL = EnvironmentConfig.shared.apiBaseURL
@@ -209,43 +369,153 @@ final class MobileCredits: ObservableObject {
         URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
             .map(\.data)
             .decode(type: CreditSummary.self, decoder: JSONDecoder())
-            .replaceError(with: CreditSummary(balance: 0, planDisplayName: "—", estimatedShootsRemaining: 0))
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] sum in
+            .sink(receiveCompletion: { [weak self] completion in
+                if case .failure = completion {
+                    // Failed to fetch, use cached data
+                    self?.loadCachedData()
+                }
+            }, receiveValue: { [weak self] sum in
                 self?.balance = sum.balance
                 self?.plan = sum.planDisplayName
                 self?.shootsLeft = sum.estimatedShootsRemaining
-            }.store(in: &cancellables)
+                self?.usingCachedData = false
+
+                // Cache the fresh data
+                CacheManager.shared.cacheCreditSummary(sum)
+            }).store(in: &cancellables)
     }
 }
 
 struct HomeView: View {
     @StateObject var credits = MobileCredits()
+    @StateObject private var webSocket = WebSocketService.shared
+    @StateObject private var syncCoordinator = SyncCoordinator.shared
+    @StateObject private var networkMonitor = NetworkMonitor.shared
+    @StateObject private var operationQueue = OfflineOperationQueue.shared
     @State private var showingPrompts = false
     @State private var showingFolders = false
 
     var body: some View {
         NavigationView {
-            List {
-                Section(header: Text("Credits")) {
-                    HStack { Text("Available"); Spacer(); Text("\(credits.balance)").font(.headline) }
-                    HStack { Text("Plan"); Spacer(); Text(credits.plan) }
-                    HStack { Text("Est. Shoots Left"); Spacer(); Text(String(format: "%.0f", credits.shootsLeft)) }
-                    Button("Buy Credits") { /* open web */ }
+            VStack(spacing: 0) {
+                // Network status banner
+                HStack {
+                    Image(systemName: networkMonitor.isConnected ? "wifi" : "wifi.slash")
+                        .foregroundColor(networkMonitor.isConnected ? .green : .orange)
+                    Text(networkMonitor.connectionDescription)
+                        .font(.caption)
+                    Spacer()
+                    if operationQueue.pendingOperationsCount > 0 {
+                        Text("\(operationQueue.pendingOperationsCount) pending")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-                Section(header: Text("Active Shoot")) {
-                    HStack { Text("Model"); Spacer(); Text("—") }
-                    HStack { Text("Progress"); Spacer(); Text("0 / 0") }
-                    HStack { Text("ETA"); Spacer(); Text("—") }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(networkMonitor.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+
+                // Syncing indicator
+                if operationQueue.isSyncing {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Syncing operations...")
+                            .font(.caption)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.blue.opacity(0.1))
                 }
-                Section {
-                    NavigationLink(isActive: $showingFolders) { FoldersView() } label: { Button("Folders") { showingFolders = true } }
-                    NavigationLink(isActive: $showingPrompts) { MarketplaceView() } label: { Button("Prompt Marketplace") { showingPrompts = true } }
+
+                // WebSocket connection status
+                HStack {
+                    Image(systemName: webSocket.isConnected ? "bolt.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(webSocket.isConnected ? .green : .orange)
+                    Text(webSocket.isConnected ? "Real-time sync active" : connectionStateText)
+                        .font(.caption)
+                    Spacer()
+                    if let lastSync = webSocket.lastSyncTime {
+                        Text("Last sync: \(timeAgo(lastSync))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(webSocket.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+
+                List {
+                    Section(header: Text("Credits")) {
+                        HStack {
+                            Text("Available")
+                            Spacer()
+                            Text("\(syncCoordinator.creditBalance > 0 ? syncCoordinator.creditBalance : credits.balance)")
+                                .font(.headline)
+                        }
+                        HStack { Text("Plan"); Spacer(); Text(credits.plan) }
+                        HStack { Text("Est. Shoots Left"); Spacer(); Text(String(format: "%.0f", credits.shootsLeft)) }
+                        Button("Buy Credits") { /* open web */ }
+                    }
+
+                    // Active shoot progress
+                    if syncCoordinator.isAnyShooting {
+                        Section(header: Text("Active Shoots")) {
+                            ForEach(Array(syncCoordinator.activeShootProgress.values), id: \.shootId) { progress in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text("Shoot: \(progress.shootId.prefix(8))")
+                                            .font(.caption)
+                                        Spacer()
+                                        Text("\(progress.processedCount)/\(progress.totalCount)")
+                                            .font(.caption)
+                                    }
+                                    ProgressView(value: progress.progress)
+                                    if let eta = progress.eta {
+                                        Text("ETA: \(Int(eta))s")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Section {
+                        NavigationLink(isActive: $showingFolders) { FoldersView() } label: { Button("Folders") { showingFolders = true } }
+                        NavigationLink(isActive: $showingPrompts) { MarketplaceView() } label: { Button("Prompt Marketplace") { showingPrompts = true } }
+                    }
                 }
             }
             .navigationTitle("Kull")
             .onAppear { credits.refresh() }
         }
+    }
+
+    private var connectionStateText: String {
+        switch webSocket.connectionState {
+        case .disconnected:
+            return "Offline"
+        case .connecting:
+            return "Connecting..."
+        case .connected:
+            return "Connected"
+        case .reconnecting(let attempt):
+            return "Reconnecting (\(attempt))..."
+        case .failed(let error):
+            return "Failed"
+        }
+    }
+
+    private func timeAgo(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "\(seconds)s ago" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        return "\(hours)h ago"
     }
 }
 

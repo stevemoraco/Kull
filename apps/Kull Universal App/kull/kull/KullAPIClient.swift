@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 struct DeviceLinkInitiateResponse: Decodable {
     let code: String
@@ -100,24 +101,43 @@ final class KullAPIClient {
     }
 
     private func perform<T: Decodable>(_ request: URLRequest, acceptedStatusCodes: Set<Int> = [200]) async throws -> T {
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let endpoint = request.url?.path ?? "unknown"
+        let method = request.httpMethod ?? "GET"
+
+        Logger.api.logAPIRequest(method, endpoint)
+
         let (data, response) = try await session.data(for: request)
+
+        let duration = CFAbsoluteTimeGetCurrent() - startTime
+
         guard let http = response as? HTTPURLResponse else {
+            Logger.api.error("Invalid HTTP response for \(endpoint)")
             throw APIError.requestFailed(status: -1)
         }
+
+        Logger.api.logAPIResponse(http.statusCode, endpoint, duration: duration)
+
         if !acceptedStatusCodes.contains(http.statusCode) {
+            Logger.api.error("Request failed: \(endpoint) - status \(http.statusCode)")
             throw APIError.requestFailed(status: http.statusCode)
         }
+
         do {
             return try jsonDecoder.decode(T.self, from: data)
         } catch {
+            Logger.api.error("Failed to decode response from \(endpoint): \(error.localizedDescription)")
             throw APIError.decodingFailed
         }
     }
 
     func initiateDeviceLink(deviceName: String?) async throws -> DeviceLinkInitiateResponse {
+        Logger.auth.info("Initiating device link for device: \(deviceName ?? "unknown")")
         let payload = try JSONSerialization.data(withJSONObject: ["deviceName": deviceName as Any?].compactMapValues { $0 }, options: [])
         let request = makeRequest(path: "/api/device/link/initiate", method: "POST", body: payload)
-        return try await perform(request)
+        let response: DeviceLinkInitiateResponse = try await perform(request)
+        Logger.auth.notice("Device link initiated successfully, code: \(response.code)")
+        return response
     }
 
     func approveDeviceLink(code: String, deviceName: String?) async throws {
@@ -127,43 +147,58 @@ final class KullAPIClient {
     }
 
     func pollDeviceLink(pollToken: String) async throws -> DeviceLinkStatusResponse {
+        Logger.auth.debug("Polling device link status")
         let payload = try JSONSerialization.data(withJSONObject: ["pollToken": pollToken], options: [])
         let request = makeRequest(path: "/api/device/link/status", method: "POST", body: payload)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
+            Logger.auth.error("Invalid HTTP response while polling device link")
             throw APIError.requestFailed(status: -1)
         }
         if http.statusCode == 200 {
-            return try jsonDecoder.decode(DeviceLinkStatusResponse.self, from: data)
+            let decoded = try jsonDecoder.decode(DeviceLinkStatusResponse.self, from: data)
+            Logger.auth.info("Device link status: \(decoded.status)")
+            return decoded
         }
         if let decoded = try? jsonDecoder.decode(DeviceLinkStatusResponse.self, from: data) {
+            Logger.auth.info("Device link status: \(decoded.status)")
             return decoded
         }
         if http.statusCode == 410 {
+            Logger.auth.warning("Device link expired")
             return DeviceLinkStatusResponse(status: "expired", expiresAt: nil, deviceName: nil, user: nil, tokens: nil)
         }
+        Logger.auth.warning("Device link invalid")
         return DeviceLinkStatusResponse(status: "invalid", expiresAt: nil, deviceName: nil, user: nil, tokens: nil)
     }
 
     func fetchCurrentUser() async throws -> RemoteUser? {
+        Logger.auth.debug("Fetching current user")
         let request = makeRequest(path: "/api/auth/user")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
+            Logger.auth.error("Invalid HTTP response while fetching user")
             throw APIError.requestFailed(status: -1)
         }
         if http.statusCode == 401 {
+            Logger.auth.info("User not authenticated (401)")
             return nil
         }
         if http.statusCode == 200 {
-            return try jsonDecoder.decode(RemoteUser.self, from: data)
+            let user = try jsonDecoder.decode(RemoteUser.self, from: data)
+            Logger.auth.logAuthSuccess(user.id)
+            return user
         }
+        Logger.auth.error("Failed to fetch user: status \(http.statusCode)")
         throw APIError.requestFailed(status: http.statusCode)
     }
 
     func logout() async {
+        Logger.auth.notice("Logging out user")
         var request = makeRequest(path: "/api/logout")
         request.httpMethod = "GET"
         _ = try? await session.data(for: request)
+        Logger.auth.info("Logout request completed")
     }
 
     func fetchCreditSummary() async throws -> CreditSummaryPayload {
@@ -229,19 +264,28 @@ final class KullAPIClient {
         // Decode JWT and check expiry
         guard let payload = decodeJWT(token),
               let exp = payload["exp"] as? TimeInterval else {
+            Logger.auth.warning("Could not decode JWT token, assuming expired")
             return true  // Assume expired if can't decode
         }
 
         let expiryDate = Date(timeIntervalSince1970: exp)
         let fiveMinutesFromNow = Date().addingTimeInterval(300)
+        let expiring = expiryDate < fiveMinutesFromNow
 
-        return expiryDate < fiveMinutesFromNow
+        if expiring {
+            Logger.auth.info("Access token expiring soon, will refresh")
+        }
+
+        return expiring
     }
 
     private func refreshAccessToken() async throws {
         let deviceId = DeviceIDManager.shared.deviceID
 
+        Logger.auth.info("Refreshing access token")
+
         guard let refreshToken = KeychainManager.shared.getRefreshToken(for: deviceId) else {
+            Logger.auth.error("No refresh token found in keychain")
             throw APIError.notAuthenticated
         }
 
@@ -259,6 +303,7 @@ final class KullAPIClient {
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
             // Refresh failed - user needs to re-authenticate
+            Logger.auth.error("Token refresh failed, clearing credentials")
             KeychainManager.shared.clearAll(for: deviceId)
             throw APIError.refreshFailed
         }
@@ -271,6 +316,7 @@ final class KullAPIClient {
 
         // Save new access token
         try KeychainManager.shared.saveAccessToken(refreshResponse.accessToken, for: deviceId)
+        Logger.auth.notice("Access token refreshed successfully")
     }
 
     private func decodeJWT(_ token: String) -> [String: Any]? {

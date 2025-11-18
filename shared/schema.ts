@@ -301,6 +301,27 @@ export const shootProgress = pgTable("shoot_progress", {
 export type ShootProgress = typeof shootProgress.$inferSelect;
 export type InsertShootProgress = typeof shootProgress.$inferInsert;
 
+// Batch jobs for concurrent image processing
+export const batchJobs = pgTable("batch_jobs", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  shootId: varchar("shoot_id").notNull(),
+  providerId: varchar("provider_id").notNull(), // 'openai-gpt-5', 'claude-haiku-4-5', etc.
+  status: varchar("status").notNull(), // 'processing', 'completed', 'failed'
+  totalImages: integer("total_images").notNull(),
+  processedImages: integer("processed_images").notNull().default(0),
+  results: jsonb("results"), // array of rating results
+  error: text("error"),
+  providerJobId: varchar("provider_job_id"), // for economy mode batch APIs
+  mode: varchar("mode").notNull().default('fast'), // 'fast' or 'economy'
+  createdAt: timestamp("created_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export type BatchJob = typeof batchJobs.$inferSelect;
+export type InsertBatchJob = typeof batchJobs.$inferInsert;
+
 // Shared report links for public access
 export const sharedReportLinks = pgTable("shared_report_links", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

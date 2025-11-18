@@ -70,7 +70,7 @@ export function Hero() {
                   </div>
                   <div className="flex-1 text-left">
                     <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5 stars</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">Professional quality ratings</p>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">All images starred in seconds based on your custom, sharable prompt</p>
                   </div>
                 </div>
 
@@ -103,7 +103,7 @@ export function Hero() {
                   </div>
                   <div className="flex-1 text-left">
                     <h3 className="text-lg font-bold text-foreground leading-tight">Title</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">AI-generated titles for every image</p>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Auto-written detailed image titles based on subject, shoot context, GPS, EXIF, and other metadata</p>
                   </div>
                 </div>
 
@@ -177,7 +177,7 @@ export function Hero() {
         {/* AI Model badges */}
         <div className="mt-10 pt-6 border-t border-border/40">
           <p className="text-sm text-muted-foreground mb-6 uppercase tracking-wide font-semibold">Powered by your preference from the latest AI models</p>
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex flex-wrap justify-center gap-6 max-w-6xl mx-auto">
             {/* OpenAI GPT-5.1 */}
             <div className="group relative bg-gradient-to-br from-gray-950 via-gray-900 to-black border border-gray-700/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-emerald-500/50" data-testid="badge-ai-gpt">
               <div className="flex items-center gap-3 mb-2">
@@ -230,7 +230,7 @@ export function Hero() {
                 </div>
                 <div>
                   <div className="text-white font-bold text-sm">Groq + Moonshot AI Kimi</div>
-                  <div className="text-purple-200 text-xs">Moonshot AI Kimi k1.5</div>
+                  <div className="text-purple-200 text-xs">⚡ Ultra Fast Kimi k2 Instruct</div>
                 </div>
               </div>
               <div className="text-white text-xs font-mono">Jul 2025 <span className="text-white/80">• 4 months ago</span></div>

@@ -18,6 +18,9 @@ import promptsRouter from "./routes/prompts";
 import deviceAuthRouter from "./routes/device-auth";
 import reportsRouter from "./routes/reports";
 import exportsRouter from "./routes/exports";
+import { batchRouter } from "./routes/batch";
+import aiPassthroughRouter from "./routes/ai-passthrough";
+import adminAIRouter from "./routes/admin-ai";
 import { PromptStyleSchema, ProviderIdSchema } from "@shared/culling/schemas";
 import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
@@ -3209,6 +3212,15 @@ ${contextMarkdown}`;
 
   // Export file serving routes
   app.use('/api/exports', exportsRouter);
+
+  // Batch processing routes
+  app.use('/api/batch', batchRouter);
+
+  // AI Passthrough API (for native apps)
+  app.use('/api/ai', aiPassthroughRouter);
+
+  // Admin AI Monitoring
+  app.use('/api/admin/ai', adminAIRouter);
 
   const httpServer = createServer(app);
 

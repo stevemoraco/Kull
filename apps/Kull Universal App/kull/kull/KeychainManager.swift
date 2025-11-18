@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import OSLog
 
 enum KeychainError: Error {
     case duplicateItem
@@ -19,41 +20,89 @@ class KeychainManager {
 
     func saveAccessToken(_ token: String, for deviceId: String) throws {
         let key = "access_token_\(deviceId)"
-        try save(token, forKey: key)
+        do {
+            try save(token, forKey: key)
+            Logger.keychain.logKeychainOperation("Save access token", success: true)
+        } catch {
+            Logger.keychain.logKeychainOperation("Save access token", success: false, error: error)
+            throw error
+        }
     }
 
     func getAccessToken(for deviceId: String) -> String? {
         let key = "access_token_\(deviceId)"
-        return try? retrieve(forKey: key)
+        do {
+            let token = try retrieve(forKey: key)
+            Logger.keychain.debug("Retrieved access token")
+            return token
+        } catch {
+            if case KeychainError.itemNotFound = error {
+                Logger.keychain.debug("Access token not found")
+            } else {
+                Logger.keychain.error("Failed to retrieve access token: \(error.localizedDescription)")
+            }
+            return nil
+        }
     }
 
     func deleteAccessToken(for deviceId: String) throws {
         let key = "access_token_\(deviceId)"
-        try delete(forKey: key)
+        do {
+            try delete(forKey: key)
+            Logger.keychain.logKeychainOperation("Delete access token", success: true)
+        } catch {
+            Logger.keychain.logKeychainOperation("Delete access token", success: false, error: error)
+            throw error
+        }
     }
 
     // MARK: - Refresh Token (30 days expiry)
 
     func saveRefreshToken(_ token: String, for deviceId: String) throws {
         let key = "refresh_token_\(deviceId)"
-        try save(token, forKey: key)
+        do {
+            try save(token, forKey: key)
+            Logger.keychain.logKeychainOperation("Save refresh token", success: true)
+        } catch {
+            Logger.keychain.logKeychainOperation("Save refresh token", success: false, error: error)
+            throw error
+        }
     }
 
     func getRefreshToken(for deviceId: String) -> String? {
         let key = "refresh_token_\(deviceId)"
-        return try? retrieve(forKey: key)
+        do {
+            let token = try retrieve(forKey: key)
+            Logger.keychain.debug("Retrieved refresh token")
+            return token
+        } catch {
+            if case KeychainError.itemNotFound = error {
+                Logger.keychain.debug("Refresh token not found")
+            } else {
+                Logger.keychain.error("Failed to retrieve refresh token: \(error.localizedDescription)")
+            }
+            return nil
+        }
     }
 
     func deleteRefreshToken(for deviceId: String) throws {
         let key = "refresh_token_\(deviceId)"
-        try delete(forKey: key)
+        do {
+            try delete(forKey: key)
+            Logger.keychain.logKeychainOperation("Delete refresh token", success: true)
+        } catch {
+            Logger.keychain.logKeychainOperation("Delete refresh token", success: false, error: error)
+            throw error
+        }
     }
 
     // MARK: - Clear All
 
     func clearAll(for deviceId: String) {
+        Logger.keychain.info("Clearing all tokens for device \(deviceId)")
         try? deleteAccessToken(for: deviceId)
         try? deleteRefreshToken(for: deviceId)
+        Logger.keychain.notice("All tokens cleared")
     }
 
     // MARK: - Private Keychain Operations

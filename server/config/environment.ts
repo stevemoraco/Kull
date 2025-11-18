@@ -45,7 +45,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     databaseURL: process.env.DATABASE_URL!,
 
     anthropic: {
-      apiKey: process.env.ANTHROPIC_API_KEY!,
+      apiKey: process.env.ANTHROPIC_API_KEY || '',  // Optional
       baseURL: 'https://api.anthropic.com/v1',
       timeout: 60000
     },
@@ -55,7 +55,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
       timeout: 60000
     },
     google: {
-      apiKey: process.env.GOOGLE_API_KEY!,
+      apiKey: process.env.GOOGLE_API_KEY || '',  // Optional
       baseURL: 'https://generativelanguage.googleapis.com/v1beta',
       timeout: 60000
     },
@@ -106,9 +106,7 @@ function getClientWSURL(env: Environment): string {
 
 export function validateEnvironmentConfig(config: EnvironmentConfig): void {
   const requiredKeys = [
-    'ANTHROPIC_API_KEY',
     'OPENAI_API_KEY',
-    'GOOGLE_API_KEY',
     'JWT_SECRET',
     'DATABASE_URL'
   ];
@@ -118,13 +116,24 @@ export function validateEnvironmentConfig(config: EnvironmentConfig): void {
   if (missing.length > 0) {
     throw new Error(
       `❌ Missing required environment variables: ${missing.join(', ')}\n` +
-      `Please create a .env file based on .env.example`
+      `Please add these to your deployment secrets or .env file`
     );
   }
 
   console.log(`✅ Environment configuration loaded: ${config.environment}`);
   console.log(`✅ Client base URL: ${config.clientBaseURL}`);
-  console.log(`✅ All required API keys present`);
+  console.log(`✅ Required API keys present: OPENAI`);
+  
+  // Optional providers
+  const optionalProviders = [];
+  if (process.env.ANTHROPIC_API_KEY) optionalProviders.push('Anthropic');
+  if (process.env.GOOGLE_API_KEY) optionalProviders.push('Google');
+  if (process.env.GROK_API_KEY) optionalProviders.push('Grok');
+  if (process.env.GROQ_API_KEY) optionalProviders.push('Groq');
+  
+  if (optionalProviders.length > 0) {
+    console.log(`✅ Optional providers configured: ${optionalProviders.join(', ')}`);
+  }
 }
 
 // Export config and validate only if not in test mode
