@@ -1,5 +1,5 @@
-import { getProvider } from "@shared";
-import type { ImageMetadata } from "@shared/culling";
+import { getProvider } from "../shared/index.js";
+import type { ImageMetadata } from "../shared/culling/index.js";
 import { telemetryStore } from "./services/batchTelemetry";
 
 export type SubmitBatchFn = (args: {
