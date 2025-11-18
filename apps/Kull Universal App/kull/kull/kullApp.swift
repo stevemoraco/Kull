@@ -289,20 +289,32 @@ struct MainWindow: View {
     }
 
     private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.begin { resp in
-            if resp == .OK {
-                if let url = panel.urls.first {
-                    self.selectedFolder = url
-                    try? BookmarkStore.shared.save(url: url)
-                    Task { await FolderSyncService().sync(deviceName: Host.current().localizedName ?? "Mac") }
+        FileAccessService.shared.selectFolder { [weak self] url in
+            guard let self = self, let url = url else { return }
+
+            self.selectedFolder = url
+
+            do {
+                try FileAccessService.shared.persistAccess(to: url)
+                Task {
+                    await FolderSyncService().sync(
+                        deviceName: self.getDeviceName()
+                    )
                 }
                 self.showingRunSheet = true
+            } catch {
+                Logger.errors.error("Failed to persist folder access: \(error)")
+                ErrorPresenter.shared.present(error)
             }
         }
+    }
+
+    private func getDeviceName() -> String {
+        #if os(macOS)
+        return Host.current().localizedName ?? "Mac"
+        #else
+        return "Unknown Device"
+        #endif
     }
 
     private var connectionStateText: String {
@@ -323,10 +335,12 @@ struct MainWindow: View {
 
 #else
 // iOS and iPadOS
+import UIKit
 import Combine
 
 @main
 struct KullApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var auth = AuthViewModel()
 
     var body: some Scene {
@@ -516,6 +530,20 @@ struct HomeView: View {
         if minutes < 60 { return "\(minutes)m ago" }
         let hours = minutes / 60
         return "\(hours)h ago"
+    }
+}
+
+// iOS AppDelegate for lifecycle management
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        Logger.app.info("Kull iOS app launched")
+        return true
+    }
+
+    func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        // Handle deep links for authentication callback
+        Logger.app.info("Received deep link: \(url.absoluteString)")
+        return true
     }
 }
 

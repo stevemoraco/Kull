@@ -1,8 +1,9 @@
 /**
  * xAI Grok Provider Adapter
- * Model: grok-4-fast-reasoning
- * Pricing: Input $0.20/1M tokens | Output $0.50/1M tokens
+ * Model: grok-2-vision-1212
+ * Pricing: Input $2.00/1M tokens | Output $10.00/1M tokens
  * Batch API: Not supported (use concurrent requests)
+ * Context: 32K tokens | Vision: Yes
  */
 
 import { config } from '../../config/environment';
@@ -21,10 +22,10 @@ import {
 export class GrokAdapter extends BaseProviderAdapter {
   protected apiKey: string;
   protected baseURL: string;
-  protected modelName = 'grok-4-fast-reasoning';
+  protected modelName = 'grok-2-vision-1212';
 
-  private readonly INPUT_COST_PER_1M = 0.20;
-  private readonly OUTPUT_COST_PER_1M = 0.50;
+  private readonly INPUT_COST_PER_1M = 2.00;
+  private readonly OUTPUT_COST_PER_1M = 10.00;
 
   constructor() {
     super();
@@ -56,12 +57,17 @@ export class GrokAdapter extends BaseProviderAdapter {
     const base64Image = this.imageToBase64(image);
     const mimeType = this.getMimeType(image.format);
 
+    // Augment system prompt with RAW image reminder
+    const enhancedSystemPrompt = `${request.systemPrompt}
+
+CRITICAL RAW IMAGE REMINDER: These are RAW images. Exposure and white balance are FULLY correctable in post-processing - do not penalize for these. However, focus accuracy and moment timing CANNOT be fixed later - these are permanent.`;
+
     const body = {
       model: this.modelName,
       messages: [
         {
           role: 'system',
-          content: request.systemPrompt
+          content: enhancedSystemPrompt
         },
         {
           role: 'user',

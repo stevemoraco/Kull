@@ -10,9 +10,16 @@ struct FoldersView: View {
     @State private var loading = false
     @State private var selected: FolderItem? = nil
     @State private var showingRun = false
+    @State private var selectedLocalFolder: URL? = nil
 
     var body: some View {
         List {
+            Section(header: Text("Local Folder")) {
+                Button("Select Folder from Files...") {
+                    selectLocalFolder()
+                }
+            }
+
             Section(header: Text("Mac Folders")) {
                 if loading { ProgressView() }
                 ForEach(folders) { f in
@@ -30,6 +37,23 @@ struct FoldersView: View {
             if let folder = selected {
                 Text("Running \(folder.name)")
                     .padding()
+            } else if let localURL = selectedLocalFolder {
+                Text("Running \(localURL.lastPathComponent)")
+                    .padding()
+            }
+        }
+    }
+
+    private func selectLocalFolder() {
+        FileAccessService.shared.selectFolder { [self] url in
+            guard let url = url else { return }
+
+            do {
+                try FileAccessService.shared.persistAccess(to: url)
+                self.selectedLocalFolder = url
+                self.showingRun = true
+            } catch {
+                Logger.errors.error("Failed to persist folder access: \(error)")
             }
         }
     }

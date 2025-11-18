@@ -1,32 +1,14 @@
 import Foundation
-#if os(macOS)
-import AppKit
-import UniformTypeIdentifiers
-#endif
 
 final class TranscriptionHelper {
-    #if os(macOS)
     func transcribe(currentText: @escaping () -> String, update: @escaping (String) -> Void) {
-        let panel = NSOpenPanel()
-        if #available(macOS 12.0, *) {
-            panel.allowedContentTypes = [
-                UTType.mpeg4Audio,
-                UTType.mp3,
-                UTType.wav,
-                UTType(filenameExtension: "webm"),
-            ].compactMap { $0 }
-        } else {
-            panel.allowedFileTypes = ["m4a", "mp3", "wav", "webm"]
-        }
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.begin { resp in
-            if resp == .OK, let url = panel.urls.first {
-                Task { @MainActor in
-                    if let transcription = try? await self.upload(url: url) {
-                        let combined = (currentText() + "\n" + transcription).trimmingCharacters(in: .whitespacesAndNewlines)
-                        update(combined)
-                    }
+        FileAccessService.shared.selectAudioFile { [weak self] url in
+            guard let self = self, let url = url else { return }
+
+            Task { @MainActor in
+                if let transcription = try? await self.upload(url: url) {
+                    let combined = (currentText() + "\n" + transcription).trimmingCharacters(in: .whitespacesAndNewlines)
+                    update(combined)
                 }
             }
         }
@@ -53,10 +35,4 @@ final class TranscriptionHelper {
         }
         return ""
     }
-    #else
-    // iOS stub - transcription not available on iOS
-    func transcribe(currentText: @escaping () -> String, update: @escaping (String) -> Void) {
-        // No-op on iOS
-    }
-    #endif
 }

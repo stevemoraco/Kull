@@ -89,13 +89,13 @@ The following models have been **deprecated** and must NEVER be used in any code
    - Vision: Yes | Batch: Yes (50% off)
    - **Cheapest option**
 
-3. **grok-4-mini** (xAI)
-   - Pricing: TBD (competitive with gpt-5-nano)
-   - Vision: Yes | Batch: No
-   - **Fastest inference**
+3. **grok-2-vision-1212** (xAI)
+   - Input: $2.00/1M tokens | Output: $10.00/1M tokens
+   - Vision: Yes (32K context) | Batch: No
+   - **Fast inference with vision support**
 
 **Tier 2: Balanced Quality**
-4. **claude-haiku-4.5** (Anthropic)
+4. **claude-haiku-4-5-20251001** (Anthropic Claude Haiku 4.5)
    - Input: $1.00/1M tokens | Output: $5.00/1M tokens
    - Vision: Yes | Batch: Yes (50% off)
    - **Best reasoning for the cost**
@@ -493,6 +493,37 @@ Estimated cost: $4.98
 ```
 
 ---
+
+## Platform-Specific Features
+
+### iOS/iPadOS Apps
+
+**Authentication Flow**: Custom onboarding required (different from macOS)
+- Download app from App Store
+- Open app → "Welcome to Kull" screen with benefits
+- "Sign In" → Opens Safari with web login
+- After web login → Deep link `kull://auth-success?token=...` launches app logged in
+- NO manual code copying - fully automated
+
+**File Access Pattern**: iOS restrictions require different approach
+- Cannot browse arbitrary folders like macOS
+- Use `UIDocumentPickerViewController` for folder selection
+- Process files in app sandbox (iOS security model)
+- Export XMP via share sheet back to original location
+
+**iPad-Specific Optimizations**:
+- Split-view layouts for multitasking
+- Landscape-optimized UI
+- Larger touch targets (44pt minimum)
+- Keyboard shortcuts (Cmd+N, Cmd+,, etc.)
+- Support for iPad Pro 12.9", iPad mini, standard iPad
+
+**iOS Companion Features** (vs full macOS app):
+- Monitor shoot progress in real-time
+- Browse marketplace, purchase credits
+- Trigger remote culls (processed on Mac)
+- Push notifications for completion
+- Designed as monitoring/management tool
 
 ## Development Commands
 
