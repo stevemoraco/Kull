@@ -174,12 +174,6 @@ struct MainWindow: View {
     }
 }
 
-struct CreditSummary: Codable {
-    let balance: Int
-    let planDisplayName: String
-    let estimatedShootsRemaining: Double
-}
-
 #else
 // iOS and iPadOS
 import Combine
@@ -250,12 +244,6 @@ struct HomeView: View {
             .onAppear { credits.refresh() }
         }
     }
-}
-
-struct CreditSummary: Codable {
-    let balance: Int
-    let planDisplayName: String
-    let estimatedShootsRemaining: Double
 }
 
 #endif
