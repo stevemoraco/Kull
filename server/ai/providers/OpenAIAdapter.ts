@@ -218,8 +218,66 @@ export class OpenAIAdapter extends BaseProviderAdapter {
   }
 
   async submitBatch(request: BatchImageRequest): Promise<BatchJob> {
-    // OpenAI Batch API implementation
-    const requests = request.images.map((image, index) => ({
+    // Create response schema with 1-1000 ratings for batch requests
+    const responseSchema = {
+      type: 'object',
+      properties: {
+        imageId: { type: 'string' },
+        filename: { type: 'string' },
+        starRating: { type: 'integer', minimum: 1, maximum: 5 },
+        colorLabel: { type: 'string', enum: ['red', 'yellow', 'green', 'blue', 'purple', 'none'] },
+        keepReject: { type: 'string', enum: ['keep', 'reject', 'maybe'] },
+        tags: { type: 'array', items: { type: 'string' } },
+        description: { type: 'string' },
+        technicalQuality: {
+          type: 'object',
+          properties: {
+            focusAccuracy: { type: 'integer', minimum: 1, maximum: 1000 },
+            exposureQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            compositionScore: { type: 'integer', minimum: 1, maximum: 1000 },
+            lightingQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            colorHarmony: { type: 'integer', minimum: 1, maximum: 1000 },
+            noiseLevel: { type: 'integer', minimum: 1, maximum: 1000 },
+            sharpnessDetail: { type: 'integer', minimum: 1, maximum: 1000 },
+            dynamicRange: { type: 'integer', minimum: 1, maximum: 1000 },
+            overallTechnical: { type: 'integer', minimum: 1, maximum: 1000 }
+          },
+          required: ['focusAccuracy', 'exposureQuality', 'compositionScore', 'lightingQuality',
+                     'colorHarmony', 'noiseLevel', 'sharpnessDetail', 'dynamicRange', 'overallTechnical']
+        },
+        subjectAnalysis: {
+          type: 'object',
+          properties: {
+            primarySubject: { type: 'string' },
+            emotionIntensity: { type: 'integer', minimum: 1, maximum: 1000 },
+            eyesOpen: { type: 'boolean' },
+            eyeContact: { type: 'boolean' },
+            genuineExpression: { type: 'integer', minimum: 1, maximum: 1000 },
+            facialSharpness: { type: 'integer', minimum: 1, maximum: 1000 },
+            bodyLanguage: { type: 'integer', minimum: 1, maximum: 1000 },
+            momentTiming: { type: 'integer', minimum: 1, maximum: 1000 },
+            storyTelling: { type: 'integer', minimum: 1, maximum: 1000 },
+            uniqueness: { type: 'integer', minimum: 1, maximum: 1000 }
+          },
+          required: ['primarySubject', 'emotionIntensity', 'eyesOpen', 'eyeContact',
+                     'genuineExpression', 'facialSharpness', 'bodyLanguage', 'momentTiming',
+                     'storyTelling', 'uniqueness']
+        },
+        shootContext: {
+          type: 'object',
+          properties: {
+            eventType: { type: 'string' },
+            shootPhase: { type: 'string' },
+            timeOfDay: { type: 'string' },
+            location: { type: 'string' }
+          }
+        }
+      },
+      required: ['starRating', 'colorLabel', 'keepReject', 'description', 'technicalQuality', 'subjectAnalysis']
+    };
+
+    // OpenAI Batch API implementation with structured outputs
+    const batchRequests = request.images.map((image, index) => ({
       custom_id: `image_${index}_${Date.now()}`,
       method: 'POST',
       url: '/v1/chat/completions',
@@ -228,7 +286,7 @@ export class OpenAIAdapter extends BaseProviderAdapter {
         messages: [
           {
             role: 'system',
-            content: request.systemPrompt
+            content: request.systemPrompt + '\n\nREMINDER: These are RAW images - exposure and white balance issues are fixable in post-production. Focus on composition, sharpness, emotion, and moment.'
           },
           {
             role: 'user',
@@ -244,44 +302,77 @@ export class OpenAIAdapter extends BaseProviderAdapter {
             ]
           }
         ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'photo_rating',
+            schema: responseSchema,
+            strict: true
+          }
+        },
         max_tokens: 2000
       }
     }));
 
-    // Convert to JSONL format
-    const jsonl = requests.map(r => JSON.stringify(r)).join('\n');
+    // Convert to JSONL format (one JSON object per line)
+    const jsonlContent = batchRequests.map(r => JSON.stringify(r)).join('\n');
 
-    // Upload file
-    const fileResponse = await fetch(`${this.baseURL}/files`, {
+    // Upload JSONL file to OpenAI Files API
+    const FormData = (await import('formdata-node')).FormData;
+    const { Blob } = await import('buffer');
+
+    const formData = new FormData();
+    formData.append('purpose', 'batch');
+    formData.append('file', new Blob([jsonlContent]), 'batch_input.jsonl');
+
+    const uploadResponse = await fetch(`${this.baseURL}/files`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.apiKey}`
       },
-      body: new FormData()
+      body: formData as any
     });
 
-    // Create batch
-    const response = await fetch(`${this.baseURL}/batches`, {
+    if (!uploadResponse.ok) {
+      const error = await uploadResponse.text();
+      throw new Error(`Failed to upload batch file: ${uploadResponse.status} ${error}`);
+    }
+
+    const fileData = await uploadResponse.json();
+    const inputFileId = fileData.id;
+
+    if (!inputFileId) {
+      throw new Error('No file ID returned from OpenAI Files API');
+    }
+
+    // Create batch job with real file ID
+    const batchResponse = await fetch(`${this.baseURL}/batches`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`
       },
       body: JSON.stringify({
-        input_file_id: 'file_id_placeholder',
+        input_file_id: inputFileId,
         endpoint: '/v1/chat/completions',
         completion_window: '24h'
       })
     });
 
-    const data = await response.json();
+    if (!batchResponse.ok) {
+      const error = await batchResponse.text();
+      throw new Error(`Failed to create batch: ${batchResponse.status} ${error}`);
+    }
+
+    const batchData = await batchResponse.json();
 
     return {
-      jobId: data.id,
+      jobId: batchData.id,
       status: 'queued',
       totalImages: request.images.length,
       processedImages: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
+      estimatedCompletionTime: new Date(Date.now() + 30 * 60 * 1000) // Estimate 30 minutes
     };
   }
 
