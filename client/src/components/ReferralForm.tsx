@@ -276,19 +276,25 @@ export function ReferralForm() {
               
               {/* Milestones */}
               <div className="relative flex justify-between">
-                {/* Milestone 1: Start (0 referrals) */}
+                {/* Milestone 1: Start/Current Progress */}
                 <div className="flex flex-col items-center flex-1">
-                  <div 
+                  <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      totalSent + filledCount >= 0 
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50' 
+                      totalSent + filledCount >= 1
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50'
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    <Users className="w-5 h-5" />
+                    {totalSent + filledCount >= 1 ? (
+                      <Check className="w-5 h-5" />
+                    ) : (
+                      <Users className="w-5 h-5" />
+                    )}
                   </div>
-                  <div className="text-xs font-medium mt-2 text-center">Start</div>
-                  <div className="text-xs text-muted-foreground mt-1">0 sent</div>
+                  <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 1 ? 'text-primary' : ''}`}>
+                    {totalSent + filledCount < 3 ? 'In Progress' : 'Started'}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">{totalSent + filledCount} sent</div>
                 </div>
 
                 {/* Milestone 2: 3 referrals - 1 month free */}
