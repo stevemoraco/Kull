@@ -1,6 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { Zap, Sparkles, Star } from "lucide-react";
 
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  if (diffDays === 1) return '1 day ago';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffWeeks === 1) return '1 week ago';
+  if (diffWeeks < 5) return `${diffWeeks} weeks ago`;
+  if (diffMonths === 1) return '1 month ago';
+  return `${diffMonths} months ago`;
+}
+
 export function Hero() {
   const handleStartTrial = () => {
     window.location.href = "/api/login";
@@ -193,7 +213,7 @@ export function Hero() {
                   <div className="text-gray-400 text-xs">ChatGPT</div>
                 </div>
               </div>
-              <div className="text-white text-xs font-mono">Nov 12, 2025 <span className="text-white/80">• 6 days ago</span></div>
+              <div className="text-white text-xs font-mono">Nov 12, 2025 <span className="text-white/80">• {getRelativeTime('2025-11-12')}</span></div>
             </div>
 
             {/* Anthropic Claude Sonnet 4.5 */}
@@ -215,7 +235,7 @@ export function Hero() {
                   <div className="text-orange-200 text-xs">Constitutional AI</div>
                 </div>
               </div>
-              <div className="text-white text-xs font-mono">Sep 29, 2025 <span className="text-white/80">• 7 weeks ago</span></div>
+              <div className="text-white text-xs font-mono">Sep 29, 2025 <span className="text-white/80">• {getRelativeTime('2025-09-29')}</span></div>
             </div>
 
             {/* Groq + Moonshot Kimi */}
@@ -233,7 +253,7 @@ export function Hero() {
                   <div className="text-purple-200 text-xs">⚡ Ultra Fast Kimi k2 Instruct</div>
                 </div>
               </div>
-              <div className="text-white text-xs font-mono">Jul 2025 <span className="text-white/80">• 4 months ago</span></div>
+              <div className="text-white text-xs font-mono">Jul 2025 <span className="text-white/80">• {getRelativeTime('2025-07-15')}</span></div>
             </div>
 
             {/* xAI Grok 4.1 */}
@@ -251,7 +271,7 @@ export function Hero() {
                   <div className="text-sky-200 text-xs">by xAI, owners of twitter lol</div>
                 </div>
               </div>
-              <div className="text-white text-xs font-mono">Nov 17, 2025 <span className="text-white/80">• 1 day ago</span></div>
+              <div className="text-white text-xs font-mono">Nov 17, 2025 <span className="text-white/80">• {getRelativeTime('2025-11-17')}</span></div>
             </div>
 
             {/* Google Gemini 3 */}
@@ -285,7 +305,7 @@ export function Hero() {
                   <div className="text-slate-400 text-xs">Google DeepMind</div>
                 </div>
               </div>
-              <div className="text-white text-xs font-mono">Jun 17, 2025 <span className="text-white/80">• 5 months ago</span></div>
+              <div className="text-white text-xs font-mono">Nov 18, 2025 <span className="text-white/80">• {getRelativeTime('2025-11-18T09:00:00')}</span></div>
             </div>
           </div>
         </div>

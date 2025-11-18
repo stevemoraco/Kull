@@ -2,11 +2,14 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { BatchProcessor } from '../../../server/ai/BatchProcessor';
 import type { ImageInput, ProviderAdapter } from '../../../server/ai/BatchProcessor';
 
-// Mock WebSocket service
+// Mock WebSocket service - create a stable mock instance
+const mockBroadcastToUser = vi.fn();
+const mockWsService = {
+  broadcastToUser: mockBroadcastToUser,
+};
+
 vi.mock('../../../server/websocket', () => ({
-  getGlobalWsService: vi.fn(() => ({
-    broadcastToUser: vi.fn(),
-  })),
+  getGlobalWsService: vi.fn(() => mockWsService),
 }));
 
 describe('BatchProcessor', () => {
@@ -36,6 +39,7 @@ describe('BatchProcessor', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    mockBroadcastToUser.mockClear();
   });
 
   describe('processConcurrent', () => {
@@ -250,9 +254,6 @@ describe('BatchProcessor', () => {
         initialBackoff: 100,
       });
 
-      const { getGlobalWsService } = await import('../../../server/websocket');
-      const mockWsService = getGlobalWsService();
-
       const images: ImageInput[] = [
         { id: 'img1', filename: 'test1.jpg' },
         { id: 'img2', filename: 'test2.jpg' },
@@ -267,7 +268,8 @@ describe('BatchProcessor', () => {
       );
 
       // Should broadcast progress after each image
-      expect(mockWsService?.broadcastToUser).toHaveBeenCalled();
+      expect(mockBroadcastToUser).toHaveBeenCalled();
+      expect(mockBroadcastToUser).toHaveBeenCalledTimes(2); // Once per image
     });
 
     it('should not crash if WebSocket service unavailable', async () => {

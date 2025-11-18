@@ -213,7 +213,7 @@ describe('Environment Configuration', () => {
       console.log = originalLog;
     });
 
-    it('should throw error when ANTHROPIC_API_KEY is missing', () => {
+    it('should not throw error when ANTHROPIC_API_KEY is missing (optional)', () => {
       delete process.env.ANTHROPIC_API_KEY;
       process.env.OPENAI_API_KEY = 'sk-openai-test';
       process.env.GOOGLE_API_KEY = 'AIza-test';
@@ -222,7 +222,7 @@ describe('Environment Configuration', () => {
 
       const config = loadEnvironmentConfig();
 
-      expect(() => validateEnvironmentConfig(config)).toThrow(/ANTHROPIC_API_KEY/);
+      expect(() => validateEnvironmentConfig(config)).not.toThrow();
     });
 
     it('should throw error when OPENAI_API_KEY is missing', () => {
@@ -237,7 +237,7 @@ describe('Environment Configuration', () => {
       expect(() => validateEnvironmentConfig(config)).toThrow(/OPENAI_API_KEY/);
     });
 
-    it('should throw error when GOOGLE_API_KEY is missing', () => {
+    it('should not throw error when GOOGLE_API_KEY is missing (optional)', () => {
       process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
       process.env.OPENAI_API_KEY = 'sk-openai-test';
       delete process.env.GOOGLE_API_KEY;
@@ -246,7 +246,7 @@ describe('Environment Configuration', () => {
 
       const config = loadEnvironmentConfig();
 
-      expect(() => validateEnvironmentConfig(config)).toThrow(/GOOGLE_API_KEY/);
+      expect(() => validateEnvironmentConfig(config)).not.toThrow();
     });
 
     it('should throw error when JWT_SECRET and SESSION_SECRET are both missing', () => {
@@ -274,17 +274,19 @@ describe('Environment Configuration', () => {
       expect(() => validateEnvironmentConfig(config)).toThrow(/DATABASE_URL/);
     });
 
-    it('should throw error with all missing vars listed', () => {
-      delete process.env.ANTHROPIC_API_KEY;
-      delete process.env.OPENAI_API_KEY;
-      delete process.env.GOOGLE_API_KEY;
-      delete process.env.JWT_SECRET;
-      delete process.env.SESSION_SECRET;
-      delete process.env.DATABASE_URL;
+    it('should throw error with all required missing vars listed (not optional ones)', () => {
+      delete process.env.ANTHROPIC_API_KEY;  // Optional
+      delete process.env.OPENAI_API_KEY;      // Required
+      delete process.env.GOOGLE_API_KEY;      // Optional
+      delete process.env.JWT_SECRET;          // Required
+      delete process.env.SESSION_SECRET;      // Alternative to JWT_SECRET
+      delete process.env.DATABASE_URL;        // Required
 
       const config = loadEnvironmentConfig();
 
-      expect(() => validateEnvironmentConfig(config)).toThrow(/ANTHROPIC_API_KEY.*OPENAI_API_KEY.*GOOGLE_API_KEY.*JWT_SECRET.*DATABASE_URL/s);
+      // Should only complain about required vars: OPENAI_API_KEY, JWT_SECRET, DATABASE_URL
+      // Should NOT complain about optional vars: ANTHROPIC_API_KEY, GOOGLE_API_KEY
+      expect(() => validateEnvironmentConfig(config)).toThrow(/OPENAI_API_KEY.*JWT_SECRET.*DATABASE_URL/s);
     });
 
     it('should not throw error when optional keys are missing', () => {
