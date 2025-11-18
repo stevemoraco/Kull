@@ -89,10 +89,10 @@ The following models have been **deprecated** and must NEVER be used in any code
    - Vision: Yes | Batch: Yes (50% off)
    - **Cheapest option**
 
-3. **grok-4-mini** (xAI)
-   - Pricing: TBD (competitive with gpt-5-nano)
-   - Vision: Yes | Batch: No
-   - **Fastest inference**
+3. **grok-2-vision-1212** (xAI)
+   - Input: $2.00/1M tokens | Output: $10.00/1M tokens
+   - Vision: Yes (32K context) | Batch: No
+   - **Fast inference with vision support**
 
 **Tier 2: Balanced Quality**
 4. **claude-haiku-4.5** (Anthropic)
