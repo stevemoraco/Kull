@@ -2,7 +2,7 @@ import { Check, Gift, Shield } from "lucide-react";
 
 export function ValueStack() {
   const coreFeatures = [
-    "5 AI models analyzing every photo (Gemini, Grok, Groq, Claude, OpenAI)",
+    "Freedom to use ONLY the model(s) YOU prefer or on-device local AI to cull images for you",
     "Real-time 1-5 star ratings, titles, descriptions, tags, and color-coding",
     "Unlimited photo rating and organization during your subscription",
     "Universal Mac app (works with any folder)",

@@ -59,9 +59,15 @@ export function ProblemSection() {
         </div>
 
         <div className="mt-12 text-center">
-          <div className="inline-block bg-destructive/10 border border-destructive/20 rounded-xl px-8 py-4">
+          <div className="inline-block bg-destructive/10 border border-destructive/20 rounded-xl px-8 py-6">
+            <p className="text-xl md:text-2xl font-bold text-foreground mb-3">
+              ~2 photoshoots per week, 1-2 hours per photoshoot culling & organizing and picking selects
+            </p>
             <p className="text-2xl md:text-3xl font-bold text-foreground">
-              Average photographer spends <span className="text-destructive">200+ hours per year</span> just rating photos
+              That's <span className="text-destructive">up to 208 hours per year</span>
+            </p>
+            <p className="text-lg md:text-xl font-semibold text-muted-foreground mt-2">
+              which is <span className="text-destructive">$7,280 in billable hours wasted</span> per year at $35/hour
             </p>
           </div>
         </div>
