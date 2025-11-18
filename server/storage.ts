@@ -98,6 +98,7 @@ export interface IStorage {
   createReferral(referral: InsertReferral & { referrerId: string }): Promise<Referral>;
   getUserReferrals(userId: string): Promise<Referral[]>;
   updateReferralStatus(id: string, status: string, referredUserId?: string): Promise<void>;
+  deleteReferral(id: string): Promise<void>;
   
   // Email queue operations
   scheduleEmail(email: InsertEmailQueue): Promise<EmailQueue>;
@@ -383,6 +384,12 @@ export class DatabaseStorage implements IStorage {
         status,
         referredUserId,
       })
+      .where(eq(referrals.id, id));
+  }
+
+  async deleteReferral(id: string): Promise<void> {
+    await db
+      .delete(referrals)
       .where(eq(referrals.id, id));
   }
 

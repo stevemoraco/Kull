@@ -2353,6 +2353,29 @@ ${contextMarkdown}`;
     }
   });
 
+  app.delete('/api/referrals/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const referralId = req.params.id;
+
+      // Get the referral to verify ownership
+      const referrals = await storage.getUserReferrals(userId);
+      const referral = referrals.find(r => r.id === referralId);
+
+      if (!referral) {
+        return res.status(404).json({ message: "Referral not found" });
+      }
+
+      // Delete the referral
+      await storage.deleteReferral(referralId);
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting referral:", error);
+      res.status(500).json({ message: "Failed to delete referral: " + error.message });
+    }
+  });
+
   // Send referral confirmation email (called after all referrals are sent)
   app.post('/api/referrals/confirm', isAuthenticated, async (req: any, res) => {
     try {

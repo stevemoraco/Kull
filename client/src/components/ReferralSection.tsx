@@ -5,8 +5,8 @@ export function ReferralSection() {
     {
       referrals: 1,
       icon: Gift,
-      reward: "Bonus Feature Unlock",
-      description: "Get advanced filtering tools"
+      reward: "Marketplace Access",
+      description: "Share & search custom prompts"
     },
     {
       referrals: 3,

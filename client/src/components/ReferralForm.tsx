@@ -34,20 +34,49 @@ export function ReferralForm() {
 
       return results;
     },
+    onMutate: async (referredEmails) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/referrals'] });
+
+      // Snapshot the previous value
+      const previousReferrals = queryClient.getQueryData<Referral[]>(['/api/referrals']);
+
+      // Optimistically add new referrals
+      queryClient.setQueryData<Referral[]>(['/api/referrals'], (old) => {
+        const newReferrals = referredEmails.map((email) => ({
+          id: `temp-${Date.now()}-${Math.random()}`,
+          referrerId: 'current-user',
+          referredEmail: email,
+          referredUserId: null,
+          status: 'pending' as const,
+          bonusUnlocked: null,
+          createdAt: new Date().toISOString(),
+        }));
+        return [...(old || []), ...newReferrals];
+      });
+
+      return { previousReferrals };
+    },
+    onError: (error: Error, _referredEmails, context) => {
+      // Rollback on error
+      if (context?.previousReferrals) {
+        queryClient.setQueryData(['/api/referrals'], context.previousReferrals);
+      }
+      toast({
+        title: "Failed to Send Referrals",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
     onSuccess: (results) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
       setEmails(["", "", ""]);
       toast({
         title: `${results.length} Referral${results.length > 1 ? 's' : ''} Sent!`,
         description: "Your photographer friends will receive invitations. Check your email for confirmation!",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to Send Referrals",
-        description: error.message,
-        variant: "destructive",
-      });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
     },
   });
 
@@ -55,19 +84,40 @@ export function ReferralForm() {
     mutationFn: async (referralId: string) => {
       await apiRequest("DELETE", `/api/referrals/${referralId}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
-      toast({
-        title: "Referral Deleted",
-        description: "The referral has been removed.",
-      });
+    onMutate: async (referralId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/referrals'] });
+
+      // Snapshot the previous value
+      const previousReferrals = queryClient.getQueryData<Referral[]>(['/api/referrals']);
+
+      // Optimistically update to remove the referral
+      queryClient.setQueryData<Referral[]>(['/api/referrals'], (old) =>
+        old ? old.filter((r) => r.id !== referralId) : []
+      );
+
+      // Return context with the snapshot
+      return { previousReferrals };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _referralId, context) => {
+      // Rollback on error
+      if (context?.previousReferrals) {
+        queryClient.setQueryData(['/api/referrals'], context.previousReferrals);
+      }
       toast({
         title: "Failed to Delete Referral",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Referral Deleted",
+        description: "The referral has been removed.",
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
     },
   });
 
@@ -138,11 +188,12 @@ export function ReferralForm() {
 
   const completedReferrals = referrals.filter(r => r.status === 'completed').length;
   const totalSent = referrals.length;
-  
+
   // Determine unlocked bonuses based on new tier system
   const bonusUnlocked = (totalSent >= 10 || completedReferrals >= 3) ? '3 months free' :
                         totalSent >= 5 ? 'Priority support' :
                         totalSent >= 3 ? '1 month free' :
+                        totalSent >= 1 ? 'Marketplace access' :
                         'None yet';
 
   // Calculate next reward based on current status + filled emails
@@ -150,21 +201,23 @@ export function ReferralForm() {
     const filledEmails = emails.filter(email => email && email.includes('@')).length;
     const potentialSent = totalSent + filledEmails;
     
-    // New tier system: 1mo free (3 sent), 3mo free (10 sent OR 3 completed), priority support (5 sent)
-    
+    // New tier system: marketplace (1 sent), 1mo free (3 sent), priority support (5 sent), 3mo free (10 sent OR 3 completed)
+
     // If nothing filled yet, show first milestone
     if (filledEmails === 0) {
+      if (totalSent < 1) return { count: 1 - totalSent, reward: "Marketplace access", type: "first" };
       if (totalSent < 3) return { count: 3 - totalSent, reward: "1 month free", type: "first" };
       if (totalSent < 5) return { count: 5 - totalSent, reward: "Priority support", type: "first" };
       if (totalSent < 10 && completedReferrals < 3) return { count: 10 - totalSent, reward: "3 months free", type: "first" };
       return null;
     }
-    
+
     // With filled emails, calculate next milestone
+    if (potentialSent < 1) return { count: 1 - totalSent, reward: "Marketplace access", type: "next" };
     if (potentialSent < 3) return { count: 3 - totalSent, reward: "1 month free", type: "next" };
     if (potentialSent < 5) return { count: 5 - totalSent, reward: "Priority support", type: "next" };
     if (potentialSent < 10 && completedReferrals < 3) return { count: 10 - totalSent, reward: "3 months free", type: "next" };
-    
+
     return { count: 0, reward: "Maximum bonuses unlocked!", type: "complete" };
   };
 
@@ -194,8 +247,12 @@ export function ReferralForm() {
             </>
           ) : (
             <>
-              <div className="text-2xl font-black text-foreground">{totalSent}/3</div>
-              <div className="text-sm text-muted-foreground">Next: 1 Month Free</div>
+              <div className="text-2xl font-black text-foreground">
+                {totalSent === 0 ? '0/1' : totalSent < 3 ? `${totalSent}/3` : `${totalSent}/5`}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Next: {totalSent === 0 ? 'Marketplace Access' : totalSent < 3 ? '1 Month Free' : totalSent < 5 ? 'Priority Support' : '3 Months Free'}
+              </div>
             </>
           )}
         </div>
@@ -305,12 +362,12 @@ export function ReferralForm() {
               
               {/* Milestones */}
               <div className="relative flex justify-between">
-                {/* Milestone 1: Start/Current Progress */}
+                {/* Milestone 1: Marketplace Access (1 sent) */}
                 <div className="flex flex-col items-center flex-1">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                       totalSent + filledCount >= 1
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50'
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/50 animate-pulse'
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
@@ -321,9 +378,10 @@ export function ReferralForm() {
                     )}
                   </div>
                   <div className={`text-xs font-medium mt-2 text-center ${totalSent + filledCount >= 1 ? 'text-primary' : ''}`}>
-                    {totalSent + filledCount < 3 ? 'In Progress' : 'Started'}
+                    Marketplace Access
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">{totalSent + filledCount} sent</div>
+                  <div className="text-xs text-muted-foreground mt-1">1 sent</div>
+                  <div className="text-[10px] text-primary/70 font-medium">Share & search prompts</div>
                 </div>
 
                 {/* Milestone 2: 3 referrals - 1 month free */}

@@ -53,37 +53,52 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  // Check if user exists before upserting
-  const existingUser = await storage.getUser(claims["sub"]);
-  const isNewUser = !existingUser;
-  
-  const user = await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
+  try {
+    // Check if user exists before upserting
+    const existingUser = await storage.getUser(claims["sub"]);
+    const isNewUser = !existingUser;
 
-  // Send welcome email immediately for new users and schedule drip campaign
-  if (isNewUser && user.email && !user.trialStartedAt) {
-    const { sendEmail, scheduleNonCheckoutDripCampaign } = await import("./emailService");
-    const { emailTemplates } = await import("./emailTemplates");
-    
-    // Send welcome email immediately
-    const welcomeEmail = emailTemplates.firstLoginWelcome(user);
-    await sendEmail({
-      to: user.email,
-      subject: welcomeEmail.subject,
-      html: welcomeEmail.html,
-      text: welcomeEmail.text,
+    // If user exists, just return it without upserting (optimization)
+    if (existingUser) {
+      console.log("[Auth] Existing user, skipping upsert");
+      return existingUser;
+    }
+
+    console.log("[Auth] New user, creating...");
+    const user = await storage.upsertUser({
+      id: claims["sub"],
+      email: claims["email"],
+      firstName: claims["first_name"],
+      lastName: claims["last_name"],
+      profileImageUrl: claims["profile_image_url"],
     });
-    
-    // Schedule drip campaign
-    await scheduleNonCheckoutDripCampaign(user);
+
+    // Send welcome email immediately for new users (non-blocking)
+    if (user.email && !user.trialStartedAt) {
+      console.log("[Auth] Sending welcome email in background");
+      // Don't await - let it run in background
+      import("./emailService").then(({ sendEmail, scheduleNonCheckoutDripCampaign }) => {
+        import("./emailTemplates").then(({ emailTemplates }) => {
+          const welcomeEmail = emailTemplates.firstLoginWelcome(user);
+          sendEmail({
+            to: user.email,
+            subject: welcomeEmail.subject,
+            html: welcomeEmail.html,
+            text: welcomeEmail.text,
+          }).catch(err => console.error("[Auth] Welcome email failed:", err));
+
+          scheduleNonCheckoutDripCampaign(user).catch(err =>
+            console.error("[Auth] Drip campaign schedule failed:", err)
+          );
+        });
+      });
+    }
+
+    return user;
+  } catch (error) {
+    console.error("[Auth] upsertUser error:", error);
+    throw error;
   }
-  
-  return user;
 }
 
 export async function setupAuth(app: Express) {
@@ -98,10 +113,26 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      console.log("[Auth] Verify function called");
+      const user = {};
+      updateUserSession(user, tokens);
+      console.log("[Auth] Session updated, upserting user");
+
+      // Add timeout to upsertUser to prevent hanging
+      await Promise.race([
+        upsertUser(tokens.claims()),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("User upsert timeout")), 10000)
+        )
+      ]);
+
+      console.log("[Auth] User upserted, calling verified callback");
+      verified(null, user);
+    } catch (error) {
+      console.error("[Auth] Verify function error:", error);
+      verified(error as Error);
+    }
   };
 
   // Keep track of registered strategies
@@ -110,25 +141,42 @@ export async function setupAuth(app: Express) {
   // Helper function to ensure strategy exists for a domain
   const ensureStrategy = (domain: string) => {
     const strategyName = `replitauth:${domain}`;
-    if (!registeredStrategies.has(strategyName)) {
-      const strategy = new Strategy(
-        {
-          name: strategyName,
-          config,
-          scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
-        },
-        verify,
-      );
-      passport.use(strategy);
-      registeredStrategies.add(strategyName);
+
+    // Always unregister and re-register to avoid state corruption
+    if (registeredStrategies.has(strategyName)) {
+      try {
+        passport.unuse(strategyName);
+        console.log(`[Auth] Unregistered existing strategy: ${strategyName}`);
+      } catch (e) {
+        console.log(`[Auth] No strategy to unregister: ${strategyName}`);
+      }
     }
+
+    const strategy = new Strategy(
+      {
+        name: strategyName,
+        config,
+        scope: "openid email profile offline_access",
+        callbackURL: `https://${domain}/api/callback`,
+      },
+      verify,
+    );
+    passport.use(strategy);
+    registeredStrategies.add(strategyName);
+    console.log(`[Auth] Registered strategy: ${strategyName}`);
   };
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Check if already authenticated
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      console.log("[Auth] User already authenticated, redirecting to /");
+      return res.redirect("/");
+    }
+
+    console.log("[Auth] Starting login flow");
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
@@ -143,29 +191,46 @@ export async function setupAuth(app: Express) {
       hasSession: !!req.session
     });
 
-    ensureStrategy(req.hostname);
+    try {
+      ensureStrategy(req.hostname);
+      console.log("[Auth] Strategy ensured");
 
-    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
-      if (err) {
-        console.error("[Auth] Callback error:", err);
-        return res.status(500).send("Authentication error. Please try again.");
-      }
+      passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+        console.log("[Auth] Passport authenticate callback triggered");
 
-      if (!user) {
-        console.log("[Auth] No user returned:", info);
-        return res.redirect("/api/login");
-      }
-
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          console.error("[Auth] Login error:", loginErr);
-          return res.status(500).send("Login failed. Please try again.");
+        if (err) {
+          console.error("[Auth] Callback error:", err);
+          return res.status(500).send("Authentication error. Please try again.");
         }
 
-        console.log("[Auth] Login successful, redirecting to /");
-        return res.redirect("/");
-      });
-    })(req, res, next);
+        if (!user) {
+          console.log("[Auth] No user returned:", info);
+          return res.redirect("/api/login");
+        }
+
+        console.log("[Auth] User received, calling logIn");
+        req.logIn(user, (loginErr) => {
+          if (loginErr) {
+            console.error("[Auth] Login error:", loginErr);
+            return res.status(500).send("Login failed. Please try again.");
+          }
+
+          // Explicitly save the session before redirecting
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("[Auth] Session save error:", saveErr);
+              return res.status(500).send("Failed to save session. Please try again.");
+            }
+
+            console.log("[Auth] Session saved, login successful, redirecting to /");
+            return res.redirect("/");
+          });
+        });
+      })(req, res, next);
+    } catch (error) {
+      console.error("[Auth] Callback exception:", error);
+      return res.status(500).send("Authentication failed. Please try again.");
+    }
   });
 
   app.get("/api/logout", (req, res) => {
