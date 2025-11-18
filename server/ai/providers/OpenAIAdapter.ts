@@ -405,30 +405,61 @@ export class OpenAIAdapter extends BaseProviderAdapter {
   }
 
   async retrieveBatchResults(jobId: string): Promise<PhotoRating[]> {
-    const status = await this.checkBatchStatus(jobId);
-    if (status.status !== 'completed') {
-      throw new Error(`Batch not completed: ${status.status}`);
-    }
-
-    // Download results file
-    const response = await fetch(`${this.baseURL}/batches/${jobId}/results`, {
+    // First, get batch info to find output_file_id
+    const batchResponse = await fetch(`${this.baseURL}/batches/${jobId}`, {
       headers: {
         'Authorization': `Bearer ${this.apiKey}`
       }
     });
 
-    const resultsText = await response.text();
-    const results = resultsText.split('\n').filter(Boolean).map(line => JSON.parse(line));
+    if (!batchResponse.ok) {
+      const error = await batchResponse.text();
+      throw new Error(`Failed to get batch info: ${batchResponse.status} ${error}`);
+    }
+
+    const batchData = await batchResponse.json();
+
+    if (batchData.status !== 'completed') {
+      throw new Error(`Batch not completed: ${batchData.status}`);
+    }
+
+    if (!batchData.output_file_id) {
+      throw new Error('No output_file_id in completed batch');
+    }
+
+    // Download output file content
+    const fileResponse = await fetch(`${this.baseURL}/files/${batchData.output_file_id}/content`, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`
+      }
+    });
+
+    if (!fileResponse.ok) {
+      const error = await fileResponse.text();
+      throw new Error(`Failed to download results: ${fileResponse.status} ${error}`);
+    }
+
+    const resultsText = await fileResponse.text();
+    const resultLines = resultsText.trim().split('\n').filter(Boolean);
 
     const ratings: PhotoRating[] = [];
-    for (const result of results) {
-      if (result.response?.body?.choices?.[0]?.message?.content) {
-        try {
+    for (const line of resultLines) {
+      try {
+        const result = JSON.parse(line);
+
+        // Check for errors in individual requests
+        if (result.error) {
+          console.error(`Request ${result.custom_id} failed:`, result.error);
+          continue;
+        }
+
+        // Extract rating from response
+        if (result.response?.body?.choices?.[0]?.message?.content) {
           const ratingData = JSON.parse(result.response.body.choices[0].message.content);
           ratings.push(this.validateRating(ratingData));
-        } catch (e) {
-          console.error('Failed to parse rating:', e);
         }
+      } catch (e) {
+        console.error('Failed to parse result line:', e);
       }
     }
 
@@ -440,6 +471,32 @@ export class OpenAIAdapter extends BaseProviderAdapter {
     const outputTokens = 300;
     return ((inputTokens / 1_000_000) * this.INPUT_COST_PER_1M) +
            ((outputTokens / 1_000_000) * this.OUTPUT_COST_PER_1M);
+  }
+
+  /**
+   * Calculate batch processing cost (50% discount applied)
+   */
+  getBatchCostPerImage(): number {
+    const inputTokens = 2000;
+    const outputTokens = 300;
+    return ((inputTokens / 1_000_000) * this.BATCH_INPUT_COST_PER_1M) +
+           ((outputTokens / 1_000_000) * this.BATCH_OUTPUT_COST_PER_1M);
+  }
+
+  /**
+   * Calculate actual cost based on real token usage
+   * @param inputTokens Number of input tokens used
+   * @param outputTokens Number of output tokens used
+   * @param isBatch Whether this is batch processing (50% discount)
+   */
+  calculateActualCost(inputTokens: number, outputTokens: number, isBatch: boolean = false): number {
+    const inputCostPer1M = isBatch ? this.BATCH_INPUT_COST_PER_1M : this.INPUT_COST_PER_1M;
+    const outputCostPer1M = isBatch ? this.BATCH_OUTPUT_COST_PER_1M : this.OUTPUT_COST_PER_1M;
+
+    const inputCostUSD = (inputTokens / 1_000_000) * inputCostPer1M;
+    const outputCostUSD = (outputTokens / 1_000_000) * outputCostPer1M;
+
+    return inputCostUSD + outputCostUSD;
   }
 
   getProviderName(): string {
