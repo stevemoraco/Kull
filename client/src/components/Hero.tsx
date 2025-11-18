@@ -254,7 +254,7 @@ export function Hero() {
               <div className="text-white text-xs font-mono">Nov 17, 2025 <span className="text-white/80">• 1 day ago</span></div>
             </div>
 
-            {/* Google Gemini 2.5 Pro */}
+            {/* Google Gemini 3 */}
             <div className="group relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-600/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-blue-400/50" data-testid="badge-ai-gemini">
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex items-center gap-2">
@@ -281,7 +281,7 @@ export function Hero() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-white font-bold text-sm">Google Gemini 2.5 Pro</div>
+                  <div className="text-white font-bold text-sm">Google Gemini 3</div>
                   <div className="text-slate-400 text-xs">Google DeepMind</div>
                 </div>
               </div>
