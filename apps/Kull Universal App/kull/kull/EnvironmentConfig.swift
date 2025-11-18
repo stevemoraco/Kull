@@ -12,7 +12,7 @@ enum Environment: String, CaseIterable, Identifiable {
     var baseURL: URL {
         switch self {
         case .development:
-            return URL(string: "http://localhost:5000")!
+            return URL(string: "http://localhost:5001")!
         case .staging:
             return URL(string: "https://staging.kullai.com")!
         case .production:
@@ -23,7 +23,7 @@ enum Environment: String, CaseIterable, Identifiable {
     var wsURL: URL {
         switch self {
         case .development:
-            return URL(string: "ws://localhost:5000")!
+            return URL(string: "ws://localhost:5001")!
         case .staging:
             return URL(string: "wss://staging.kullai.com")!
         case .production:
@@ -34,7 +34,7 @@ enum Environment: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .development:
-            return "Development (localhost:5000)"
+            return "Development (localhost:5001)"
         case .staging:
             return "Staging (staging.kullai.com)"
         case .production:
@@ -64,9 +64,9 @@ class EnvironmentConfig: ObservableObject {
            let env = Environment(rawValue: saved) {
             self.current = env
         } else {
-            // Default to production for all builds
-            // Users can switch to development mode via settings if needed
-            self.current = .production
+            // Default to development for local testing
+            // Users can switch to production via settings if needed
+            self.current = .development
         }
     }
 

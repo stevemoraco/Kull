@@ -73,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     mapboxToken: process.env.MAPBOX_ACCESS_TOKEN,
   });
 
-  // Auth middleware
+  // Auth middleware (Replit OAuth - optional for local dev)
   await setupAuth(app);
   
   // Seed default prompts (safe to fail if tables don't exist yet)

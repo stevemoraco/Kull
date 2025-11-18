@@ -102,6 +102,12 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
+  // Skip OAuth setup if not running on Replit
+  if (!process.env.REPL_ID) {
+    console.log('[Auth] Skipping Replit OAuth (REPL_ID not set)');
+    return;
+  }
+
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());

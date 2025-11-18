@@ -9,6 +9,9 @@ import XCTest
 import SwiftUI
 @testable import kull
 
+// Type alias to avoid ambiguity with SwiftUI.Environment
+typealias KullEnvironment = kull.Environment
+
 @MainActor
 final class SettingsViewTests: XCTestCase {
     var authViewModel: AuthViewModel!
@@ -61,15 +64,15 @@ final class SettingsViewTests: XCTestCase {
         // Test switching to different environments
         envConfig.current = .production
         XCTAssertEqual(envConfig.current, .production)
-        XCTAssertEqual(envConfig.apiBaseURL, Environment.production.baseURL)
+        XCTAssertEqual(envConfig.apiBaseURL, KullEnvironment.production.baseURL)
 
         envConfig.current = .staging
         XCTAssertEqual(envConfig.current, .staging)
-        XCTAssertEqual(envConfig.apiBaseURL, Environment.staging.baseURL)
+        XCTAssertEqual(envConfig.apiBaseURL, KullEnvironment.staging.baseURL)
 
         envConfig.current = .development
         XCTAssertEqual(envConfig.current, .development)
-        XCTAssertEqual(envConfig.apiBaseURL, Environment.development.baseURL)
+        XCTAssertEqual(envConfig.apiBaseURL, KullEnvironment.development.baseURL)
 
         // Restore original
         envConfig.current = originalEnv
@@ -90,9 +93,9 @@ final class SettingsViewTests: XCTestCase {
     }
 
     func testEnvironmentDisplayNames() {
-        XCTAssertEqual(Environment.development.displayName, "Development (localhost:5000)")
-        XCTAssertEqual(Environment.staging.displayName, "Staging (staging.kullai.com)")
-        XCTAssertEqual(Environment.production.displayName, "Production (kullai.com)")
+        XCTAssertEqual(KullEnvironment.development.displayName, "Development (localhost:5000)")
+        XCTAssertEqual(KullEnvironment.staging.displayName, "Staging (staging.kullai.com)")
+        XCTAssertEqual(KullEnvironment.production.displayName, "Production (kullai.com)")
     }
 
     func testEnvironmentPersistence() {
@@ -103,7 +106,7 @@ final class SettingsViewTests: XCTestCase {
 
         // Verify it's persisted in UserDefaults
         let saved = UserDefaults.standard.string(forKey: "selectedEnvironment")
-        XCTAssertEqual(saved, Environment.production.rawValue)
+        XCTAssertEqual(saved, KullEnvironment.production.rawValue)
 
         // Restore original
         envConfig.current = originalEnv
@@ -232,7 +235,7 @@ final class SettingsViewTests: XCTestCase {
             object: nil,
             queue: .main
         ) { notification in
-            if let newEnv = notification.object as? Environment {
+            if let newEnv = notification.object as? KullEnvironment {
                 XCTAssertEqual(newEnv, .production)
                 expectation.fulfill()
             }
@@ -255,7 +258,7 @@ final class SettingsViewTests: XCTestCase {
         let originalEnv = envConfig.current
 
         // Switch through all environments
-        let environments: [Environment] = [.development, .staging, .production]
+        let environments: [KullEnvironment] = [.development, .staging, .production]
 
         for env in environments {
             envConfig.current = env
@@ -273,7 +276,7 @@ final class SettingsViewTests: XCTestCase {
     }
 
     func testAllEnvironmentsHaveValidURLs() {
-        for env in Environment.allCases {
+        for env in KullEnvironment.allCases {
             // Base URL should be valid
             XCTAssertNotNil(URL(string: env.baseURL.absoluteString))
 

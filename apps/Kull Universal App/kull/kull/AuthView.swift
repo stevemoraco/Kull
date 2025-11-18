@@ -28,9 +28,15 @@ struct AuthView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Sign in to Kull")
                 .font(.title2)
-            Text("We’ll open your browser so you can approve this Mac. The menubar app polls in the background and signs in automatically once you finish the flow.")
+            #if os(macOS)
+            Text("We'll open your browser so you can approve this Mac. The menubar app polls in the background and signs in automatically once you finish the flow.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            #else
+            Text("We'll open your browser so you can approve this device. The app polls in the background and signs in automatically once you finish the flow.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            #endif
             if let message {
                 Text(message)
                     .font(.callout)
@@ -90,11 +96,17 @@ struct AuthView: View {
 
     private func signedInView() -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("You’re signed in")
+            Text("You're signed in")
                 .font(.title2)
+            #if os(macOS)
             Text("Open the control panel from the menubar icon to start culling.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+            #else
+            Text("You can now start using Kull to cull your photos.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            #endif
             Button("Log Out") {
                 auth.logout()
             }

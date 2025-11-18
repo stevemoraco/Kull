@@ -236,17 +236,17 @@ final class WebSocketServiceTests: XCTestCase {
 
         // Register multiple handlers concurrently
         await withTaskGroup(of: Void.self) { group in
-            for i in 0..<5 {
+            for _ in 0..<5 {
                 group.addTask { @MainActor in
                     self.service.registerHandler(for: .shootProgress) { (_: ShootProgressPayload) in
-                        // Handler \(i)
+                        // Handler
                     }
                     expectation.fulfill()
                 }
             }
         }
 
-        wait(for: [expectation], timeout: 2.0)
+        await fulfillment(of: [expectation], timeout: 2.0)
     }
 
     // MARK: - Message Sending Tests

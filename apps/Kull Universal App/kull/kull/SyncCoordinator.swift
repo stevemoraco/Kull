@@ -84,11 +84,9 @@ final class SyncCoordinator: ObservableObject {
 
             // Remove completed or failed shoots after a delay
             if payload.status == .completed || payload.status == .failed {
-                Task {
+                Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    await MainActor.run {
-                        self.activeShootProgress.removeValue(forKey: payload.shootId)
-                    }
+                    self.activeShootProgress.removeValue(forKey: payload.shootId)
                 }
             }
         }
@@ -145,7 +143,7 @@ final class SyncCoordinator: ObservableObject {
 
         // Admin Session Update Handler (for admin users)
         webSocketService.registerHandler(for: .adminSessionUpdate) { [weak self] (payload: AdminSessionUpdatePayload) in
-            guard let self = self else { return }
+            guard self != nil else { return }
 
             print("[SyncCoordinator] Admin session update: \(payload.sessionId) - \(payload.action)")
 

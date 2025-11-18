@@ -78,6 +78,7 @@ describe('Environment Configuration', () => {
 
     it('should return correct URLs for development environment', () => {
       process.env.NODE_ENV = 'development';
+      process.env.PORT = '5001'; // Default from .env
       process.env.DATABASE_URL = 'postgresql://localhost/test';
       process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
       process.env.OPENAI_API_KEY = 'sk-openai-test';
@@ -86,8 +87,10 @@ describe('Environment Configuration', () => {
 
       const config = loadEnvironmentConfig();
 
-      expect(config.clientBaseURL).toBe('http://localhost:5000');
-      expect(config.clientWSURL).toBe('ws://localhost:5000');
+      // Server and client both use PORT from .env (5001 in this case)
+      expect(config.port).toBe(5001);
+      expect(config.clientBaseURL).toBe('http://localhost:5001');
+      expect(config.clientWSURL).toBe('ws://localhost:5001');
     });
 
     it('should return correct URLs for staging environment', () => {

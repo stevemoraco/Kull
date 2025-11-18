@@ -62,7 +62,7 @@ final class RunControllerTests: XCTestCase {
 
     @MainActor
     func testRunCullingThrowsWithInvalidFolder() async {
-        let invalidURL = URL(fileURLWithPath: "/nonexistent/path")
+        let invalidURL = URL(fileURLWithPath: "/nonexistent/path/\(UUID().uuidString)")
 
         do {
             try await sut.runCulling(
@@ -71,10 +71,13 @@ final class RunControllerTests: XCTestCase {
                 mode: .local,
                 prompt: "Test prompt"
             )
-            XCTFail("Should have thrown error")
+            XCTFail("Should have thrown error for non-existent folder")
+        } catch let error as NSError {
+            // Expected to fail with enumerator error
+            XCTAssertTrue(error.domain == "RunController" || error.domain == NSCocoaErrorDomain)
         } catch {
-            // Expected to fail
-            XCTAssertTrue(true)
+            // Any error is acceptable for invalid folder
+            XCTAssertNotNil(error)
         }
     }
 

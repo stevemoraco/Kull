@@ -52,7 +52,7 @@ final class AuthViewModel: ObservableObject {
     init(api: KullAPIClient = .shared, syncCoordinator: SyncCoordinator = .shared) {
         self.api = api
         self.syncCoordinator = syncCoordinator
-        Task { await refreshSession() }
+        Task { @MainActor in await refreshSession() }
     }
 
     var isAuthenticated: Bool {
