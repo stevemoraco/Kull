@@ -57,12 +57,17 @@ export class GroqAdapter extends BaseProviderAdapter {
     const base64Image = this.imageToBase64(image);
     const mimeType = this.getMimeType(image.format);
 
+    // Augment system prompt with RAW image reminder
+    const enhancedSystemPrompt = `${request.systemPrompt}
+
+CRITICAL RAW IMAGE REMINDER: These are RAW images. Exposure and white balance are FULLY correctable in post-processing - do not penalize for these. However, focus accuracy and moment timing CANNOT be fixed later - these are permanent.`;
+
     const body = {
       model: this.modelName,
       messages: [
         {
           role: 'system',
-          content: request.systemPrompt
+          content: enhancedSystemPrompt
         },
         {
           role: 'user',

@@ -95,7 +95,7 @@ The following models have been **deprecated** and must NEVER be used in any code
    - **Fast inference with vision support**
 
 **Tier 2: Balanced Quality**
-4. **claude-haiku-4.5** (Anthropic)
+4. **claude-haiku-4-5-20251001** (Anthropic Claude Haiku 4.5)
    - Input: $1.00/1M tokens | Output: $5.00/1M tokens
    - Vision: Yes | Batch: Yes (50% off)
    - **Best reasoning for the cost**

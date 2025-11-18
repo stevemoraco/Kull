@@ -1,6 +1,6 @@
 /**
  * Anthropic Claude Provider Adapter
- * Model: claude-haiku-4.5
+ * Model: claude-haiku-4-5-20251001 (Claude Haiku 4.5)
  * Pricing: Input $1.00/1M tokens | Output $5.00/1M tokens
  * Batch API: Supported (50% off)
  */
@@ -21,7 +21,7 @@ import {
 export class AnthropicAdapter extends BaseProviderAdapter {
   protected apiKey: string;
   protected baseURL: string;
-  protected modelName = 'claude-haiku-4.5';
+  protected modelName = 'claude-haiku-4-5-20251001';
 
   // Pricing per million tokens
   private readonly INPUT_COST_PER_1M = 1.00;
@@ -59,7 +59,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
     const base64Image = this.imageToBase64(image);
     const mimeType = this.getMimeType(image.format);
 
-    // Build structured output schema
+    // Build structured output schema with 1-1000 rating scale
     const responseSchema = {
       type: 'object',
       properties: {
@@ -82,23 +82,64 @@ export class AnthropicAdapter extends BaseProviderAdapter {
         technicalQuality: {
           type: 'object',
           properties: {
-            sharpness: { type: 'number', minimum: 0, maximum: 1 },
-            exposure: { type: 'number', minimum: 0, maximum: 1 },
-            composition: { type: 'number', minimum: 0, maximum: 1 },
-            overallScore: { type: 'number', minimum: 0, maximum: 1 }
+            // New 1-1000 scale fields
+            focusAccuracy: { type: 'integer', minimum: 1, maximum: 1000 },
+            exposureQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            compositionScore: { type: 'integer', minimum: 1, maximum: 1000 },
+            lightingQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            colorHarmony: { type: 'integer', minimum: 1, maximum: 1000 },
+            noiseLevel: { type: 'integer', minimum: 1, maximum: 1000 },
+            sharpnessDetail: { type: 'integer', minimum: 1, maximum: 1000 },
+            dynamicRange: { type: 'integer', minimum: 1, maximum: 1000 },
+            overallTechnical: { type: 'integer', minimum: 1, maximum: 1000 }
           },
-          required: ['sharpness', 'exposure', 'composition', 'overallScore']
+          required: [
+            'focusAccuracy',
+            'exposureQuality',
+            'compositionScore',
+            'lightingQuality',
+            'colorHarmony',
+            'noiseLevel',
+            'sharpnessDetail',
+            'dynamicRange',
+            'overallTechnical'
+          ]
         },
         subjectAnalysis: {
           type: 'object',
           properties: {
             primarySubject: { type: 'string' },
-            emotion: { type: 'string' },
+            emotionIntensity: { type: 'integer', minimum: 1, maximum: 1000 },
             eyesOpen: { type: 'boolean' },
-            smiling: { type: 'boolean' },
-            inFocus: { type: 'boolean' }
+            eyeContact: { type: 'boolean' },
+            genuineExpression: { type: 'integer', minimum: 1, maximum: 1000 },
+            facialSharpness: { type: 'integer', minimum: 1, maximum: 1000 },
+            bodyLanguage: { type: 'integer', minimum: 1, maximum: 1000 },
+            momentTiming: { type: 'integer', minimum: 1, maximum: 1000 },
+            storyTelling: { type: 'integer', minimum: 1, maximum: 1000 },
+            uniqueness: { type: 'integer', minimum: 1, maximum: 1000 }
           },
-          required: ['primarySubject', 'emotion', 'eyesOpen', 'smiling', 'inFocus']
+          required: [
+            'primarySubject',
+            'emotionIntensity',
+            'eyesOpen',
+            'eyeContact',
+            'genuineExpression',
+            'facialSharpness',
+            'bodyLanguage',
+            'momentTiming',
+            'storyTelling',
+            'uniqueness'
+          ]
+        },
+        shootContext: {
+          type: 'object',
+          properties: {
+            eventType: { type: 'string' },
+            shootPhase: { type: 'string' },
+            timeOfDay: { type: 'string' },
+            location: { type: 'string' }
+          }
         }
       },
       required: [
@@ -114,10 +155,15 @@ export class AnthropicAdapter extends BaseProviderAdapter {
       ]
     };
 
+    // Add RAW reminder to system prompt
+    const enhancedSystemPrompt = `${request.systemPrompt}
+
+CRITICAL REMINDER: These are RAW images - exposure and white balance are fully correctable in post-processing. When rating exposureQuality, focus on whether detail is retained in highlights and shadows, NOT the current brightness or color temperature. However, focus accuracy and moment timing CANNOT be fixed in post - prioritize these heavily in your ratings.`;
+
     const body = {
       model: this.modelName,
       max_tokens: 4096,
-      system: request.systemPrompt,
+      system: enhancedSystemPrompt,
       messages: [
         {
           role: 'user',
@@ -148,6 +194,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
       headers: {
         'Content-Type': 'application/json',
         'anthropic-version': '2025-11-01',
+        'anthropic-beta': 'structured-outputs-2025-11-13',
         'x-api-key': this.apiKey
       },
       body: JSON.stringify(body)
@@ -238,6 +285,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
       headers: {
         'Content-Type': 'application/json',
         'anthropic-version': '2025-11-01',
+        'anthropic-beta': 'structured-outputs-2025-11-13',
         'x-api-key': this.apiKey
       },
       body: JSON.stringify({ requests })
@@ -263,6 +311,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
     const response = await fetch(`${this.baseURL}/messages/batches/${jobId}`, {
       headers: {
         'anthropic-version': '2025-11-01',
+        'anthropic-beta': 'structured-outputs-2025-11-13',
         'x-api-key': this.apiKey
       }
     });
@@ -294,6 +343,7 @@ export class AnthropicAdapter extends BaseProviderAdapter {
     const response = await fetch(`${this.baseURL}/messages/batches/${jobId}/results`, {
       headers: {
         'anthropic-version': '2025-11-01',
+        'anthropic-beta': 'structured-outputs-2025-11-13',
         'x-api-key': this.apiKey
       }
     });
