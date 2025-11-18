@@ -23,7 +23,7 @@ export function ReferralForm() {
         apiRequest("POST", "/api/referrals", { referredEmail: email }).then(r => r.json())
       );
       const results = await Promise.all(promises);
-      
+
       // Send confirmation email to referrer
       try {
         await apiRequest("POST", "/api/referrals/confirm", { referredEmails });
@@ -31,7 +31,7 @@ export function ReferralForm() {
         console.error("Failed to send confirmation email:", confirmError);
         // Don't fail the whole operation if confirmation email fails
       }
-      
+
       return results;
     },
     onSuccess: (results) => {
@@ -45,6 +45,26 @@ export function ReferralForm() {
     onError: (error: Error) => {
       toast({
         title: "Failed to Send Referrals",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteReferralMutation = useMutation({
+    mutationFn: async (referralId: string) => {
+      await apiRequest("DELETE", `/api/referrals/${referralId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/referrals'] });
+      toast({
+        title: "Referral Deleted",
+        description: "The referral has been removed.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Delete Referral",
         description: error.message,
         variant: "destructive",
       });
@@ -403,13 +423,25 @@ export function ReferralForm() {
                 data-testid={`referral-item-${referral.id}`}
               >
                 <span className="text-sm text-foreground">{referral.referredEmail}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  referral.status === 'completed' 
-                    ? 'bg-primary/20 text-primary' 
-                    : 'bg-muted text-muted-foreground'
-                }`}>
-                  {referral.status === 'completed' ? 'Joined' : 'Pending'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    referral.status === 'completed'
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {referral.status === 'completed' ? 'Joined' : 'Pending'}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => deleteReferralMutation.mutate(referral.id)}
+                    disabled={deleteReferralMutation.isPending}
+                    data-testid={`button-delete-referral-${referral.id}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
