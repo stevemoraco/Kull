@@ -123,7 +123,7 @@ export function Hero() {
                   </div>
                   <div className="flex-1 text-left">
                     <h3 className="text-lg font-bold text-foreground leading-tight">Title</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">Auto-written detailed image titles based on subject, shoot context, GPS, EXIF, and other metadata</p>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Auto-written based on subject, shoot context, GPS, EXIF, and other metadata</p>
                   </div>
                 </div>
 

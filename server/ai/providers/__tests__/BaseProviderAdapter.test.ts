@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BaseProviderAdapter, ImageInput, ProcessImageRequest, PhotoRating } from '../BaseProviderAdapter';
+import { BaseProviderAdapter, ImageInput, ProcessImageRequest, PhotoRating } from '../../BaseProviderAdapter';
 
 // Mock implementation for testing
 class MockProviderAdapter extends BaseProviderAdapter {

@@ -292,8 +292,10 @@ export abstract class BaseProviderAdapter {
   }
 
   private clampStarRating(value: any): 1 | 2 | 3 | 4 | 5 {
-    const num = Number(value) || 3;
-    const clamped = Math.max(1, Math.min(5, Math.round(num)));
+    const num = Number(value);
+    // Use 3 as default only if value is not a valid number
+    const normalizedNum = isNaN(num) ? 3 : num;
+    const clamped = Math.max(1, Math.min(5, Math.round(normalizedNum)));
     return clamped as 1 | 2 | 3 | 4 | 5;
   }
 
