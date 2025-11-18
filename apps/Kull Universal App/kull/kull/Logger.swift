@@ -36,6 +36,9 @@ extension Logger {
 
     /// User interface interactions and navigation
     static let ui = Logger(subsystem: subsystem, category: "ui")
+
+    /// General application logs (miscellaneous operations)
+    static let general = Logger(subsystem: subsystem, category: "general")
 }
 
 /// Helper extension for logging with consistent formatting

@@ -11,8 +11,10 @@ import Foundation
 
 #if os(macOS)
 import AppKit
+import UniformTypeIdentifiers
 #elseif os(iOS)
 import UIKit
+import UniformTypeIdentifiers
 #endif
 
 // MARK: - Protocol
@@ -22,6 +24,10 @@ protocol FileAccessServiceProtocol {
     /// Select a folder for processing
     /// - Parameter completion: Called with selected folder URL or nil if cancelled
     func selectFolder(completion: @escaping (URL?) -> Void)
+
+    /// Select an audio file for transcription
+    /// - Parameter completion: Called with selected audio file URL or nil if cancelled
+    func selectAudioFile(completion: @escaping (URL?) -> Void)
 
     /// Persist access to a folder/file (security-scoped bookmarks)
     /// - Parameter url: The URL to persist access to
@@ -56,6 +62,35 @@ final class FileAccessService: FileAccessServiceProtocol {
         panel.prompt = "Select Folder"
         panel.canCreateDirectories = false
         panel.allowedContentTypes = []
+
+        panel.begin { response in
+            if response == .OK {
+                completion(panel.urls.first)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+
+    func selectAudioFile(completion: @escaping (URL?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Select an audio file to transcribe"
+        panel.prompt = "Select Audio"
+        panel.canCreateDirectories = false
+
+        if #available(macOS 12.0, *) {
+            panel.allowedContentTypes = [
+                UTType.mpeg4Audio,
+                UTType.mp3,
+                UTType.wav,
+                UTType(filenameExtension: "webm"),
+            ].compactMap { $0 }
+        } else {
+            panel.allowedFileTypes = ["m4a", "mp3", "wav", "webm"]
+        }
 
         panel.begin { response in
             if response == .OK {
@@ -118,6 +153,41 @@ final class FileAccessService: NSObject, FileAccessServiceProtocol, UIDocumentPi
             picker.allowsMultipleSelection = false
             picker.shouldShowFileExtensions = true
             picker.directoryURL = nil
+
+            // Present from top-most view controller
+            var topVC = rootVC
+            while let presented = topVC.presentedViewController {
+                topVC = presented
+            }
+
+            topVC.present(picker, animated: true)
+        }
+    }
+
+    func selectAudioFile(completion: @escaping (URL?) -> Void) {
+        // Must run on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                completion(nil)
+                return
+            }
+
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootVC = windowScene.windows.first?.rootViewController else {
+                Logger.errors.error("FileAccessService: No root view controller found")
+                completion(nil)
+                return
+            }
+
+            self.completion = completion
+
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.mpeg4Audio, .mp3, .wav],
+                asCopy: true
+            )
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            picker.shouldShowFileExtensions = true
 
             // Present from top-most view controller
             var topVC = rootVC

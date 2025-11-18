@@ -102,8 +102,8 @@ describe('AnthropicAdapter', () => {
     });
   });
 
-  describe('Response Schema - 1-1000 Rating Fields', () => {
-    it('should include all 9 technicalQuality 1-1000 fields in schema', async () => {
+  describe('Prompt Engineering (since Haiku 4.5 does not support structured outputs)', () => {
+    it('should include JSON schema in user prompt for 1-1000 rating fields', async () => {
       const mockResponse = createMockAnthropicResponse();
       fetchMock.mockResolvedValueOnce(mockResponse);
 
@@ -111,21 +111,17 @@ describe('AnthropicAdapter', () => {
       await adapter.processSingleImage(request);
 
       const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-      const schema = callBody.response_format.schema;
-      const techProps = schema.properties.technicalQuality.properties;
+      const userMessage = callBody.messages[0].content.find((c: any) => c.type === 'text');
 
-      expect(techProps.focusAccuracy).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.exposureQuality).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.compositionScore).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.lightingQuality).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.colorHarmony).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.noiseLevel).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.sharpnessDetail).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.dynamicRange).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(techProps.overallTechnical).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
+      expect(userMessage.text).toContain('focusAccuracy');
+      expect(userMessage.text).toContain('exposureQuality');
+      expect(userMessage.text).toContain('compositionScore');
+      expect(userMessage.text).toContain('minimum": 1');
+      expect(userMessage.text).toContain('maximum": 1000');
+      expect(userMessage.text).toContain('Return ONLY the JSON object');
     });
 
-    it('should include all 9 subjectAnalysis 1-1000 fields in schema', async () => {
+    it('should include all subject analysis fields in prompt schema', async () => {
       const mockResponse = createMockAnthropicResponse();
       fetchMock.mockResolvedValueOnce(mockResponse);
 
@@ -133,21 +129,18 @@ describe('AnthropicAdapter', () => {
       await adapter.processSingleImage(request);
 
       const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-      const schema = callBody.response_format.schema;
-      const subjectProps = schema.properties.subjectAnalysis.properties;
+      const userMessage = callBody.messages[0].content.find((c: any) => c.type === 'text');
 
-      expect(subjectProps.emotionIntensity).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.genuineExpression).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.facialSharpness).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.bodyLanguage).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.momentTiming).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.storyTelling).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.uniqueness).toEqual({ type: 'integer', minimum: 1, maximum: 1000 });
-      expect(subjectProps.eyesOpen).toEqual({ type: 'boolean' });
-      expect(subjectProps.eyeContact).toEqual({ type: 'boolean' });
+      expect(userMessage.text).toContain('emotionIntensity');
+      expect(userMessage.text).toContain('genuineExpression');
+      expect(userMessage.text).toContain('facialSharpness');
+      expect(userMessage.text).toContain('bodyLanguage');
+      expect(userMessage.text).toContain('momentTiming');
+      expect(userMessage.text).toContain('eyesOpen');
+      expect(userMessage.text).toContain('eyeContact');
     });
 
-    it('should include shootContext in schema', async () => {
+    it('should include shootContext in prompt schema', async () => {
       const mockResponse = createMockAnthropicResponse();
       fetchMock.mockResolvedValueOnce(mockResponse);
 
@@ -155,13 +148,12 @@ describe('AnthropicAdapter', () => {
       await adapter.processSingleImage(request);
 
       const callBody = JSON.parse(fetchMock.mock.calls[0][1].body);
-      const schema = callBody.response_format.schema;
-      const contextProps = schema.properties.shootContext.properties;
+      const userMessage = callBody.messages[0].content.find((c: any) => c.type === 'text');
 
-      expect(contextProps.eventType).toEqual({ type: 'string' });
-      expect(contextProps.shootPhase).toEqual({ type: 'string' });
-      expect(contextProps.timeOfDay).toEqual({ type: 'string' });
-      expect(contextProps.location).toEqual({ type: 'string' });
+      expect(userMessage.text).toContain('eventType');
+      expect(userMessage.text).toContain('shootPhase');
+      expect(userMessage.text).toContain('timeOfDay');
+      expect(userMessage.text).toContain('location');
     });
 
     it('should validate rating response with all 1-1000 fields', async () => {
@@ -207,10 +199,10 @@ describe('AnthropicAdapter', () => {
       await adapter.processSingleImage(request);
 
       const headers = fetchMock.mock.calls[0][1].headers;
-      expect(headers['anthropic-version']).toBe('2025-11-01');
+      expect(headers['anthropic-version']).toBe('2023-06-01');
     });
 
-    it('should include structured-outputs beta header', async () => {
+    it('should NOT include structured-outputs beta header (Haiku 4.5 does not support it)', async () => {
       const mockResponse = createMockAnthropicResponse();
       fetchMock.mockResolvedValueOnce(mockResponse);
 
@@ -218,7 +210,7 @@ describe('AnthropicAdapter', () => {
       await adapter.processSingleImage(request);
 
       const headers = fetchMock.mock.calls[0][1].headers;
-      expect(headers['anthropic-beta']).toBe('structured-outputs-2025-11-13');
+      expect(headers['anthropic-beta']).toBeUndefined();
     });
 
     it('should include x-api-key header', async () => {
@@ -525,7 +517,7 @@ describe('AnthropicAdapter', () => {
       expect(results[0].starRating).toBeDefined();
     });
 
-    it('should include structured-outputs beta header in batch requests', async () => {
+    it('should NOT include structured-outputs beta header in batch requests (Haiku 4.5 does not support it)', async () => {
       const batchResponse = {
         ok: true,
         status: 200,
@@ -543,7 +535,7 @@ describe('AnthropicAdapter', () => {
       await adapter.submitBatch(request);
 
       const headers = fetchMock.mock.calls[0][1].headers;
-      expect(headers['anthropic-beta']).toBe('structured-outputs-2025-11-13');
+      expect(headers['anthropic-beta']).toBeUndefined();
     });
   });
 

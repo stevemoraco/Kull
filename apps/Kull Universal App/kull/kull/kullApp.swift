@@ -335,10 +335,12 @@ struct MainWindow: View {
 
 #else
 // iOS and iPadOS
+import UIKit
 import Combine
 
 @main
 struct KullApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var auth = AuthViewModel()
 
     var body: some Scene {
@@ -528,6 +530,20 @@ struct HomeView: View {
         if minutes < 60 { return "\(minutes)m ago" }
         let hours = minutes / 60
         return "\(hours)h ago"
+    }
+}
+
+// iOS AppDelegate for lifecycle management
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        Logger.app.info("Kull iOS app launched")
+        return true
+    }
+
+    func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        // Handle deep links for authentication callback
+        Logger.app.info("Received deep link: \(url.absoluteString)")
+        return true
     }
 }
 

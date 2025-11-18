@@ -160,6 +160,16 @@ export class AnthropicAdapter extends BaseProviderAdapter {
 
 CRITICAL REMINDER: These are RAW images - exposure and white balance are fully correctable in post-processing. When rating exposureQuality, focus on whether detail is retained in highlights and shadows, NOT the current brightness or color temperature. However, focus accuracy and moment timing CANNOT be fixed in post - prioritize these heavily in your ratings.`;
 
+    // Note: Structured outputs (output_format) are only supported on Sonnet 4.5 and Opus 4.1
+    // Haiku 4.5 does not support structured outputs yet, so we rely on prompt engineering
+    // and post-processing validation
+    const promptWithSchema = `${request.userPrompt}
+
+IMPORTANT: You MUST respond with valid JSON matching this exact schema:
+${JSON.stringify(responseSchema, null, 2)}
+
+Return ONLY the JSON object, no other text.`;
+
     const body = {
       model: this.modelName,
       max_tokens: 4096,
@@ -178,23 +188,18 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
             },
             {
               type: 'text',
-              text: request.userPrompt
+              text: promptWithSchema
             }
           ]
         }
-      ],
-      response_format: {
-        type: 'json_schema',
-        schema: responseSchema
-      }
+      ]
     };
 
     const response = await fetch(`${this.baseURL}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'anthropic-version': '2025-11-01',
-        'anthropic-beta': 'structured-outputs-2025-11-13',
+        'anthropic-version': '2023-06-01',
         'x-api-key': this.apiKey
       },
       body: JSON.stringify(body)
@@ -222,7 +227,15 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
       throw new Error('No content in Anthropic response');
     }
 
-    const ratingData = JSON.parse(content);
+    // Strip code blocks if present (Claude sometimes wraps JSON in ```json```)
+    let jsonContent = content.trim();
+    if (jsonContent.startsWith('```json')) {
+      jsonContent = jsonContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (jsonContent.startsWith('```')) {
+      jsonContent = jsonContent.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+
+    const ratingData = JSON.parse(jsonContent);
     ratingData.imageId = image.filename;
     ratingData.filename = image.filename;
 
@@ -284,8 +297,7 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'anthropic-version': '2025-11-01',
-        'anthropic-beta': 'structured-outputs-2025-11-13',
+        'anthropic-version': '2023-06-01',
         'x-api-key': this.apiKey
       },
       body: JSON.stringify({ requests })
@@ -310,8 +322,7 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
   async checkBatchStatus(jobId: string): Promise<BatchJobStatus> {
     const response = await fetch(`${this.baseURL}/messages/batches/${jobId}`, {
       headers: {
-        'anthropic-version': '2025-11-01',
-        'anthropic-beta': 'structured-outputs-2025-11-13',
+        'anthropic-version': '2023-06-01',
         'x-api-key': this.apiKey
       }
     });
@@ -342,8 +353,7 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
   async retrieveBatchResults(jobId: string): Promise<PhotoRating[]> {
     const response = await fetch(`${this.baseURL}/messages/batches/${jobId}/results`, {
       headers: {
-        'anthropic-version': '2025-11-01',
-        'anthropic-beta': 'structured-outputs-2025-11-13',
+        'anthropic-version': '2023-06-01',
         'x-api-key': this.apiKey
       }
     });
@@ -360,7 +370,15 @@ CRITICAL REMINDER: These are RAW images - exposure and white balance are fully c
         const content = result.result.message?.content?.[0]?.text;
         if (content) {
           try {
-            const ratingData = JSON.parse(content);
+            // Strip code blocks if present
+            let jsonContent = content.trim();
+            if (jsonContent.startsWith('```json')) {
+              jsonContent = jsonContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+            } else if (jsonContent.startsWith('```')) {
+              jsonContent = jsonContent.replace(/^```\n/, '').replace(/\n```$/, '');
+            }
+
+            const ratingData = JSON.parse(jsonContent);
             ratings.push(this.validateRating(ratingData));
           } catch (e) {
             console.error('Failed to parse rating:', e);

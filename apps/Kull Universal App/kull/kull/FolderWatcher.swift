@@ -1,5 +1,7 @@
 import Foundation
 import Dispatch
+
+#if os(macOS)
 import Darwin
 
 final class FolderWatcher {
@@ -22,4 +24,22 @@ final class FolderWatcher {
         sources.removeAll()
     }
 }
+
+#elseif os(iOS)
+
+// iOS: Filesystem monitoring not available due to sandboxing
+// This is a no-op implementation that maintains API compatibility
+final class FolderWatcher {
+    func watch(urls: [URL], onChange: @escaping (URL) -> Void) {
+        Logger.general.info("FolderWatcher: Folder watching not available on iOS (sandboxing restrictions)")
+        // iOS apps cannot monitor filesystem changes outside their sandbox
+        // Users must manually trigger processing instead
+    }
+
+    func stop() {
+        // No-op on iOS
+    }
+}
+
+#endif
 

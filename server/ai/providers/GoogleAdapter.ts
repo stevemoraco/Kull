@@ -192,8 +192,12 @@ export class GoogleAdapter extends BaseProviderAdapter {
         'x-goog-api-key': this.apiKey
       },
       body: JSON.stringify({
-        model: `models/${this.modelName}`,
-        file_name: fileUri
+        batch: {
+          display_name: `kull-batch-${Date.now()}`,
+          input_config: {
+            file_name: fileUri
+          }
+        }
       })
     });
 
