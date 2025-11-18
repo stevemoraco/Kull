@@ -10,5 +10,9 @@
 	<array>
 		<string>CloudKit</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)media.lander.kull</string>
+	</array>
 </dict>
 </plist>

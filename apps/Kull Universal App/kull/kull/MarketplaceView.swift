@@ -44,9 +44,13 @@ struct MarketplaceView: View {
     }
 
     private func load() async {
-        guard var comp = URLComponents(string: "http://localhost:5000/api/kull/prompts") else { return }
-        if !search.isEmpty { comp.queryItems = [URLQueryItem(name: "search", value: search)] }
-        guard let url = comp.url else { return }
+        let baseURL = EnvironmentConfig.shared.apiBaseURL
+        var url = baseURL.appendingPathComponent("/api/kull/prompts")
+        if !search.isEmpty {
+            var comp = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            comp.queryItems = [URLQueryItem(name: "search", value: search)]
+            url = comp.url!
+        }
         loading = true
         defer { loading = false }
         do {

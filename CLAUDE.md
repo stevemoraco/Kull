@@ -2,258 +2,584 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## Vision, Mission & Values
+
+### Vision
+Kull empowers professional photographers to focus on creativity, not tedious culling. We leverage cutting-edge AI to deliver instant, accurate photo ratings that match—and often exceed—human judgment, freeing photographers to spend time on what matters: their craft and their clients.
+
+### Mission
+Build the world's fastest, most accurate, and most affordable AI photo culling platform. Every photographer, from wedding shooters to commercial studios, should have access to enterprise-grade AI that processes thousands of photos in seconds, not hours.
+
+### Core Values
+
+**1. Speed Above All**
+- Fire all concurrent requests immediately (up to 30,000/minute)
+- Never wait when you can parallelize
+- Retry failures with exponential backoff, but always prioritize completion speed
+- Users shouldn't wait—photoshoots should be processed in seconds, not minutes
+
+**2. Radical Transparency**
+- Show users exactly what they're paying (2x our provider costs)
+- No hidden fees, no "credit" systems that obfuscate real costs
+- Display token usage and provider costs in real-time
+- Admin visibility into every rate limit, every retry, every failure
+
+**3. Relentless Reliability**
+- Auto-retry until 100% success—users should never see failures
+- Exponential backoff for hours if needed
+- Log everything for admin debugging, show nothing to users
+- Tests must be 100% green before any release
+
+**4. Security First**
+- API keys NEVER leave the server
+- Keychain stores ONLY user JWT tokens
+- All AI requests go through backend passthrough API
+- Zero-trust architecture for all native apps
+
+**5. Model Agnosticism**
+- Support ALL major providers (Anthropic, OpenAI, Google, xAI, Groq)
+- Default to cheapest models that deliver quality (gpt-5-nano, gemini-2.5-flash-lite)
+- Let users choose: instant (local), fast (cloud concurrent), or economy (batch API)
+- Always use latest models—deprecate old ones immediately
+
+---
+
+## Current AI Models (2025)
+
+### ⚠️ CRITICAL: Deprecated Models (DO NOT USE)
+
+The following models have been **deprecated** and must NEVER be used in any code:
+
+**OpenAI (Deprecated):**
+- ❌ gpt-4o (replaced by gpt-5)
+- ❌ gpt-4o-mini (replaced by gpt-5-mini)
+- ❌ gpt-4-turbo (replaced by gpt-5)
+- ❌ gpt-4 (replaced by gpt-5)
+- ❌ gpt-3.5-turbo (fully deprecated)
+
+**Anthropic (Deprecated):**
+- ❌ claude-3-opus (replaced by claude-opus-4.1)
+- ❌ claude-3-sonnet (replaced by claude-sonnet-4.5)
+- ❌ claude-3-haiku (replaced by claude-haiku-4.5)
+- ❌ claude-2.x (all versions deprecated)
+
+**Google (Deprecated):**
+- ❌ gemini-1.5-pro (replaced by gemini-2.5-pro)
+- ❌ gemini-1.5-flash (replaced by gemini-2.5-flash)
+- ❌ gemini-1.0-pro (fully deprecated)
+
+**IF YOU SEE ANY OF THESE MODELS IN CODE OR SUGGESTIONS, IMMEDIATELY FLAG AS ERROR AND USE CURRENT MODELS INSTEAD.**
+
+---
+
+### ✅ Current Models (Use These)
+
+#### Default Models (Prioritize for Speed & Cost)
+
+**Tier 1: Ultra-Fast & Cheap (Default)**
+1. **gpt-5-nano** (OpenAI)
+   - Input: $0.05/1M tokens | Output: $0.40/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+   - **Primary default model**
+
+2. **gemini-2.5-flash-lite** (Google)
+   - Input: $0.10/1M tokens | Output: $0.40/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+   - **Cheapest option**
+
+3. **grok-4-mini** (xAI)
+   - Pricing: TBD (competitive with gpt-5-nano)
+   - Vision: Yes | Batch: No
+   - **Fastest inference**
+
+**Tier 2: Balanced Quality**
+4. **claude-haiku-4.5** (Anthropic)
+   - Input: $1.00/1M tokens | Output: $5.00/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+   - **Best reasoning for the cost**
+
+5. **kimi-k2-instruct** (Groq)
+   - Pricing: TBD (very fast, cheap)
+   - Vision: Yes | Batch: No
+   - **Extremely fast inference**
+
+**Tier 3: Premium (User Opt-In)**
+6. **gpt-5** (OpenAI)
+   - Input: $1.25/1M tokens | Output: $10.00/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+
+7. **claude-sonnet-4.5** (Anthropic)
+   - Input: $3.00/1M tokens | Output: $15.00/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+   - **Best overall quality**
+
+8. **gemini-2.5-pro** (Google)
+   - Input: $1.25/1M tokens | Output: $10.00/1M tokens
+   - Vision: Yes | Batch: Yes (50% off)
+
+**Tier 4: On-Device (Free, macOS Only)**
+9. **Apple Intelligence** (VisionFoundationModel)
+   - Cost: $0.00 (on-device)
+   - Vision: Yes | Batch: No
+   - **Free but slowest, macOS 15+ required**
+
+---
+
+### Pricing Model
+
+**ALWAYS charge 2x our provider costs (50% margin).**
+
+Example calculation:
+```
+Provider cost per image: $0.002
+User cost: $0.004 (2x markup)
+
+For 1000 images:
+Provider cost: $2.00
+User pays: $4.00
+Kull profit: $2.00
+```
+
+**Display to users:**
+- "This photoshoot will cost $4.00 (1000 images × $0.004)"
+- "Processing with gpt-5-nano"
+- Do NOT use "credits" language—just show dollar amounts from their annual subscription
+
+**Batch API discount:**
+- Provider cost: 50% off (e.g., $0.001 per image)
+- User cost: Still 2x ($0.002 per image)
+- User saves 50%, we maintain 50% margin
+
+---
+
 ## Project Overview
 
-Kull is a photography culling platform that helps professional photographers rate, describe, and tag entire shoots using AI. The application consists of:
+Kull is a professional AI photo culling platform with:
+- **Web application** (Vite + React) - Sales, dashboard, admin panel
+- **Express API** (TypeScript) - Authentication, billing, AI orchestration
+- **Universal Native App** (Swift, macOS + iOS) - Local processing, cloud sync, real-time progress
 
-- **Web application** (Vite + React) - Sales/marketing site and subscription backend
-- **Express API** (TypeScript) - Authentication, billing, prompts marketplace, and orchestration APIs
-- **Future native apps** - macOS menubar app and iOS/iPadOS companion (planned)
+---
 
-The current implementation is a monolithic full-stack web app with planned expansion to native desktop and mobile clients.
+## Architecture
+
+### Universal App Structure
+
+```
+apps/
+└── Kull Universal App/
+    └── kull/
+        ├── kull.xcodeproj         # Xcode project
+        ├── kull/                  # App source
+        │   ├── kullApp.swift      # Main entry (macOS + iOS)
+        │   ├── KullMenubarApp.swift
+        │   ├── KullMobileApp.swift
+        │   ├── Auth/
+        │   │   ├── AuthView.swift
+        │   │   ├── AuthViewModel.swift
+        │   │   ├── KeychainManager.swift
+        │   │   └── DeviceIDManager.swift
+        │   ├── Services/
+        │   │   ├── CloudAIService.swift
+        │   │   ├── WebSocketService.swift
+        │   │   ├── KullAPIClient.swift
+        │   │   └── EnvironmentConfig.swift
+        │   └── ... (other Swift files)
+        └── kullTests/
+```
+
+**ALL NATIVE APP DEVELOPMENT HAPPENS IN `apps/Kull Universal App/kull/`**
+
+Old `apps/mac-menubar/` and `apps/mobile-companion/` are deprecated—code has been migrated to universal app.
+
+---
+
+### Backend Structure
+
+```
+server/
+├── config/
+│   └── environment.ts         # Centralized config (API keys server-side only)
+├── ai/
+│   ├── BaseProviderAdapter.ts
+│   ├── providers/
+│   │   ├── AnthropicAdapter.ts
+│   │   ├── OpenAIAdapter.ts
+│   │   ├── GoogleAdapter.ts
+│   │   ├── GrokAdapter.ts
+│   │   └── GroqAdapter.ts
+│   ├── BatchProcessor.ts
+│   └── BatchJobQueue.ts
+├── routes/
+│   ├── ai-passthrough.ts      # NEW: Passthrough API for native apps
+│   ├── batch.ts               # NEW: Batch processing endpoints
+│   ├── device-auth.ts
+│   ├── credits.ts
+│   ├── prompts.ts
+│   └── reports.ts
+└── ... (existing files)
+```
+
+---
+
+## Key Systems
+
+### 1. AI Provider Passthrough API (NEW)
+
+**Architecture:** Native apps NEVER store provider API keys. All AI requests go through backend.
+
+```
+Native App → Backend Passthrough API → Provider API
+  (JWT auth)   (Provider API key)      (OpenAI, Anthropic, etc.)
+```
+
+**Endpoints:**
+- `POST /api/ai/process-single` - Process one image, return result + cost
+- `POST /api/ai/process-batch` - Submit batch job (if provider supports)
+- `GET /api/ai/batch-status/:jobId` - Check batch progress
+- `GET /api/ai/batch-results/:jobId` - Retrieve completed results
+- `GET /api/ai/providers` - List available providers and pricing
+
+**Concurrency Strategy:**
+- Fire ALL photos simultaneously (up to 30k/min rate limit)
+- Exponential backoff on rate limit errors: 1s → 2s → 4s → 8s → 16s → 32s → 60s (max)
+- Retry for up to 6 hours on failures
+- Different backoff for different errors (rate limits = aggressive, others = cautious)
+- Never show failures to users—only log for admin
+
+**Security:**
+- All provider API keys stored in `server/config/environment.ts`
+- Loaded from environment variables (NEVER commit to repo)
+- Native apps send JWT Bearer token, backend validates and proxies to provider
+- Keychain stores ONLY user JWT tokens (access + refresh)
+
+---
+
+### 2. WebSocket Real-Time Sync
+
+**Server:** `server/websocket.ts` (fully implemented)
+**Native Client:** `apps/Kull Universal App/kull/kull/WebSocketService.swift` (NEW)
+
+**Authentication:**
+- Web: `ws://host/ws?token=userId`
+- Native: `ws://host/ws?token=userId:deviceId`
+
+**Message Types** (`shared/types/sync.ts`):
+- `SHOOT_PROGRESS` - Real-time progress updates (every image processed)
+- `CREDIT_UPDATE` - Balance changes (immediate)
+- `DEVICE_CONNECTED` / `DEVICE_DISCONNECTED` - Multi-device sync
+- `PROMPT_CHANGE` - Marketplace updates
+
+**Native Implementation:**
+- Use `URLSessionWebSocketTask` (native iOS/macOS)
+- Auto-reconnect with exponential backoff
+- Type-safe message handlers via `SyncCoordinator`
+
+---
+
+### 3. Device Authentication
+
+**Flow:**
+1. Native app requests 6-digit code: `POST /api/device-auth/request`
+2. User enters code on web: `POST /api/device-auth/approve`
+3. Native app polls: `GET /api/device-auth/status/:code`
+4. Backend returns JWT access + refresh tokens
+5. Native app stores tokens in Keychain (NEVER stores provider API keys)
+
+**Token Management:**
+- Access token: 1 hour expiry
+- Refresh token: 30 days expiry
+- Auto-refresh when <5 minutes remaining
+- On 401 error: refresh token and retry request
+
+---
+
+### 4. Credits System → Pricing Transparency
+
+**OLD (Deprecated):** "Credits" abstraction (confusing)
+**NEW:** Show real costs to users
+
+**Display in UI:**
+```
+Processing 1,247 images with gpt-5-nano
+Estimated cost: $4.98
+(Provider: $2.49 | Kull: $2.49)
+```
+
+**Backend tracking:**
+- Still use `creditTransactions` table for accounting
+- Convert token costs to dollars: `(inputTokens * inputCost + outputTokens * outputCost) / 1_000_000`
+- Charge user: `providerCost * 2`
+- Deduct from user's annual subscription balance
+
+**Annual Subscription:**
+- Users pay upfront (e.g., $1000/year)
+- Balance decreases as they process shoots
+- Show remaining balance in dashboard
+- Alert when <$100 remaining
+
+---
+
+### 5. Native App Processing Modes
+
+**User selects ONE of three modes:**
+
+**1. Default (Fast)**
+- Uses cloud models: gpt-5-nano, gemini-2.5-flash-lite
+- Fires ALL photos simultaneously (up to 30k/min)
+- Fastest completion (seconds for 1000 images)
+- Costs 2x provider pricing
+
+**2. Economy (Batch API)**
+- Uses provider batch APIs (50% off provider cost, still 2x to user)
+- User cost: Same 2x provider cost, but provider is 50% cheaper
+- Submits batch, polls for completion (may take 10 minutes - 24 hours)
+- Best for non-urgent shoots
+
+**3. Local (On-Device, macOS Only)**
+- Uses Apple Intelligence VisionFoundationModel
+- Free ($0.00 cost)
+- Very slow (processes sequentially on device)
+- Complete privacy (no data sent to cloud)
+
+**UI Example:**
+```
+┌─────────────────────────────────┐
+│ Processing Mode                 │
+├─────────────────────────────────┤
+│ ○ Default (Fast)                │
+│   1000 images in ~30 seconds    │
+│   Cost: $4.00                   │
+├─────────────────────────────────┤
+│ ○ Economy (Batch)               │
+│   1000 images in ~10-30 minutes │
+│   Cost: $2.00 (50% off)         │
+├─────────────────────────────────┤
+│ ○ Local (On-Device)             │
+│   1000 images in ~2 hours       │
+│   Cost: FREE                    │
+└─────────────────────────────────┘
+```
+
+---
 
 ## Development Commands
 
 ```bash
-# Development
-npm run dev          # Start Express API + Vite dev server (hot reload)
-
-# Type checking
-npm run check        # TypeScript type checking across all files
-
-# Production
-npm run build        # Build client (Vite) + bundle server (esbuild)
-npm start            # Run bundled production server
+# Backend development
+npm run dev          # Start Express API + Vite dev server
+npm run check        # TypeScript type checking
+npm run build        # Build for production
+npm start            # Run production server
 
 # Database
-npm run db:push      # Push schema changes to database (Drizzle)
+npm run db:push      # Push Drizzle schema changes
+
+# Native app (from apps/Kull Universal App/kull/)
+open kull.xcodeproj  # Open in Xcode
+# Build: Cmd+B
+# Run: Cmd+R
+# Test: Cmd+U
 ```
 
-## Architecture
+---
 
-### Directory Structure
+## Testing Requirements
 
-- `client/` - React frontend (Vite)
-  - `src/components/` - UI components (shadcn/ui + custom)
-  - `src/pages/` - Page components (routed via wouter)
-  - `src/services/` - API clients and WebSocket service
-  - `src/hooks/` - React hooks for data fetching and state
-- `server/` - Express backend
-  - `routes/` - API route handlers (prompts, credits, device-auth, sync, reports, exports)
-  - `auth/` - Device authentication and JWT token management
-  - `storage.ts` - Database abstraction layer (implements IStorage interface)
-  - `websocket.ts` - WebSocket server for real-time sync
-  - `chatService.ts` - Support chat integration
-- `shared/` - Shared TypeScript code
-  - `schema.ts` - Drizzle database schema and Zod validation
-  - `types/` - TypeScript types for sync, credits, devices, marketplace, reports
+**ALL agents must write tests with 100% pass rate before completing.**
 
-### Tech Stack
+**Test Coverage Target: 90%+ (Full coverage)**
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, Wouter (routing), TanStack Query
-- **Backend**: Express, TypeScript, Drizzle ORM, PostgreSQL (Neon serverless)
-- **Real-time**: WebSocket (ws library) for bidirectional sync
-- **Authentication**: Replit Auth (web), JWT tokens (native devices)
-- **Payments**: Stripe (subscriptions + one-time credit purchases)
-- **Forms**: React Hook Form + Zod validation
+**Required Tests:**
 
-### Database Schema
+**Backend:**
+- Unit tests for all provider adapters
+- Integration tests for passthrough API
+- Batch processing end-to-end tests
+- Token refresh flow tests
+- WebSocket message handling tests
+- Credit/pricing calculation tests
 
-All database tables are defined in `shared/schema.ts`:
+**Native App:**
+- Unit tests for KeychainManager, DeviceIDManager
+- Unit tests for CloudAIService, WebSocketService
+- Integration tests for auth flow
+- UI tests for critical paths (auth, processing, settings)
+- Mock all network requests in tests
 
-- `users` - User accounts with Stripe subscription data
-- `prompts` - Marketplace prompts for culling profiles
-- `promptVotes` - User votes on prompts (quality scoring)
-- `creditTransactions` - Credit purchases and usage tracking
-- `deviceSessions` - Native device authentication sessions
-- `shootReports` - Generated shoot summaries with hero images
-- `shootProgress` - Real-time shoot processing progress
-- `chatSessions` - Support chat conversation history
-- `supportQueries` - Individual support messages with cost tracking
-- `referrals` - Photographer referral program
-- `emailQueue` - Scheduled email campaigns
+**Test Framework:**
+- Backend: Vitest (already configured)
+- Native: XCTest (built into Xcode)
 
-Access patterns use the `storage.ts` abstraction (implements `IStorage` interface). Always use `storage.*` methods rather than direct Drizzle queries.
+**Running Tests:**
+```bash
+# Backend
+npm test
 
-## Key Systems
-
-### 1. WebSocket Real-Time Sync
-
-Location: `server/websocket.ts`, `client/src/services/websocket.ts`
-
-**Server-side**: WebSocket server on `/ws` path manages user connection pools and broadcasts sync messages (shoot progress, credit updates, prompt changes, device connections).
-
-**Client-side**: Singleton WebSocket service with auto-reconnection, exponential backoff, and type-safe message handling.
-
-**Authentication**:
-- Web apps: `ws://host/ws?token=userId`
-- Native apps: `ws://host/ws?token=userId:deviceId`
-
-**Triggering sync from server**:
-```typescript
-import { getGlobalWsService } from './websocket';
-const wsService = getGlobalWsService();
-if (wsService) {
-  wsService.broadcastToUser(userId, message);
-}
+# Native app
+cd apps/Kull\ Universal\ App/kull/
+xcodebuild test -scheme kull -destination 'platform=macOS'
 ```
 
-**Message types**: See `shared/types/sync.ts` for all SyncMessage types (SHOOT_PROGRESS, CREDIT_UPDATE, DEVICE_CONNECTED, PROMPT_CHANGE).
+**Tests must be 100% green before marking any task complete.**
 
-### 2. Credits System
-
-Location: `server/routes/credits.ts`, `client/src/components/credits/`
-
-Users purchase credit packages ($500 = 50k credits, $1000 = 110k credits with bonus) via Stripe. Credits are deducted when using AI culling features. All transactions tracked in `creditTransactions` table with running balance.
-
-**Key endpoints**:
-- `GET /api/credits/balance` - Current balance
-- `POST /api/credits/purchase` - Create Stripe PaymentIntent
-- `POST /api/credits/purchase-confirm` - Confirm payment and add credits
-- `POST /api/credits/deduct` - Deduct credits for AI usage
-- `GET /api/credits/usage-summary` - Usage breakdown by provider
-
-**Stripe webhooks**: `POST /api/stripe/webhook` handles `payment_intent.succeeded` and `payment_intent.payment_failed` events.
-
-### 3. Device Authentication
-
-Location: `server/routes/device-auth.ts`, `server/auth/`
-
-Native apps authenticate via 6-digit verification codes. Flow:
-1. Device requests code: `POST /api/device-auth/request-code`
-2. User approves on web: `POST /api/device-auth/approve`
-3. Device polls for approval: `GET /api/device-auth/poll/:code`
-4. Device receives JWT token for API access
-
-Device sessions tracked in `deviceSessions` table with push tokens for notifications.
-
-### 4. Prompt Marketplace
-
-Location: `server/routes/prompts.ts`, `client/src/components/marketplace/`
-
-Community-driven marketplace for culling prompts. Each prompt defines:
-- Profile type (standard, wedding, corporate, sports, portrait, product, real estate)
-- System prompt and first message for AI
-- Star/color rating schema (Lightroom-compatible)
-- Quality score (calculated from user votes)
-
-**Key endpoints**:
-- `GET /api/prompts` - List prompts with filters (profile, tags, featured, authorId)
-- `POST /api/prompts` - Create new prompt
-- `POST /api/prompts/:id/vote` - Vote on prompt quality
-- `POST /api/prompts/:id/use` - Increment usage counter
-
-### 5. Shoot Reports
-
-Location: `server/routes/reports.ts`, `client/src/components/reports/`
-
-Auto-generated reports after shoot processing containing:
-- Top 5-star hero images
-- Narrative summary
-- Processing statistics (provider usage, credit spend, processing time)
-- Client-ready export links
-
-Stored in `shootReports` table, accessed via:
-- `GET /api/reports` - List user's reports
-- `GET /api/reports/:id` - Get specific report
-- `POST /api/reports` - Create new report
-
-## Data Flow Patterns
-
-### Client Data Fetching
-
-Uses custom hooks wrapping fetch calls (not TanStack Query by default, though it's installed):
-
-```typescript
-// Example: useCredits hook
-const { balance, loading, error, refetch } = useCredits();
-```
-
-### Server Response Format
-
-Most endpoints return:
-- Success: `{ data: T }` or direct object
-- Error: `{ message: string, error?: any }`
-
-### Real-time Updates
-
-When data changes on server that affects multiple clients:
-1. Update database via `storage.*` methods
-2. Broadcast WebSocket message via `getGlobalWsService()`
-3. Clients receive message and update UI (refetch or optimistic update)
-
-## Native App Integration (Future)
-
-The codebase is structured to support upcoming native apps:
-
-### macOS Menubar App
-- Drag-and-drop shoot ingestion
-- Local AI processing (Apple Intelligence) or cloud providers
-- Real-time sync via WebSocket
-- Lightroom XMP metadata export
-
-### iOS/iPadOS Companion
-- Monitor shoot progress from mobile
-- Browse/vote on marketplace prompts
-- Purchase credits
-- Trigger remote culls
-
-### Native API Access
-- Authenticate via device code flow (6-digit codes)
-- Receive JWT tokens for API access
-- WebSocket format: `ws://host/ws?token=userId:deviceId`
-- Use same REST endpoints as web app
-
-## Important Notes
-
-### Authentication Context
-- Web users: Replit Auth with session cookies
-- Admin access: Restricted to `steve@lander.media`
-- Native devices: JWT tokens from device-auth flow
-- WebSocket auth: Query param token (`?token=...`)
-
-### Credit Pricing
-- All credit amounts stored in cents (100 credits = $1.00)
-- $500 package = 50,000 credits
-- $1000 package = 110,000 credits (includes 10k bonus)
-- Provider margins already included in displayed costs
-
-### Lightroom Integration
-Culling profiles define star ratings and color labels matching Adobe Lightroom's schema:
-- Stars: 1-5 (reject to hero)
-- Colors: Red, Yellow, Green, Blue, Purple (or none)
-- Metadata written to XMP sidecars for sync
-
-### Email Campaigns
-Drip campaigns and transactional emails queued in `emailQueue` table, processed by `emailService.ts`. Cancel drip emails when user converts or requests refund.
-
-### Support Chat
-Support chat widget powered by Claude API with prompt caching. Each query tracked in `supportQueries` with token usage and cost. Full conversations saved in `chatSessions`.
+---
 
 ## Common Patterns
 
-### Adding a new API endpoint
+### Adding a New Provider Adapter
+
+1. Create `server/ai/providers/NewProviderAdapter.ts`
+2. Extend `BaseProviderAdapter`
+3. Implement all abstract methods:
+   - `processSingleImage()`
+   - `submitBatch()` (throw error if not supported)
+   - `checkBatchStatus()`
+   - `retrieveBatchResults()`
+   - `getCostPerImage()` - return cost in dollars
+   - `getProviderName()`
+   - `supportsBatch()`
+4. Register in `server/routes/ai-passthrough.ts`
+5. Add to `CloudAIService.swift` enum
+6. Write tests for all methods
+7. Document pricing in this file
+
+### Adding a New WebSocket Message Type
+
+1. Define in `shared/types/sync.ts`
+2. Add handler in `server/websocket.ts`
+3. Create Swift model in `SyncMessageModels.swift`
+4. Register handler in `SyncCoordinator.swift`
+5. Update UI to respond to message
+
+### Adding a New API Endpoint
+
 1. Define route in `server/routes/*.ts`
-2. Add storage method to `storage.ts` if database access needed
-3. Export router and mount in `server/routes.ts`
-4. Create client-side API function in `client/src/api/*.ts`
-5. Create React hook if state management needed
+2. Add JWT verification middleware: `verifyDeviceToken`
+3. Add storage method to `storage.ts` if needed
+4. Call provider adapters if AI-related
+5. Broadcast WebSocket updates if state changes
+6. Update Swift `KullAPIClient.swift` to call endpoint
+7. Write integration tests
 
-### Adding a new WebSocket message type
-1. Define type in `shared/types/sync.ts`
-2. Handle in `server/websocket.ts` message handlers
-3. Handle in `client/src/services/websocket.ts` onMessage
-4. Update React hooks to respond to new message type
+---
 
-### Adding a new database table
-1. Define in `shared/schema.ts` with Drizzle schema
-2. Add storage methods to `IStorage` interface and `DatabaseStorage` class
-3. Run `npm run db:push` to update database
-4. Create API endpoints and client hooks as needed
+## Admin Dashboard
 
-## Testing Considerations
+**Location:** `client/src/pages/AdminDashboard.tsx` (existing)
 
-- No test suite currently implemented
-- Manual testing via browser DevTools and API clients
-- WebSocket testing: Use browser console or dedicated WS client
-- Stripe testing: Use test mode with `4242 4242 4242 4242` card
+**NEW Section (add to bottom):**
+
+### AI Processing Monitor
+
+Display real-time metrics:
+- **Rate Limits:** Show provider rate limit hits per minute
+- **Errors:** List all API errors with timestamps
+- **Retry Stats:** Show retry counts and backoff durations
+- **Active Jobs:** List all in-progress batch jobs
+- **Provider Health:** Green/yellow/red status per provider
+
+**New Endpoints:**
+- `GET /api/admin/rate-limits` - Last 100 rate limit hits
+- `GET /api/admin/errors` - Last 100 errors
+- `GET /api/admin/active-jobs` - Current batch jobs
+- `GET /api/admin/provider-health` - Status of each provider
+
+**Implementation:** Agent B should add these routes during passthrough API work.
+
+---
+
+## API Documentation References
+
+**All API docs stored in `api-docs/` directory:**
+
+```
+api-docs/
+├── anthropic/
+│   ├── batch-api.md
+│   ├── image-input.md
+│   ├── models.md
+│   ├── pricing.md
+│   └── structured-output.md
+├── openai/
+│   ├── batch-api.md
+│   ├── image-input.md
+│   ├── models.md
+│   ├── pricing.md
+│   └── structured-output.md
+├── google/
+│   ├── batch-api.md
+│   ├── image-input.md
+│   ├── models.md
+│   ├── pricing.md
+│   └── structured-output.md
+├── grok/
+│   ├── batch-api.md
+│   ├── image-input.md
+│   ├── models.md
+│   └── structured-output.md
+└── groq/
+    ├── batch-api.md
+    ├── image-input.md
+    ├── models.md
+    └── structured-output.md
+```
+
+**When implementing provider adapters, ALWAYS reference these docs for:**
+- Correct model names (use current, not deprecated)
+- Request/response formats
+- Pricing (calculate 2x markup for users)
+- Batch API usage (if supported)
+- Error handling strategies
+
+---
+
+## Implementation Plan
+
+**Comprehensive plan:** `/home/runner/workspace/docs/UNIVERSAL_APP_IMPLEMENTATION_PLAN.md`
+
+**All agents must:**
+1. Read this CLAUDE.md first
+2. Reference the implementation plan for their specific role
+3. Check API docs before implementing provider integrations
+4. Write tests as they code (not after)
+5. Ensure 100% test pass rate before completing
+
+---
+
+## Critical Reminders
+
+### ❌ NEVER DO THESE:
+1. Use deprecated models (gpt-4o, claude-3-*, gemini-1.5-*)
+2. Store provider API keys in Keychain or native apps
+3. Show errors to users (only log for admin)
+4. Use "credits" language in UI (show dollar amounts)
+5. Hardcode API URLs (use `EnvironmentConfig`)
+6. Skip tests
+7. Batch complete tasks before tests pass
+
+### ✅ ALWAYS DO THESE:
+1. Use current models (gpt-5-nano, claude-haiku-4.5, etc.)
+2. Store ONLY JWT tokens in Keychain
+3. Fire all requests concurrently (up to 30k/min)
+4. Retry with exponential backoff for hours
+5. Charge 2x provider costs (50% margin)
+6. Show real costs to users, not "credits"
+7. Write tests as you code
+8. Make tests 100% green before marking complete
+
+---
+
+## Support & Questions
+
+- **Documentation Issues:** Update this file immediately
+- **API Questions:** Check `api-docs/` directory first
+- **Architecture Questions:** Check `/home/runner/workspace/docs/UNIVERSAL_APP_IMPLEMENTATION_PLAN.md`
+- **Admin Access:** steve@lander.media only
+
+---
+
+**Last Updated:** 2025-11-18
+**Next Review:** When new AI models are released or deprecated

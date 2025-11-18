@@ -31,7 +31,9 @@ final class TranscriptionHelper {
 
     private func upload(url: URL) async throws -> String {
         let data = try Data(contentsOf: url)
-        var req = URLRequest(url: URL(string: "http://localhost:5000/api/transcribe")!)
+        let baseURL = EnvironmentConfig.shared.apiBaseURL
+        let apiURL = baseURL.appendingPathComponent("/api/transcribe")
+        var req = URLRequest(url: apiURL)
         req.httpMethod = "POST"
         let boundary = UUID().uuidString
         req.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")

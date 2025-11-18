@@ -107,14 +107,21 @@ final class AuthViewModel: ObservableObject {
     func logout() {
         pollTask?.cancel()
         Task {
+            let deviceId = DeviceIDManager.shared.deviceID
+
+            // Clear Keychain
+            KeychainManager.shared.clearAll(for: deviceId)
+
+            // Notify backend (optional, best effort)
             await api.logout()
+
+            // Clear user state
             state = .signedOut()
         }
     }
 
     private func apiBaseForApproval() -> URL {
-        let baseURL = URL(string: ProcessInfo.processInfo.environment["KULL_DEVICE_BASE_URL"] ?? "https://kullai.com") ?? URL(string: "https://kullai.com")!
-        return baseURL
+        return EnvironmentConfig.shared.apiBaseURL
     }
 
     private func pollLinking() async {
@@ -145,6 +152,20 @@ final class AuthViewModel: ObservableObject {
                         // continue polling
                         break
                     case "approved":
+                        // Save tokens to Keychain before updating state
+                        if let tokens = response.tokens {
+                            let deviceId = DeviceIDManager.shared.deviceID
+                            do {
+                                try KeychainManager.shared.saveAccessToken(tokens.accessToken, for: deviceId)
+                                try KeychainManager.shared.saveRefreshToken(tokens.refreshToken, for: deviceId)
+                            } catch {
+                                await MainActor.run {
+                                    self.state = .signedOut(message: "Failed to save credentials: \(error.localizedDescription)")
+                                }
+                                return
+                            }
+                        }
+
                         if let user = response.user {
                             let deviceUser = DeviceUser(id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, profileImageUrl: user.profileImageUrl)
                             await MainActor.run {

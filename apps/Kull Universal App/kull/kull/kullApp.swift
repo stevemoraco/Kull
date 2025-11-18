@@ -29,7 +29,8 @@ struct KullApp: App {
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("Kull Website") {
-                    if let url = URL(string: "https://kullai.com") { NSWorkspace.shared.open(url) }
+                    let url = EnvironmentConfig.shared.apiBaseURL
+                    NSWorkspace.shared.open(url)
                 }
             }
         }
@@ -86,7 +87,8 @@ final class CreditSummaryViewModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     func refresh() {
-        guard let url = URL(string: "https://kullai.com/api/kull/credits/summary") else { return }
+        let baseURL = EnvironmentConfig.shared.apiBaseURL
+        let url = baseURL.appendingPathComponent("/api/kull/credits/summary")
         loading = true
         URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
             .map(\.data)
@@ -202,7 +204,8 @@ final class MobileCredits: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     func refresh() {
-        guard let url = URL(string: "https://kullai.com/api/kull/credits/summary") else { return }
+        let baseURL = EnvironmentConfig.shared.apiBaseURL
+        let url = baseURL.appendingPathComponent("/api/kull/credits/summary")
         URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
             .map(\.data)
             .decode(type: CreditSummary.self, decoder: JSONDecoder())

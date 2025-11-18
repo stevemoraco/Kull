@@ -16,6 +16,7 @@ export default defineConfig({
       "client/src/__tests__/**/*.test.tsx",
       "shared/__tests__/**/*.test.ts",
       "tests/unit/**/*.test.ts",
+      "server/**/*.test.ts",
      ],
     coverage: {
       reporter: ["text", "html"],

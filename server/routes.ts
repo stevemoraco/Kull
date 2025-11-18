@@ -66,7 +66,18 @@ const exifGeoService = new ExifGeoContextService({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
-  await storage.seedDefaultPrompts(defaultPrompts, "team@kullai.com");
+  
+  // Seed default prompts (safe to fail if tables don't exist yet)
+  try {
+    await storage.seedDefaultPrompts(defaultPrompts, "team@kullai.com");
+  } catch (error: any) {
+    if (error.code === '42P01') { // Table doesn't exist
+      console.log('⚠️  Prompt presets table not found - skipping seed. Run migrations first: npm run db:push');
+    } else {
+      console.error('Error seeding default prompts:', error.message);
+      throw error; // Re-throw if it's not a "table doesn't exist" error
+    }
+  }
 
   // Admin middleware (restricted to steve@lander.media)
   const isAdmin = (req: any, res: Response, next: NextFunction) => {

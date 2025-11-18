@@ -34,7 +34,8 @@ struct FoldersView: View {
     }
 
     private func load() async {
-        guard let url = URL(string: "http://localhost:5000/api/kull/folders") else { return }
+        let baseURL = EnvironmentConfig.shared.apiBaseURL
+        let url = baseURL.appendingPathComponent("/api/kull/folders")
         loading = true
         defer { loading = false }
         do {

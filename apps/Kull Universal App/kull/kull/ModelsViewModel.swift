@@ -19,7 +19,8 @@ final class ModelsViewModel: ObservableObject {
         loading = true
         defer { loading = false }
         do {
-            let url = URL(string: "http://localhost:5000/api/kull/models")!
+            let baseURL = EnvironmentConfig.shared.apiBaseURL
+            let url = baseURL.appendingPathComponent("/api/kull/models")
             let (data, _) = try await URLSession.shared.data(from: url)
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let arr = json["providers"] as? [[String: Any]] {
                 let dec = JSONDecoder()
