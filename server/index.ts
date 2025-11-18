@@ -8,6 +8,7 @@ import { startEmailProcessor } from "./emailService";
 import { refreshRepoCache } from "./fetchRepo";
 import { setupWebSocketServer } from "./websocket";
 import { createSyncRouter } from "./routes/sync";
+import { bootstrapNotificationAdapters } from "./services/bootstrapNotifications";
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  bootstrapNotificationAdapters();
   const server = await registerRoutes(app);
 
   // Setup WebSocket server

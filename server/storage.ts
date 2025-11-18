@@ -1,3 +1,5 @@
+import type { PromptStyle } from "@shared/culling/schemas";
+import { PromptSeedDefinition } from "../packages/prompt-presets/defaults";
 import {
   users,
   referrals,
@@ -13,6 +15,10 @@ import {
   shootReports,
   shootProgress,
   globalSettings,
+  promptPresets,
+  promptPresetVotes,
+  promptPresetSaves,
+  creditLedger,
   type User,
   type UpsertUser,
   type Referral,
@@ -41,21 +47,52 @@ import {
   type InsertShootProgress,
   type GlobalSetting,
   type InsertGlobalSetting,
+  type PromptPreset,
+  type InsertPromptPreset,
+  type PromptPresetVote,
+  type InsertPromptPresetVote,
+  type PromptPresetSave,
+  type InsertPromptPresetSave,
+  type CreditLedger,
+  type InsertCreditLedger,
 } from "@shared/schema";
+import { PLANS, DEFAULT_PLAN_ID } from "@shared/culling/plans";
+import { estimateCreditsForImages } from "@shared/utils/cost";
 import { db } from "./db";
-import { eq, lte, and, isNull, gte, sql, desc } from "drizzle-orm";
+import { eq, lte, and, or, isNull, ilike, gte, sql, desc } from "drizzle-orm";
+
+export interface CreditSummary {
+  balance: number;
+  planId: string;
+  planDisplayName: string;
+  monthlyAllowance: number;
+  estimatedShootsRemaining: number;
+  ledger: CreditLedger[];
+}
 
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations (required for Replit Auth / authentication)
   getUser(id: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Trial and subscription operations
   startTrial(userId: string, tier: string, paymentMethodId: string, setupIntentId: string): Promise<User>;
-  updateSubscription(userId: string, tier: string, status: string, stripeCustomerId?: string, stripeSubscriptionId?: string): Promise<User>;
+  updateSubscription(
+    userId: string,
+    tier: string,
+    status: string,
+    stripeCustomerId?: string,
+    stripeSubscriptionId?: string,
+  ): Promise<User>;
   convertTrialToSubscription(userId: string, subscriptionId: string): Promise<User>;
   markAppInstalled(userId: string): Promise<User>;
+  // Folder catalog for native apps
+  updateFolderCatalog(
+    userId: string,
+    catalog: { deviceName?: string; folders: { id: string; name: string; bookmark?: string }[]; updatedAt: string },
+  ): Promise<User>;
+  getFolderCatalog(userId: string): Promise<User | undefined>;
   
   // Referral operations
   createReferral(referral: InsertReferral & { referrerId: string }): Promise<Referral>;
@@ -110,7 +147,7 @@ export interface IStorage {
   getChatSessions(userId?: string): Promise<ChatSession[]>;
   deleteChatSession(sessionId: string): Promise<void>;
 
-  // Prompt marketplace operations
+  // Prompt marketplace operations (website prompts)
   createPrompt(prompt: InsertPrompt): Promise<Prompt>;
   getPrompt(id: string): Promise<Prompt | undefined>;
   getPrompts(filters?: { profile?: string; tags?: string[]; authorId?: string; featured?: boolean }): Promise<Prompt[]>;
@@ -124,7 +161,33 @@ export interface IStorage {
   getPromptVotes(promptId: string): Promise<PromptVote[]>;
   updatePromptVoteScore(promptId: string): Promise<void>;
 
-  // Credit operations
+  // Kull prompt preset operations (shared between web + native)
+  seedDefaultPrompts(prompts: PromptSeedDefinition[], authorEmail: string): Promise<void>;
+  listPromptPresets(filters?: { shootType?: string; search?: string; limit?: number }): Promise<PromptPreset[]>;
+  listUserPrompts(userId: string): Promise<PromptPreset[]>;
+  listSavedPrompts(userId: string): Promise<PromptPreset[]>;
+  getPromptPresetBySlug(slug: string): Promise<PromptPreset | undefined>;
+  createPromptPreset(input: {
+    userId: string;
+    userEmail: string;
+    title: string;
+    summary: string;
+    instructions: string;
+    shootTypes: string[];
+    tags: string[];
+    style: PromptStyle;
+    shareWithMarketplace: boolean;
+  }): Promise<PromptPreset>;
+  voteOnPrompt(
+    userId: string,
+    presetId: string,
+    value: number,
+    rating?: number,
+    comment?: string,
+  ): Promise<PromptPreset>;
+  togglePromptSave(userId: string, presetId: string): Promise<boolean>;
+
+  // Credit operations (website credits transactions)
   getCreditBalance(userId: string): Promise<number>;
   createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
   getCreditTransactions(userId: string): Promise<CreditTransaction[]>;
@@ -134,6 +197,11 @@ export interface IStorage {
     currentBalance: number;
     byProvider: Array<{ provider: string; totalSpent: number; transactionCount: number; lastUsed?: Date }>;
   }>;
+
+  // Credit operations (Kull credit ledger)
+  recordCreditEntry(entry: InsertCreditLedger & { userId: string }): Promise<CreditLedger>;
+  getCreditLedger(userId: string, options?: { limit?: number }): Promise<CreditLedger[]>;
+  getCreditSummary(userId: string): Promise<CreditSummary>;
 
   // Device session operations
   createDeviceSession(session: InsertDeviceSession): Promise<DeviceSession>;
@@ -274,6 +342,24 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateFolderCatalog(
+    userId: string,
+    catalog: { deviceName?: string; folders: { id: string; name: string; bookmark?: string }[]; updatedAt: string },
+  ): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ folderCatalog: catalog as any, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return user;
+  }
+
+  async getFolderCatalog(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    return user;
+  }
+
   async createReferral(referral: InsertReferral & { referrerId: string }): Promise<Referral> {
     const [newReferral] = await db
       .insert(referrals)
@@ -298,6 +384,198 @@ export class DatabaseStorage implements IStorage {
         referredUserId,
       })
       .where(eq(referrals.id, id));
+  }
+
+  // Kull prompt presets (shared marketplace)
+  async seedDefaultPrompts(prompts: PromptSeedDefinition[], authorEmail: string): Promise<void> {
+    const timestamp = new Date();
+    for (const preset of prompts) {
+      await db
+        .insert(promptPresets)
+        .values({
+          slug: preset.slug,
+          title: preset.title,
+          summary: preset.summary,
+          instructions: preset.instructions,
+          shootTypes: preset.shootTypes,
+          tags: preset.tags,
+          style: preset.style,
+          authorEmail,
+          isDefault: true,
+          sharedWithMarketplace: true,
+          aiScore: preset.aiScore ?? null,
+          aiSummary: preset.aiSummary ?? null,
+          updatedAt: timestamp,
+        })
+        .onConflictDoUpdate({
+          target: promptPresets.slug,
+          set: {
+            title: preset.title,
+            summary: preset.summary,
+            instructions: preset.instructions,
+            shootTypes: preset.shootTypes,
+            tags: preset.tags,
+            style: preset.style,
+            isDefault: true,
+            sharedWithMarketplace: true,
+            aiScore: preset.aiScore ?? null,
+            aiSummary: preset.aiSummary ?? null,
+            authorEmail,
+            updatedAt: timestamp,
+          },
+        });
+    }
+  }
+
+  async listPromptPresets(
+    filters: { shootType?: string; search?: string; limit?: number } = {},
+  ): Promise<PromptPreset[]> {
+    const conditions: any[] = [eq(promptPresets.sharedWithMarketplace, true)];
+
+    if (filters.shootType) {
+      conditions.push(sql`${promptPresets.shootTypes} @> ${JSON.stringify([filters.shootType])}::jsonb`);
+    }
+
+    if (filters.search) {
+      const pattern = `%${filters.search}%`;
+      conditions.push(or(ilike(promptPresets.title, pattern), ilike(promptPresets.summary, pattern)));
+    }
+
+    let query = db.select().from(promptPresets);
+    if (conditions.length) {
+      let whereClause = conditions[0];
+      for (let i = 1; i < conditions.length; i += 1) {
+        whereClause = and(whereClause, conditions[i]);
+      }
+      query = query.where(whereClause);
+    }
+
+    query = query.orderBy(
+      desc(promptPresets.humanScoreAverage),
+      desc(promptPresets.upvotes),
+      desc(promptPresets.createdAt),
+    );
+
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
+
+    return await query;
+  }
+
+  async listUserPrompts(userId: string): Promise<PromptPreset[]> {
+    return await db
+      .select()
+      .from(promptPresets)
+      .where(eq(promptPresets.authorId, userId))
+      .orderBy(desc(promptPresets.updatedAt));
+  }
+
+  async listSavedPrompts(userId: string): Promise<PromptPreset[]> {
+    const rows = await db
+      .select({ preset: promptPresets })
+      .from(promptPresetSaves)
+      .innerJoin(promptPresets, eq(promptPresetSaves.presetId, promptPresets.id))
+      .where(eq(promptPresetSaves.userId, userId))
+      .orderBy(desc(promptPresetSaves.createdAt));
+
+    return rows.map((row) => row.preset);
+  }
+
+  async getPromptPresetBySlug(slug: string): Promise<PromptPreset | undefined> {
+    const [preset] = await db.select().from(promptPresets).where(eq(promptPresets.slug, slug)).limit(1);
+    return preset;
+  }
+
+  async createPromptPreset(input: {
+    userId: string;
+    userEmail: string;
+    title: string;
+    summary: string;
+    instructions: string;
+    shootTypes: string[];
+    tags: string[];
+    style: PromptStyle;
+    shareWithMarketplace: boolean;
+  }): Promise<PromptPreset> {
+    const slug = await this.generateUniquePromptSlug(input.title);
+
+    const [preset] = await db
+      .insert(promptPresets)
+      .values({
+        slug,
+        title: input.title,
+        summary: input.summary,
+        instructions: input.instructions,
+        shootTypes: input.shootTypes,
+        tags: input.tags,
+        style: input.style,
+        authorId: input.userId,
+        authorEmail: input.userEmail,
+        sharedWithMarketplace: input.shareWithMarketplace,
+        isDefault: false,
+      })
+      .returning();
+
+    return preset;
+  }
+
+  async voteOnPrompt(
+    userId: string,
+    presetId: string,
+    value: number,
+    rating?: number,
+    comment?: string,
+  ): Promise<PromptPreset> {
+    const normalizedValue = value > 0 ? 1 : value < 0 ? -1 : 0;
+
+    await db
+      .insert(promptPresetVotes)
+      .values({
+        presetId,
+        userId,
+        value: normalizedValue,
+        rating,
+        comment,
+      })
+      .onConflictDoUpdate({
+        target: [promptPresetVotes.presetId, promptPresetVotes.userId],
+        set: {
+          value: normalizedValue,
+          rating,
+          comment,
+          updatedAt: new Date(),
+        },
+      });
+
+    await this.refreshPromptMetrics(presetId);
+    const preset = await this.getPromptPresetById(presetId);
+    if (!preset) {
+      throw new Error("Prompt preset not found after vote.");
+    }
+    return preset;
+  }
+
+  async togglePromptSave(userId: string, presetId: string): Promise<boolean> {
+    const [existing] = await db
+      .select()
+      .from(promptPresetSaves)
+      .where(and(eq(promptPresetSaves.userId, userId), eq(promptPresetSaves.presetId, presetId)))
+      .limit(1);
+
+    if (existing) {
+      await db.delete(promptPresetSaves).where(eq(promptPresetSaves.id, existing.id));
+      return false;
+    }
+
+    await db
+      .insert(promptPresetSaves)
+      .values({
+        userId,
+        presetId,
+      });
+
+    return true;
   }
 
   // Email queue operations
@@ -903,6 +1181,58 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Credit operations (Kull credit ledger)
+  async recordCreditEntry(entry: InsertCreditLedger & { userId: string }): Promise<CreditLedger> {
+    const [created] = await db
+      .insert(creditLedger)
+      .values({
+        ...entry,
+        userId: entry.userId,
+        createdAt: entry.createdAt ?? new Date(),
+      })
+      .returning();
+
+    return created;
+  }
+
+  async getCreditLedger(userId: string, options: { limit?: number } = {}): Promise<CreditLedger[]> {
+    let query = db
+      .select()
+      .from(creditLedger)
+      .where(eq(creditLedger.userId, userId))
+      .orderBy(desc(creditLedger.createdAt));
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+
+    return await query;
+  }
+
+  async getCreditSummary(userId: string): Promise<CreditSummary> {
+    const user = await this.getUser(userId);
+    const planId = (user?.subscriptionTier as keyof typeof PLANS) || DEFAULT_PLAN_ID;
+    const plan = PLANS[planId] ?? PLANS[DEFAULT_PLAN_ID];
+
+    const ledger = await this.getCreditLedger(userId, { limit: 20 });
+    const balance = ledger.reduce((sum, entry) => {
+      return sum + (entry.entryType === "credit" ? entry.credits : -entry.credits);
+    }, 0);
+
+    const estimatedShootsRemaining = plan.estimatedCreditsPerShoot
+      ? Math.max(balance / plan.estimatedCreditsPerShoot, 0)
+      : 0;
+
+    return {
+      balance,
+      planId: plan.id,
+      planDisplayName: plan.displayName,
+      monthlyAllowance: plan.monthlyCredits,
+      estimatedShootsRemaining,
+      ledger,
+    };
+  }
+
   // Device session operations
   async createDeviceSession(sessionData: InsertDeviceSession): Promise<DeviceSession> {
     const [session] = await db
@@ -1068,6 +1398,68 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShootProgress(shootId: string): Promise<void> {
     await db.delete(shootProgress).where(eq(shootProgress.shootId, shootId));
+  }
+
+  // Helpers for Kull prompt presets
+  private async getPromptPresetById(id: string): Promise<PromptPreset | undefined> {
+    const [preset] = await db
+      .select()
+      .from(promptPresets)
+      .where(eq(promptPresets.id, id))
+      .limit(1);
+    return preset;
+  }
+
+  private async refreshPromptMetrics(presetId: string): Promise<void> {
+    const [stats] = await db
+      .select({
+        upvotes: sql`COALESCE(sum(CASE WHEN ${promptPresetVotes.value} > 0 THEN 1 ELSE 0 END), 0)`,
+        downvotes: sql`COALESCE(sum(CASE WHEN ${promptPresetVotes.value} < 0 THEN 1 ELSE 0 END), 0)`,
+        averageRating: sql`AVG(NULLIF(${promptPresetVotes.rating}, 0))`,
+        ratingCount: sql`COALESCE(sum(CASE WHEN ${promptPresetVotes.rating} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(promptPresetVotes)
+      .where(eq(promptPresetVotes.presetId, presetId));
+
+    const upvotes = Number(stats?.upvotes ?? 0);
+    const downvotes = Number(stats?.downvotes ?? 0);
+    const averageRating = Number(stats?.averageRating ?? 0);
+    const ratingCount = Number(stats?.ratingCount ?? 0);
+
+    await db
+      .update(promptPresets)
+      .set({
+        upvotes,
+        downvotes,
+        humanScoreAverage: averageRating,
+        ratingsCount: ratingCount,
+        updatedAt: new Date(),
+      })
+      .where(eq(promptPresets.id, presetId));
+  }
+
+  private async generateUniquePromptSlug(title: string): Promise<string> {
+    const base = this.slugifyTitle(title);
+    let attempt = 0;
+
+    while (true) {
+      const slug = attempt === 0 ? base : `${base}-${attempt}`;
+      const existing = await this.getPromptPresetBySlug(slug);
+      if (!existing) {
+        return slug;
+      }
+      attempt += 1;
+    }
+  }
+
+  private slugifyTitle(title: string): string {
+    const slug = title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 120);
+
+    return slug.length > 0 ? slug : `prompt-${Date.now()}`;
   }
 
   // Global settings operations

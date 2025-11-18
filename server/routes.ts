@@ -1,8 +1,15 @@
 import type { Express, Response, NextFunction } from "express";
+import { z } from "zod";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { defaultPrompts } from "../packages/prompt-presets";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { schedulePostCheckoutEmails, scheduleNonCheckoutDripCampaign, cancelDripCampaign, processPendingEmails } from "./emailService";
+import {
+  schedulePostCheckoutEmails,
+  scheduleNonCheckoutDripCampaign,
+  cancelDripCampaign,
+  processPendingEmails,
+} from "./emailService";
 import { insertRefundSurveySchema, supportQueries, users } from "@shared/schema";
 import { db } from "./db";
 import { desc } from "drizzle-orm";
@@ -11,6 +18,22 @@ import promptsRouter from "./routes/prompts";
 import deviceAuthRouter from "./routes/device-auth";
 import reportsRouter from "./routes/reports";
 import exportsRouter from "./routes/exports";
+import { PromptStyleSchema, ProviderIdSchema } from "@shared/culling/schemas";
+import { estimateCreditsForImages } from "@shared/utils/cost";
+import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
+import { getProviderConfig } from "@shared/culling/providers";
+import { GenerateReportSchema } from "./report";
+import { writeSidecars } from "./xmpWriter";
+import { ExifGeoContextService, type ParseResult } from "./services/exifGeo";
+import path from "path";
+import fs from "fs/promises";
+import { Buffer } from "node:buffer";
+import { runOrchestratedCulling } from "./services/batchOrchestrator";
+import type { BatchImagePayload } from "./orchestrator";
+import { buildShootReport, type ShootReport } from "./services/reportBuilder";
+import { initiateDeviceLink, approveDeviceLink, claimDeviceLink } from "./services/deviceLink";
+import { telemetryStore } from "./services/batchTelemetry";
+import { emitShootCompletedNotification } from "./services/reportNotifications";
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
@@ -36,9 +59,14 @@ const STRIPE_PRICES = {
   },
 };
 
+const exifGeoService = new ExifGeoContextService({
+  mapboxToken: process.env.MAPBOX_ACCESS_TOKEN,
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+  await storage.seedDefaultPrompts(defaultPrompts, "team@kullai.com");
 
   // Admin middleware (restricted to steve@lander.media)
   const isAdmin = (req: any, res: Response, next: NextFunction) => {
@@ -99,6 +127,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating model preference:", error);
       res.status(500).json({ message: "Failed to update model preference" });
+    }
+  });
+
+  // Device link endpoints for native apps
+  app.post('/api/device/link/initiate', async (req, res) => {
+    try {
+      const schema = z.object({ deviceName: z.string().max(120).optional() });
+      const { deviceName } = schema.parse(req.body ?? {});
+      const link = initiateDeviceLink(deviceName);
+      res.json({
+        code: link.code,
+        pollToken: link.pollToken,
+        expiresAt: new Date(link.expiresAt).toISOString(),
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid link initiation payload", issues: error.flatten() });
+      }
+      console.error("device link initiate error", error);
+      res.status(500).json({ message: "Failed to initiate device link" });
+    }
+  });
+
+  app.post('/api/device/link/approve', isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({ code: z.string().min(4), deviceName: z.string().max(120).optional() });
+      const { code, deviceName } = schema.parse(req.body ?? {});
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const approved = approveDeviceLink(
+        code,
+        {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
+        },
+        deviceName,
+      );
+      if (!approved) {
+        return res.status(400).json({ message: "Invalid or expired device code" });
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid device approval payload", issues: error.flatten() });
+      }
+      console.error("device link approve error", error);
+      res.status(500).json({ message: "Failed to approve device link" });
+    }
+  });
+
+  app.post('/api/device/link/status', async (req: any, res) => {
+    try {
+      const schema = z.object({ pollToken: z.string().min(8) });
+      const { pollToken } = schema.parse(req.body ?? {});
+      const result = claimDeviceLink(pollToken);
+      if (result.status === "pending" && result.record) {
+        return res.json({
+          status: "pending",
+          expiresAt: new Date(result.record.expiresAt).toISOString(),
+        });
+      }
+      if (result.status === "approved" && result.record && result.record.user) {
+        const snapshot = result.record.user;
+        const deviceUser = {
+          deviceSession: true,
+          claims: {
+            sub: snapshot.id,
+            email: snapshot.email,
+            first_name: snapshot.firstName,
+            last_name: snapshot.lastName,
+          },
+          profile: snapshot,
+        };
+
+        return req.login(deviceUser as any, (err) => {
+          if (err) {
+            console.error("device link login failed", err);
+            return res.status(500).json({ message: "Failed to issue session" });
+          }
+          return res.json({
+            status: "approved",
+            deviceName: result.record?.deviceName,
+            user: {
+              id: snapshot.id,
+              email: snapshot.email,
+              firstName: snapshot.firstName,
+              lastName: snapshot.lastName,
+              profileImageUrl: snapshot.profileImageUrl,
+            },
+          });
+        });
+      }
+      if (result.status === "expired") {
+        return res.status(410).json({ status: "expired" });
+      }
+      return res.status(404).json({ status: "invalid" });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid poll payload", issues: error.flatten() });
+      }
+      console.error("device link status error", error);
+      res.status(500).json({ message: "Failed to check device link status" });
     }
   });
 
@@ -2663,6 +2802,388 @@ ${contextMarkdown}`;
         message: "Failed to process refund",
         detail: error.message 
       });
+    }
+  });
+
+  // =============== Kull Prompt Marketplace & Credits APIs ===============
+  // List marketplace prompts
+  app.get("/api/kull/prompts", isAuthenticated, async (req: any, res) => {
+    try {
+      const { shootType, search, limit } = req.query as Record<string, string>;
+      const presets = await storage.listPromptPresets({
+        shootType: shootType || undefined,
+        search: search || undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      res.json({ presets });
+    } catch (err: any) {
+      console.error("list prompts error", err);
+      res.status(500).json({ message: "Failed to list prompts" });
+    }
+  });
+
+  // List my prompts
+  app.get("/api/kull/prompts/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const presets = await storage.listUserPrompts(userId);
+      res.json({ presets });
+    } catch (err: any) {
+      console.error("list my prompts error", err);
+      res.status(500).json({ message: "Failed to list my prompts" });
+    }
+  });
+
+  // List saved prompts
+  app.get("/api/kull/prompts/saved", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const presets = await storage.listSavedPrompts(userId);
+      res.json({ presets });
+    } catch (err: any) {
+      console.error("list saved prompts error", err);
+      res.status(500).json({ message: "Failed to list saved prompts" });
+    }
+  });
+
+  // Compact cache for offline prompt search on mobile/desktop
+  app.get("/api/kull/prompts/cache", isAuthenticated, async (_req: any, res) => {
+    try {
+      const presets = await storage.listPromptPresets({ limit: 500 });
+      const cache = presets.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        summary: p.summary,
+        tags: p.tags,
+        shootTypes: p.shootTypes,
+        aiScore: p.aiScore ?? 0,
+        humanScoreAverage: p.humanScoreAverage ?? 0,
+        ratingsCount: p.ratingsCount ?? 0,
+        updatedAt: p.updatedAt,
+      }));
+      res.json({ cache, count: cache.length });
+    } catch (err: any) {
+      console.error("prompt cache error", err);
+      res.status(500).json({ message: "Failed to export prompt cache" });
+    }
+  });
+
+  // Create prompt preset
+  app.post("/api/kull/prompts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, summary, instructions, shootTypes, tags, style, shareWithMarketplace } = req.body;
+      const user = await storage.getUser(userId);
+      if (!user?.email) return res.status(400).json({ message: "User email required" });
+
+      const preset = await storage.createPromptPreset({
+        userId,
+        userEmail: user.email,
+        title,
+        summary,
+        instructions,
+        shootTypes: Array.isArray(shootTypes) ? shootTypes : [],
+        tags: Array.isArray(tags) ? tags : [],
+        style,
+        shareWithMarketplace: Boolean(shareWithMarketplace),
+      });
+      res.json({ preset });
+    } catch (err: any) {
+      console.error("create prompt error", err);
+      res.status(500).json({ message: "Failed to create prompt" });
+    }
+  });
+
+  // Vote on prompt (up/down + optional rating/comment)
+  app.post("/api/kull/prompts/:id/vote", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { value, rating, comment } = req.body as { value: number; rating?: number; comment?: string };
+      const preset = await storage.voteOnPrompt(
+        userId,
+        id,
+        Number(value),
+        rating ? Number(rating) : undefined,
+        comment,
+      );
+      res.json({ preset });
+    } catch (err: any) {
+      console.error("vote prompt error", err);
+      res.status(500).json({ message: "Failed to vote" });
+    }
+  });
+
+  // Toggle save prompt
+  app.post("/api/kull/prompts/:id/save", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const saved = await storage.togglePromptSave(userId, id);
+      res.json({ saved });
+    } catch (err: any) {
+      console.error("save prompt error", err);
+      res.status(500).json({ message: "Failed to toggle save" });
+    }
+  });
+
+  // Credits summary for Kull
+  app.get("/api/kull/credits/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getCreditSummary(userId);
+      res.json(summary);
+    } catch (err: any) {
+      console.error("credits summary error", err);
+      res.status(500).json({ message: "Failed to load credits summary" });
+    }
+  });
+
+  // List available models/capabilities for Kull clients
+  app.get("/api/kull/models", async (_req: any, res) => {
+    try {
+      const providers = Object.values(getProviderConfig as any)
+        ? CREDIT_TOP_UP_PACKAGES // placeholder to keep imports used if getProviderConfig is refactored
+        : [];
+      res.json({ providers });
+    } catch (err: any) {
+      console.error("models error", err);
+      res.status(500).json({ message: "Failed to list models" });
+    }
+  });
+
+  // Run OpenAI-based culling orchestrator
+  app.post("/api/kull/run/openai", isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        model: z.string().optional(),
+        images: z
+          .array(
+            z.object({
+              id: z.string(),
+              url: z.string().url().optional(),
+              b64: z.string().optional(),
+              filename: z.string().optional(),
+              relativePath: z.string().optional(),
+            }),
+          )
+          .min(1),
+        prompt: z.string().min(1),
+        baseDir: z.string().optional(),
+        report: z.boolean().optional(),
+        providerOrder: z.array(ProviderIdSchema).optional(),
+        allowFallback: z.boolean().optional(),
+        shootName: z.string().optional(),
+        previewBaseUrl: z.string().optional(),
+        heroLimit: z.number().int().min(1).max(25).optional(),
+      });
+
+      const {
+        model,
+        images,
+        prompt,
+        baseDir,
+        report,
+        providerOrder,
+        allowFallback,
+        shootName,
+        previewBaseUrl,
+        heroLimit,
+      } = schema.parse(req.body ?? {});
+
+      const userId = req.user.claims.sub;
+      const apiKey = process.env.OPENAI_API_KEY;
+
+      const metadataCache = new Map<string, ParseResult | null>();
+
+      const loadMetadata = async (image: { id: string; url?: string; b64?: string; filename?: string; relativePath?: string }) => {
+        if (metadataCache.has(image.id)) return metadataCache.get(image.id) ?? null;
+        if (!image.url && !image.b64) {
+          metadataCache.set(image.id, null);
+          return null;
+        }
+        try {
+          const buffer =
+            image.b64 && image.b64.length > 0
+              ? Buffer.from(image.b64, "base64")
+              : image.url
+              ? Buffer.from(await (await fetch(image.url)).arrayBuffer())
+              : null;
+          if (!buffer) {
+            metadataCache.set(image.id, null);
+            return null;
+          }
+          const fallbackName =
+            image.filename ??
+            (image.relativePath ? path.basename(image.relativePath) : undefined);
+          const parsed = await exifGeoService.extractFromBuffer(buffer, { filename: fallbackName });
+          metadataCache.set(image.id, parsed);
+          return parsed;
+        } catch (err) {
+          console.warn("metadata extraction failed", err);
+          metadataCache.set(image.id, null);
+          return null;
+        }
+      };
+
+      const preparedImages: BatchImagePayload[] = [];
+      for (const image of images) {
+        const meta = await loadMetadata(image);
+        const filename =
+          image.filename ??
+          (image.relativePath ? path.basename(image.relativePath) : undefined);
+        preparedImages.push({
+          id: image.id,
+          url: image.url,
+          b64: image.b64,
+          filename,
+          metadata: meta?.metadata,
+          tags: meta?.tags,
+        });
+      }
+
+      const orchestrated = await runOrchestratedCulling(storage, {
+        userId,
+        prompt,
+        images: preparedImages,
+        providerOrder,
+        allowFallback,
+        providerOptions: {
+          "openai-gpt-5": { apiKey, model },
+        },
+      });
+
+      const { ratings, creditsCharged, providerId: providerUsed, attempts } = orchestrated;
+      let user: Awaited<ReturnType<typeof storage.getUser>> | undefined;
+      try {
+        user = await storage.getUser(userId);
+      } catch (error) {
+        console.warn("failed to load user for notifications", error);
+      }
+      // optionally write XMP sidecars if baseDir provided
+      let sidecars: any[] = [];
+      if (baseDir) {
+        sidecars = await writeSidecars(
+          baseDir,
+          ratings.map((r: any) => ({
+            imageId: r.imageId || r.filename || "",
+            filename: r.filename,
+            starRating: r.starRating,
+            colorLabel: r.colorLabel,
+            title: r.title,
+            description: r.description,
+            tags: r.tags,
+          })),
+        );
+      }
+      let reportPayload: ShootReport | undefined;
+      if (report) {
+        const payloadRatings = ratings.map((r: any) => ({
+          imageId: r.imageId || "",
+          filename: r.filename,
+          starRating: r.starRating,
+          colorLabel: r.colorLabel,
+          title: r.title,
+          description: r.description,
+          tags: r.tags,
+        }));
+        reportPayload = await buildShootReport({
+          shootName: shootName ?? "Kull Run",
+          ratings: payloadRatings,
+          heroLimit,
+          previewBaseUrl,
+          apiKey,
+        });
+        emitShootCompletedNotification(user, reportPayload);
+      }
+
+      const estimatedCostUSD = creditsCharged;
+      res.json({
+        ok: true,
+        providerId: providerUsed,
+        ratings,
+        sidecars,
+        estimatedCostUSD,
+        attempts,
+        report: report ? reportPayload : undefined,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid run payload", issues: error.flatten() });
+      }
+      console.error("OpenAI run error", error);
+      res.status(500).json({ message: "Failed to run OpenAI batch" });
+    }
+  });
+
+  // Generate shoot report narrative
+  app.post("/api/kull/report/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = GenerateReportSchema.parse(req.body);
+      const apiKey = process.env.OPENAI_API_KEY;
+      const reportPayload = await buildShootReport({
+        shootName: parsed.shootName,
+        ratings: parsed.ratings,
+        heroLimit: parsed.heroLimit,
+        previewBaseUrl: parsed.previewBaseUrl,
+        apiKey,
+      });
+      let user: Awaited<ReturnType<typeof storage.getUser>> | undefined;
+      try {
+        user = await storage.getUser(req.user.claims.sub);
+      } catch (error) {
+        console.warn("failed to load user for notifications", error);
+      }
+      emitShootCompletedNotification(user, reportPayload);
+      res.json(reportPayload);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid report payload", issues: error.flatten() });
+      }
+      console.error("report generate error", error);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
+  // Apply metadata by writing XMP sidecars on the server (when running locally)
+  app.post("/api/kull/metadata/write", isAuthenticated, async (req: any, res) => {
+    try {
+      const schema = z.object({
+        baseDir: z.string().min(1),
+        updates: z.array(
+          z.object({
+            imageId: z.string().min(1),
+            filename: z.string().optional(),
+            starRating: z.number().int().min(0).max(5).optional(),
+            colorLabel: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            tags: z.array(z.string()).optional(),
+          }),
+        ),
+      });
+      const { baseDir, updates } = schema.parse(req.body);
+      const results = await writeSidecars(baseDir, updates);
+      res.json({ ok: true, results });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid metadata payload", issues: error.flatten() });
+      }
+      console.error("write sidecars error", error);
+      res.status(500).json({ message: "Failed to write XMP sidecars" });
+    }
+  });
+
+  // Folder catalog for Kull clients
+  app.get("/api/kull/folders", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getFolderCatalog(userId);
+      res.json({ folderCatalog: user?.folderCatalog ?? null });
+    } catch (error: any) {
+      console.error("folders error", error);
+      res.status(500).json({ message: "Failed to load folder catalog" });
     }
   });
 

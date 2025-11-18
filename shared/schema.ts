@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import type { PromptStyle } from "./culling";
 import {
   index,
   jsonb,
@@ -9,6 +10,8 @@ import {
   boolean,
   numeric,
   text,
+  doublePrecision,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -45,6 +48,12 @@ export const users = pgTable("users", {
   specialOfferExpiresAt: timestamp("special_offer_expires_at"), // 24 hours after sign-in
   // App installation tracking
   appInstalledAt: timestamp("app_installed_at"),
+  // Synced folder catalog for mobile selection
+  folderCatalog: jsonb("folder_catalog").$type<{
+    deviceName?: string;
+    folders: { id: string; name: string; bookmark?: string }[];
+    updatedAt: string;
+  }>(),
   // AI Model preference
   preferredChatModel: varchar("preferred_chat_model").default('gpt-5-nano'), // 'gpt-5-nano', 'gpt-5-mini', 'gpt-5'
   // Timestamps
@@ -315,6 +324,110 @@ export const globalSettings = pgTable("global_settings", {
 
 export type GlobalSetting = typeof globalSettings.$inferSelect;
 export type InsertGlobalSetting = typeof globalSettings.$inferInsert;
+
+// Kull prompt presets and credit ledger (for native + web orchestration)
+export const promptPresets = pgTable("prompt_presets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 160 }).notNull(),
+  title: varchar("title", { length: 160 }).notNull(),
+  summary: text("summary").notNull(),
+  instructions: text("instructions").notNull(),
+  shootTypes: jsonb("shoot_types").notNull().$type<string[]>(),
+  tags: jsonb("tags").notNull().$type<string[]>(),
+  style: jsonb("style").notNull().$type<PromptStyle>(),
+  authorId: varchar("author_id").references(() => users.id),
+  authorEmail: varchar("author_email"),
+  isDefault: boolean("is_default").notNull().default(false),
+  sharedWithMarketplace: boolean("shared_with_marketplace").notNull().default(true),
+  aiScore: doublePrecision("ai_score"),
+  aiSummary: text("ai_summary"),
+  humanScoreAverage: doublePrecision("human_score_average").notNull().default(0),
+  upvotes: integer("upvotes").notNull().default(0),
+  downvotes: integer("downvotes").notNull().default(0),
+  ratingsCount: integer("ratings_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_presets_slug_key").on(table.slug),
+  index("prompt_presets_author_idx").on(table.authorId),
+]);
+
+export const promptPresetVotes = pgTable("prompt_preset_votes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  presetId: varchar("preset_id").notNull().references(() => promptPresets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  value: integer("value").notNull(),
+  rating: integer("rating"),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_preset_votes_user_unique").on(table.presetId, table.userId),
+  index("prompt_preset_votes_preset_idx").on(table.presetId),
+]);
+
+export const promptPresetSaves = pgTable("prompt_preset_saves", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  presetId: varchar("preset_id").notNull().references(() => promptPresets.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("prompt_preset_saves_unique").on(table.presetId, table.userId),
+]);
+
+export type PromptPreset = typeof promptPresets.$inferSelect;
+export type InsertPromptPreset = typeof promptPresets.$inferInsert;
+export const insertPromptPresetSchema = createInsertSchema(promptPresets).omit({
+  id: true,
+  aiScore: true,
+  aiSummary: true,
+  humanScoreAverage: true,
+  upvotes: true,
+  downvotes: true,
+  ratingsCount: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PromptPresetVote = typeof promptPresetVotes.$inferSelect;
+export type InsertPromptPresetVote = typeof promptPresetVotes.$inferInsert;
+export const insertPromptPresetVoteSchema = createInsertSchema(promptPresetVotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PromptPresetSave = typeof promptPresetSaves.$inferSelect;
+export type InsertPromptPresetSave = typeof promptPresetSaves.$inferInsert;
+export const insertPromptPresetSaveSchema = createInsertSchema(promptPresetSaves).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const creditLedger = pgTable("credit_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  entryType: varchar("entry_type", { length: 10 }).notNull(), // 'credit' or 'debit'
+  credits: integer("credits").notNull(),
+  currency: varchar("currency", { length: 16 }).notNull().default('credits'),
+  metadata: jsonb("metadata").$type<{
+    providerId?: string;
+    shootId?: string;
+    imagesProcessed?: number;
+  }>(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("credit_ledger_user_idx").on(table.userId),
+  index("credit_ledger_created_idx").on(table.createdAt),
+]);
+
+export type CreditLedger = typeof creditLedger.$inferSelect;
+export type InsertCreditLedger = typeof creditLedger.$inferInsert;
+export const insertCreditLedgerSchema = createInsertSchema(creditLedger).omit({
+  id: true,
+  createdAt: true,
+});
 
 // Re-export email queue types
 export * from "./emailQueue";
