@@ -20,7 +20,7 @@ vi.mock("@/pages/Checkout", () => ({
 describe("App shell", () => {
   it("renders the public landing page for unauthenticated users", () => {
     render(<App />);
-    expect(screen.getByTestId("text-logo")).toHaveTextContent("Kull AI");
+    expect(screen.getByTestId("text-logo")).toHaveTextContent("Kull");
     expect(screen.getByTestId("button-login-nav")).toBeInTheDocument();
   });
 });
