@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { UrgencyBanner } from "@/components/UrgencyBanner";
 import { PricingSection } from "@/components/PricingSection";
 import { ReferralForm } from "@/components/ReferralForm";
-import { ModelSelector } from "@/components/ModelSelector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Smartphone, LogOut, Gift, Clock, DollarSign } from "lucide-react";
@@ -148,13 +147,6 @@ export default function Home() {
         {!hasActiveSubscription && (
           <div className="mb-16">
             <PricingSection onSelectPlan={handleSelectPlan} />
-          </div>
-        )}
-
-        {/* AI Model Settings - Only for paid users */}
-        {hasAccess && (
-          <div className="max-w-4xl mx-auto mb-16">
-            <ModelSelector />
           </div>
         )}
 

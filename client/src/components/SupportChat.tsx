@@ -1309,14 +1309,31 @@ export function SupportChat() {
 
   // Countdown effect with proactive message sending
   useEffect(() => {
-    if (nextMessageIn !== null && nextMessageIn > 0) {
-      // Clear any existing countdown
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
+    // Clear any existing countdown
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
 
+    // Don't start countdown if paused
+    if (isProactiveMessagesPausedRef.current) {
+      console.log('[Chat] Countdown not started - proactive messages paused');
+      return;
+    }
+
+    if (nextMessageIn !== null && nextMessageIn > 0) {
       // Start countdown
       countdownIntervalRef.current = setInterval(() => {
+        // Check pause state using ref (not stale state)
+        if (isProactiveMessagesPausedRef.current) {
+          console.log('[Chat] Countdown stopped - proactive messages paused');
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+          return;
+        }
+
         setNextMessageIn(prev => {
           if (prev === null || prev <= 1) {
             if (countdownIntervalRef.current) {
@@ -1335,13 +1352,13 @@ export function SupportChat() {
             // 1. Tab is visible OR activity was within last minute
             // 2. Chat is open
             // 3. Not currently loading
-            // 4. Proactive messages are not paused
+            // 4. Proactive messages are not paused (use ref for current value)
             // 5. At least 30 seconds since last user message
             // 6. At least 30 seconds since last AI message
             const shouldSendProactive = (isTabVisible || timeSinceActivity < ONE_MINUTE)
               && isOpen
               && !isLoading
-              && !isProactiveMessagesPaused
+              && !isProactiveMessagesPausedRef.current
               && timeSinceUserMessage >= THIRTY_SECONDS
               && timeSinceAiMessage >= THIRTY_SECONDS;
 
@@ -1352,7 +1369,7 @@ export function SupportChat() {
               timeSinceAiMessage: Math.round(timeSinceAiMessage / 1000) + 's',
               isOpen,
               isLoading,
-              isPaused: isProactiveMessagesPaused
+              isPaused: isProactiveMessagesPausedRef.current
             });
 
             if (shouldSendProactive) {
