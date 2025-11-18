@@ -165,10 +165,19 @@ export function ReferralForm() {
           <div className="text-3xl font-black text-foreground">{completedReferrals}</div>
           <div className="text-sm text-muted-foreground">Completed</div>
         </div>
-        <div className="bg-card border border-card-border rounded-xl p-6 text-center">
-          <Gift className="w-8 h-8 text-primary mx-auto mb-2" />
-          <div className="text-lg font-bold text-foreground">{bonusUnlocked}</div>
-          <div className="text-sm text-muted-foreground">Bonus Unlocked</div>
+        <div className={`border rounded-xl p-6 text-center ${bonusUnlocked !== 'None yet' ? 'bg-primary/10 border-primary/30' : 'bg-card border-card-border'}`}>
+          <Gift className={`w-8 h-8 mx-auto mb-2 ${bonusUnlocked !== 'None yet' ? 'text-primary animate-pulse' : 'text-muted-foreground'}`} />
+          {bonusUnlocked !== 'None yet' ? (
+            <>
+              <div className="text-lg font-bold text-primary">{bonusUnlocked}</div>
+              <div className="text-sm text-foreground font-semibold">🎉 Unlocked!</div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-black text-foreground">{totalSent}/3</div>
+              <div className="text-sm text-muted-foreground">Next: 1 Month Free</div>
+            </>
+          )}
         </div>
       </div>
 
