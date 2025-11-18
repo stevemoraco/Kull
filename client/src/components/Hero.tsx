@@ -10,38 +10,128 @@ export function Hero() {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
-      
+
       {/* Decorative elements */}
       <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-      
+
       {/* Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 py-20 md:py-32 text-center">
-        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-8" data-testid="badge-announcement">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20 text-center">
+        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4" data-testid="badge-announcement">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">1-Day Unlimited Free Trial</span>
+          <span className="text-sm font-semibold text-foreground">Start your unlimited free trial now</span>
         </div>
 
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black leading-tight mb-4 text-foreground" data-testid="text-hero-headline">
-          10,000+ photos in seconds
-          <br />
-          <span className="text-primary">Using AI</span>
+        <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-hero-headline">
+          Find all your <span className="inline-flex gap-1">⭐⭐⭐⭐⭐</span> images in seconds{" "}
+          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">even if you have</span>{" "}
+          <span className="text-primary">10,000+ photos</span>{" "}
+          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">across multiple photoshoots</span>
         </h1>
 
-        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-6">
-          <span className="text-sm font-semibold text-foreground">(multiple photoshoots at once)</span>
+        <div className="max-w-6xl mx-auto mb-8" data-testid="text-hero-subheadline">
+          <div className="bg-gradient-to-br from-card via-card/95 to-card border border-card-border rounded-3xl p-6 md:p-8 shadow-2xl">
+            <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+              {/* First column - Kull only */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎯</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight mb-2">Kull</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-base mt-0.5">💬</span>
+                        <p className="text-sm text-muted-foreground leading-snug">Tell Kull your desired number of deliverable images</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-base mt-0.5">🗣️</span>
+                        <p className="text-sm text-muted-foreground leading-snug">Tell Kull your priority for ranking this shoot in plain language</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-base mt-0.5">😊</span>
+                        <p className="text-sm text-muted-foreground leading-snug">Kull organizes by composition, lighting, focus, even subject mood</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-base mt-0.5">👁️</span>
+                        <p className="text-sm text-muted-foreground leading-snug">Watch Kull work right in Lightroom!</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Second column */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">⭐</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5 stars</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Professional quality ratings</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎨</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Color-code</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Visual organization at a glance</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🔄</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Re-rank & Re-organize</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Get more or less strict selects instantly</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Third column */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">✍️</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Title</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">AI-generated titles for every image</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📝</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Describe</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Detailed descriptions of each shot</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🏷️</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Tag</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Smart tags for easy organization</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-12 leading-relaxed space-y-3" data-testid="text-hero-subheadline">
-          <p className="flex items-center gap-3">✍️ <span>Title</span></p>
-          <p className="flex items-center gap-3">📝 <span>Describe</span></p>
-          <p className="flex items-center gap-3">🏷️ <span>Tag</span></p>
-          <p className="flex items-center gap-3">⭐ <span>Rate 1-5 stars</span></p>
-          <p className="flex items-center gap-3">🎨 <span>Color-code</span></p>
-          <p className="flex items-center gap-3">🎯 <span>Kull down to your exact ideal number of final images ranked/organized by the best composition, lighting and technical aspects like focus, detail, and subject mood</span></p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
           <Button
             size="lg"
             className="text-lg h-14 px-8 min-w-[240px]"
@@ -66,7 +156,7 @@ export function Hero() {
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-background flex items-center justify-center text-white font-semibold text-xs">
               JD
             </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 border-2 border-background flex items-center justify-center text-white font-semibold text-xs">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 border-2 border-background flex items-center justify-center text-white font-semibold text-xs">
               SK
             </div>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 border-2 border-background flex items-center justify-center text-white font-semibold text-xs">
@@ -85,8 +175,8 @@ export function Hero() {
         </div>
 
         {/* AI Model badges */}
-        <div className="mt-16 pt-8 border-t border-border/40">
-          <p className="text-sm text-muted-foreground mb-8 uppercase tracking-wide font-semibold">Powered by your preference from the latest AI models</p>
+        <div className="mt-10 pt-6 border-t border-border/40">
+          <p className="text-sm text-muted-foreground mb-6 uppercase tracking-wide font-semibold">Powered by your preference from the latest AI models</p>
           <div className="flex flex-wrap items-center justify-center gap-6">
             {/* OpenAI GPT-5.1 */}
             <div className="group relative bg-gradient-to-br from-gray-950 via-gray-900 to-black border border-gray-700/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-emerald-500/50" data-testid="badge-ai-gpt">
@@ -103,17 +193,21 @@ export function Hero() {
                   <div className="text-gray-400 text-xs">ChatGPT</div>
                 </div>
               </div>
-              <div className="text-gray-500 text-xs font-mono">Nov 12, 2025 <span className="text-gray-600">• 6 days ago</span></div>
+              <div className="text-white text-xs font-mono">Nov 12, 2025 <span className="text-white/80">• 6 days ago</span></div>
             </div>
 
             {/* Anthropic Claude Sonnet 4.5 */}
             <div className="group relative bg-gradient-to-br from-orange-950 via-orange-900 to-orange-800 border border-orange-600/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-orange-400/50" data-testid="badge-ai-claude">
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shadow-lg">
-                    <svg viewBox="0 0 200 200" fill="white" className="w-6 h-6">
-                      <path d="M100 20 L180 60 L180 140 L100 180 L20 140 L20 60 Z M100 50 L160 80 L160 120 L100 150 L40 120 L40 80 Z M70 70 L100 85 L130 70 L130 100 L100 115 L70 100 Z"/>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center shadow-lg p-2">
+                    <svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 655" className="w-full h-full" fill="white">
+                      <path d="m536.5 1.3l260 653.6h142.5l-260-653.6z"/>
+                      <path fillRule="evenodd" d="m259.7 0.5h149.1l259.7 653.6h-145.3l-53.1-137.2h-271.7l-53.2 137.2h-145.2zm-14.4 394.9h178l-89-229.7z"/>
                     </svg>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shadow-lg">
+                    <img src="/logos/Claude_AI_symbol.svg.png" alt="Claude" className="w-6 h-6 object-contain" />
                   </div>
                 </div>
                 <div>
@@ -121,7 +215,25 @@ export function Hero() {
                   <div className="text-orange-200 text-xs">Constitutional AI</div>
                 </div>
               </div>
-              <div className="text-orange-700 text-xs font-mono">Sep 29, 2025 <span className="text-orange-800">• 7 weeks ago</span></div>
+              <div className="text-white text-xs font-mono">Sep 29, 2025 <span className="text-white/80">• 7 weeks ago</span></div>
+            </div>
+
+            {/* Groq + Moonshot Kimi */}
+            <div className="group relative bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-900 border border-purple-600/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-purple-400/50" data-testid="badge-ai-groq">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg p-2">
+                    <svg fill="white" fillRule="evenodd" viewBox="0 0 24 24" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12.036 2c-3.853-.035-7 3-7.036 6.781-.035 3.782 3.055 6.872 6.908 6.907h2.42v-2.566h-2.292c-2.407.028-4.38-1.866-4.408-4.23-.029-2.362 1.901-4.298 4.308-4.326h.1c2.407 0 4.358 1.915 4.365 4.278v6.305c0 2.342-1.944 4.25-4.323 4.279a4.375 4.375 0 01-3.033-1.252l-1.851 1.818A7 7 0 0012.029 22h.092c3.803-.056 6.858-3.083 6.879-6.816v-6.5C18.907 4.963 15.817 2 12.036 2z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-white font-bold text-sm">Groq + Moonshot AI Kimi</div>
+                  <div className="text-purple-200 text-xs">Moonshot AI Kimi k1.5</div>
+                </div>
+              </div>
+              <div className="text-white text-xs font-mono">Jul 2025 <span className="text-white/80">• 4 months ago</span></div>
             </div>
 
             {/* xAI Grok 4.1 */}
@@ -136,10 +248,10 @@ export function Hero() {
                 </div>
                 <div>
                   <div className="text-white font-bold text-sm">xAI Grok 4.1</div>
-                  <div className="text-sky-200 text-xs">by Elon Musk</div>
+                  <div className="text-sky-200 text-xs">by xAI, owners of twitter lol</div>
                 </div>
               </div>
-              <div className="text-sky-700 text-xs font-mono">Nov 17, 2025 <span className="text-sky-800">• 1 day ago</span></div>
+              <div className="text-white text-xs font-mono">Nov 17, 2025 <span className="text-white/80">• 1 day ago</span></div>
             </div>
 
             {/* Google Gemini 2.5 Pro */}
@@ -147,11 +259,11 @@ export function Hero() {
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg bg-white">
-                    <svg viewBox="0 0 48 48" className="w-6 h-6">
-                      <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/>
-                      <path fill="#34A853" d="M11.4 28.8l-2.2 1.6-1 2.3C10.1 36.9 16.5 40 24 40c5.6 0 10.9-2.1 14.8-5.6l-7.3-5.7c-2 1.3-4.6 2.2-7.5 2.2-5.5 0-10.2-3.5-11.6-8.1z"/>
-                      <path fill="#FBBC05" d="M8.2 32.7C7.4 30.9 7 28.9 7 27s.4-3.9 1.2-5.7l-2.2-1.6-1-2.3C3.4 19.8 3 21.8 3 24s.4 4.2 1 6.1l2.2 1.6 1 2.3z"/>
-                      <path fill="#EA4335" d="M24 11c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 16.5 2 10.1 5.1 7.2 9.3l2.2 1.6 1 2.3C11.8 8.7 17.5 5.2 24 5.2z"/>
+                    <svg viewBox="0 0 24 24" className="w-6 h-6">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
                   </div>
                   <div className="w-8 h-8 flex items-center justify-center">
@@ -170,29 +282,10 @@ export function Hero() {
                 </div>
                 <div>
                   <div className="text-white font-bold text-sm">Google Gemini 2.5 Pro</div>
-                  <div className="text-slate-400 text-xs">DeepMind</div>
+                  <div className="text-slate-400 text-xs">Google DeepMind</div>
                 </div>
               </div>
-              <div className="text-slate-500 text-xs font-mono">Jun 17, 2025 <span className="text-slate-600">• 5 months ago</span></div>
-            </div>
-
-            {/* Moonshot Kimi K2 */}
-            <div className="group relative bg-gradient-to-br from-indigo-950 via-indigo-900 to-purple-900 border border-indigo-600/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-indigo-400/50" data-testid="badge-ai-kimi">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                    <svg viewBox="0 0 200 200" fill="white" className="w-6 h-6">
-                      <circle cx="100" cy="80" r="35"/>
-                      <path d="M 65 100 Q 50 140 70 170 Q 85 185 100 180 Q 115 185 130 170 Q 150 140 135 100 Z"/>
-                    </svg>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-white font-bold text-sm">Moonshot AI Kimi K2</div>
-                  <div className="text-indigo-200 text-xs">Open Source</div>
-                </div>
-              </div>
-              <div className="text-indigo-700 text-xs font-mono">Jul 2025 <span className="text-indigo-800">• 4 months ago</span></div>
+              <div className="text-white text-xs font-mono">Jun 17, 2025 <span className="text-white/80">• 5 months ago</span></div>
             </div>
           </div>
         </div>

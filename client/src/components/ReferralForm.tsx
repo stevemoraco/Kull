@@ -266,10 +266,10 @@ export function ReferralForm() {
             <div className="relative">
               {/* Progress Line */}
               <div className="absolute top-5 left-0 right-0 h-1 bg-muted">
-                <div 
-                  className="h-full bg-gradient-to-r from-primary to-purple-500 transition-all duration-500 ease-out"
-                  style={{ 
-                    width: `${Math.min(100, ((totalSent + filledCount) / 10) * 100)}%` 
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-cyan-500 transition-all duration-500 ease-out"
+                  style={{
+                    width: `${Math.min(100, ((totalSent + filledCount) / 10) * 100)}%`
                   }}
                 />
               </div>

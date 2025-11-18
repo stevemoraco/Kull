@@ -115,7 +115,7 @@ function transformRawUrlsToMarkdown(text: string): string {
   });
 }
 
-// Helper function to render markdown with purple theme
+// Helper function to render markdown with teal theme
 function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
   // First, transform any raw URLs to markdown links (safety check)
   const safeText = transformRawUrlsToMarkdown(text);
@@ -129,7 +129,7 @@ function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
     // Headers
     if (line.startsWith('### ')) {
       elements.push(
-        <h3 key={key++} className="text-lg font-bold text-purple-600 mt-3 mb-2">
+        <h3 key={key++} className="text-lg font-bold text-teal-600 mt-3 mb-2">
           {parseInlineMarkdown(line.substring(4), onLinkClick, key)}
         </h3>
       );
@@ -137,7 +137,7 @@ function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
     }
     if (line.startsWith('## ')) {
       elements.push(
-        <h2 key={key++} className="text-xl font-bold text-purple-700 mt-4 mb-2">
+        <h2 key={key++} className="text-xl font-bold text-teal-700 mt-4 mb-2">
           {parseInlineMarkdown(line.substring(3), onLinkClick, key)}
         </h2>
       );
@@ -145,7 +145,7 @@ function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
     }
     if (line.startsWith('# ')) {
       elements.push(
-        <h1 key={key++} className="text-2xl font-bold text-purple-800 mt-4 mb-3">
+        <h1 key={key++} className="text-2xl font-bold text-teal-800 mt-4 mb-3">
           {parseInlineMarkdown(line.substring(2), onLinkClick, key)}
         </h1>
       );
@@ -155,7 +155,7 @@ function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
     // Blockquotes
     if (line.startsWith('> ')) {
       elements.push(
-        <blockquote key={key++} className="border-l-4 border-purple-400 pl-4 italic text-purple-600 my-2">
+        <blockquote key={key++} className="border-l-4 border-teal-400 pl-4 italic text-teal-600 my-2">
           {parseInlineMarkdown(line.substring(2), onLinkClick, key)}
         </blockquote>
       );
@@ -166,7 +166,7 @@ function renderMarkdown(text: string, onLinkClick: (url: string) => void) {
     if (line.match(/^[•\-*]\s/)) {
       elements.push(
         <div key={key++} className="flex gap-2 my-1">
-          <span className="text-purple-500">•</span>
+          <span className="text-teal-500">•</span>
           <span>{parseInlineMarkdown(line.replace(/^[•\-*]\s/, ''), onLinkClick, key)}</span>
         </div>
       );
@@ -241,7 +241,7 @@ function parseInlineMarkdown(text: string, onLinkClick: (url: string) => void, b
               e.preventDefault();
               onLinkClick(earliestMatch!.url!);
             }}
-            className="text-purple-600 hover:text-purple-700 underline cursor-pointer font-medium"
+            className="text-teal-600 hover:text-teal-700 underline cursor-pointer font-medium"
           >
             {earliestMatch.content}
           </button>
@@ -249,21 +249,21 @@ function parseInlineMarkdown(text: string, onLinkClick: (url: string) => void, b
         break;
       case 'bold':
         parts.push(
-          <strong key={key++} className="font-bold text-purple-700">
+          <strong key={key++} className="font-bold text-teal-700">
             {earliestMatch.content}
           </strong>
         );
         break;
       case 'italic':
         parts.push(
-          <em key={key++} className="italic text-purple-600">
+          <em key={key++} className="italic text-teal-600">
             {earliestMatch.content}
           </em>
         );
         break;
       case 'code':
         parts.push(
-          <code key={key++} className="bg-purple-100 text-purple-700 px-1 py-0.5 rounded text-sm font-mono">
+          <code key={key++} className="bg-teal-100 text-teal-700 px-1 py-0.5 rounded text-sm font-mono">
             {earliestMatch.content}
           </code>
         );
@@ -1181,8 +1181,8 @@ export function SupportChat() {
               setTimeout(() => {
                 if (isActive) setShowGreetingPopover(false);
               }, 10000);
-            } else {
-              // Chat is open - add as first message
+            } else if (!isProactiveMessagesPausedRef.current) {
+              // Chat is open and not paused - add as first message
               const newMessage: Message = {
                 id: 'context-' + Date.now(),
                 role: 'assistant',
@@ -1191,10 +1191,18 @@ export function SupportChat() {
               };
               setMessages(prev => [...prev, newMessage]);
               lastAiMessageTimeRef.current = Date.now();
+            } else {
+              console.log('[Chat] First greeting ready but proactive messages are paused - not adding to conversation');
             }
           } else {
             // Subsequent generations
             const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
+
+            // Double-check pause state before adding message (in case pause was activated during generation)
+            if (isProactiveMessagesPausedRef.current) {
+              console.log('[Chat] Greeting ready but proactive messages are paused - not adding to conversation');
+              return;
+            }
 
             if (currentIsOpen && timeSinceLastUserMessage > 20000) {
               // Chat is open: add as new message to conversation
@@ -1903,7 +1911,7 @@ export function SupportChat() {
               <MessageCircle className="w-6 h-6" />
             </Button>
             {nextMessageIn !== null && nextMessageIn > 0 && (
-              <div className="bg-purple-600 text-white text-xs font-bold rounded-full px-2 py-0.5 shadow-md">
+              <div className="bg-teal-600 text-white text-xs font-bold rounded-full px-2 py-0.5 shadow-md">
                 {nextMessageIn}s
               </div>
             )}
@@ -1912,11 +1920,11 @@ export function SupportChat() {
           {/* Greeting Popover */}
           {showGreetingPopover && popoverGreeting && (
             <div
-              className="fixed bottom-4 left-20 md:left-24 md:bottom-6 max-w-[280px] md:max-w-[320px] bg-card border border-purple-200/50 rounded-2xl p-3 md:p-4 z-[9999] animate-in slide-in-from-left-2 fade-in duration-300"
+              className="fixed bottom-4 left-20 md:left-24 md:bottom-6 max-w-[280px] md:max-w-[320px] bg-card border border-teal-200/50 rounded-2xl p-3 md:p-4 z-[9999] animate-in slide-in-from-left-2 fade-in duration-300"
               style={{
                 position: 'fixed',
-                boxShadow: '0 20px 60px -10px rgba(139, 92, 246, 0.3), 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(139, 92, 246, 0.1)',
-                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(250, 249, 255, 0.98) 100%)',
+                boxShadow: '0 20px 60px -10px rgba(45, 212, 191, 0.3), 0 10px 30px -5px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(45, 212, 191, 0.1)',
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 253, 250, 0.98) 100%)',
                 backdropFilter: 'blur(12px)',
               }}
             >
@@ -1924,7 +1932,7 @@ export function SupportChat() {
               <div
                 className="absolute inset-0 rounded-2xl pointer-events-none"
                 style={{
-                  background: 'radial-gradient(circle at top left, rgba(139, 92, 246, 0.08) 0%, transparent 60%)',
+                  background: 'radial-gradient(circle at top left, rgba(20, 184, 166, 0.08) 0%, transparent 60%)',
                 }}
               />
 
@@ -1941,8 +1949,8 @@ export function SupportChat() {
                   <div
                     className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+                      background: 'linear-gradient(135deg, #14b8a6 0%, #5eead4 100%)',
+                      boxShadow: '0 4px 12px rgba(20, 184, 166, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
                     }}
                   >
                     <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
@@ -1960,7 +1968,7 @@ export function SupportChat() {
                     setIsOpen(true);
                     setShowGreetingPopover(false);
                   }}
-                  className="mt-2.5 text-[10px] md:text-xs text-purple-600 hover:text-purple-700 font-semibold transition-colors"
+                  className="mt-2.5 text-[10px] md:text-xs text-teal-600 hover:text-teal-700 font-semibold transition-colors"
                 >
                   Open chat →
                 </button>
@@ -1995,7 +2003,7 @@ export function SupportChat() {
                   <Pause className="w-5 h-5 text-primary-foreground" />
                 )}
                 {nextMessageIn !== null && nextMessageIn > 0 && !isProactiveMessagesPaused && (
-                  <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-white text-teal-600 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     {nextMessageIn}
                   </span>
                 )}
@@ -2124,15 +2132,15 @@ export function SupportChat() {
                     {message.role === 'assistant' ? (
                       message.content === '__GENERATING_GREETING__' ? (
                         // Special rendering for greeting placeholder
-                        <div className="flex items-start gap-3 border-l-4 border-purple-400 pl-3 py-1 bg-purple-50/50 rounded-r">
-                          <Loader2 className="w-4 h-4 animate-spin text-purple-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-purple-700 italic">Generating your personalized greeting...</span>
+                        <div className="flex items-start gap-3 border-l-4 border-teal-400 pl-3 py-1 bg-teal-50/50 rounded-r">
+                          <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-teal-700 italic">Generating your personalized greeting...</span>
                         </div>
                       ) : message.content === '__THINKING__' ? (
                         // Special rendering for thinking placeholder
-                        <div className="flex items-start gap-3 border-l-4 border-purple-400 pl-3 py-1 bg-purple-50/50 rounded-r">
-                          <Loader2 className="w-4 h-4 animate-spin text-purple-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-purple-700 italic">Thinking...</span>
+                        <div className="flex items-start gap-3 border-l-4 border-teal-400 pl-3 py-1 bg-teal-50/50 rounded-r">
+                          <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
+                          <span className="text-teal-700 italic">Thinking...</span>
                         </div>
                       ) : message.content.length === 0 ? (
                         // Waiting for first token

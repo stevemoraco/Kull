@@ -4,7 +4,7 @@ export function ValueStack() {
   const coreFeatures = [
     "Freedom to use ONLY the model(s) YOU prefer or on-device local AI to cull images for you",
     "Real-time 1-5 star ratings, titles, descriptions, tags, and color-coding",
-    "Unlimited photo rating and organization during your subscription",
+    "With no rate limits",
     "Universal Mac app (works with any folder)",
     "iPhone & iPad companion apps for on-the-go organization",
     "Automatic sync across all your devices",
@@ -20,9 +20,9 @@ export function ValueStack() {
   ];
 
   return (
-    <section className="py-20 md:py-32 px-4" data-testid="section-value-stack">
+    <section className="py-12 md:py-20 px-4" data-testid="section-value-stack">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-value-headline">
             Everything You Get With Kull
           </h2>

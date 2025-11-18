@@ -185,6 +185,9 @@ export function Footer() {
               Built and powered by <a href="https://heydata.org" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">heydata.org</a>
             </p>
           </div>
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            <p>Adobe, Lightroom, and the Lightroom logo are either registered trademarks or trademarks of Adobe Inc. in the United States and/or other countries.</p>
+          </div>
         </div>
       </div>
     </footer>

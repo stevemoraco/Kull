@@ -11,7 +11,7 @@ interface PromptCardProps {
 
 const profileColors: Record<string, string> = {
   wedding: "bg-pink-500/10 text-pink-500 border-pink-500/20",
-  portrait: "bg-purple-500/10 text-purple-500 border-purple-500/20",
+  portrait: "bg-teal-500/10 text-teal-500 border-teal-500/20",
   sports: "bg-orange-500/10 text-orange-500 border-orange-500/20",
   corporate: "bg-blue-500/10 text-blue-500 border-blue-500/20",
   product: "bg-green-500/10 text-green-500 border-green-500/20",
