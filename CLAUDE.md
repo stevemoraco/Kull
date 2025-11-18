@@ -494,6 +494,37 @@ Estimated cost: $4.98
 
 ---
 
+## Platform-Specific Features
+
+### iOS/iPadOS Apps
+
+**Authentication Flow**: Custom onboarding required (different from macOS)
+- Download app from App Store
+- Open app → "Welcome to Kull" screen with benefits
+- "Sign In" → Opens Safari with web login
+- After web login → Deep link `kull://auth-success?token=...` launches app logged in
+- NO manual code copying - fully automated
+
+**File Access Pattern**: iOS restrictions require different approach
+- Cannot browse arbitrary folders like macOS
+- Use `UIDocumentPickerViewController` for folder selection
+- Process files in app sandbox (iOS security model)
+- Export XMP via share sheet back to original location
+
+**iPad-Specific Optimizations**:
+- Split-view layouts for multitasking
+- Landscape-optimized UI
+- Larger touch targets (44pt minimum)
+- Keyboard shortcuts (Cmd+N, Cmd+,, etc.)
+- Support for iPad Pro 12.9", iPad mini, standard iPad
+
+**iOS Companion Features** (vs full macOS app):
+- Monitor shoot progress in real-time
+- Browse marketplace, purchase credits
+- Trigger remote culls (processed on Mac)
+- Push notifications for completion
+- Designed as monitoring/management tool
+
 ## Development Commands
 
 ```bash

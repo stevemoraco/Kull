@@ -71,23 +71,54 @@ export class OpenAIAdapter extends BaseProviderAdapter {
         technicalQuality: {
           type: 'object',
           properties: {
+            focusAccuracy: { type: 'integer', minimum: 1, maximum: 1000 },
+            exposureQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            compositionScore: { type: 'integer', minimum: 1, maximum: 1000 },
+            lightingQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            colorHarmony: { type: 'integer', minimum: 1, maximum: 1000 },
+            noiseLevel: { type: 'integer', minimum: 1, maximum: 1000 },
+            sharpnessDetail: { type: 'integer', minimum: 1, maximum: 1000 },
+            dynamicRange: { type: 'integer', minimum: 1, maximum: 1000 },
+            overallTechnical: { type: 'integer', minimum: 1, maximum: 1000 },
+            // Legacy 0-1 fields for backward compatibility
             sharpness: { type: 'number' },
             exposure: { type: 'number' },
             composition: { type: 'number' },
             overallScore: { type: 'number' }
           },
-          required: ['sharpness', 'exposure', 'composition', 'overallScore']
+          required: ['focusAccuracy', 'exposureQuality', 'compositionScore', 'lightingQuality',
+                     'colorHarmony', 'noiseLevel', 'sharpnessDetail', 'dynamicRange', 'overallTechnical']
         },
         subjectAnalysis: {
           type: 'object',
           properties: {
             primarySubject: { type: 'string' },
-            emotion: { type: 'string' },
+            emotionIntensity: { type: 'integer', minimum: 1, maximum: 1000 },
             eyesOpen: { type: 'boolean' },
+            eyeContact: { type: 'boolean' },
+            genuineExpression: { type: 'integer', minimum: 1, maximum: 1000 },
+            facialSharpness: { type: 'integer', minimum: 1, maximum: 1000 },
+            bodyLanguage: { type: 'integer', minimum: 1, maximum: 1000 },
+            momentTiming: { type: 'integer', minimum: 1, maximum: 1000 },
+            storyTelling: { type: 'integer', minimum: 1, maximum: 1000 },
+            uniqueness: { type: 'integer', minimum: 1, maximum: 1000 },
+            // Legacy fields for backward compatibility
+            emotion: { type: 'string' },
             smiling: { type: 'boolean' },
             inFocus: { type: 'boolean' }
           },
-          required: ['primarySubject', 'emotion', 'eyesOpen', 'smiling', 'inFocus']
+          required: ['primarySubject', 'emotionIntensity', 'eyesOpen', 'eyeContact',
+                     'genuineExpression', 'facialSharpness', 'bodyLanguage', 'momentTiming',
+                     'storyTelling', 'uniqueness']
+        },
+        shootContext: {
+          type: 'object',
+          properties: {
+            eventType: { type: 'string' },
+            shootPhase: { type: 'string' },
+            timeOfDay: { type: 'string' },
+            location: { type: 'string' }
+          }
         }
       },
       required: ['starRating', 'colorLabel', 'keepReject', 'description', 'technicalQuality', 'subjectAnalysis'],
@@ -99,7 +130,7 @@ export class OpenAIAdapter extends BaseProviderAdapter {
       messages: [
         {
           role: 'system',
-          content: request.systemPrompt
+          content: request.systemPrompt + '\n\nREMINDER: These are RAW images - exposure and white balance issues are fixable in post-production. Focus on composition, sharpness, emotion, and moment.'
         },
         {
           role: 'user',
