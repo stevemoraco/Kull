@@ -137,10 +137,34 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log("[Auth] Callback received:", {
+      hostname: req.hostname,
+      query: req.query,
+      hasSession: !!req.session
+    });
+
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("[Auth] Callback error:", err);
+        return res.status(500).send("Authentication error. Please try again.");
+      }
+
+      if (!user) {
+        console.log("[Auth] No user returned:", info);
+        return res.redirect("/api/login");
+      }
+
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("[Auth] Login error:", loginErr);
+          return res.status(500).send("Login failed. Please try again.");
+        }
+
+        console.log("[Auth] Login successful, redirecting to /");
+        return res.redirect("/");
+      });
     })(req, res, next);
   });
 
