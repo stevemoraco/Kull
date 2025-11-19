@@ -943,22 +943,23 @@ ${userActivity.map((event: any, idx: number) => {
         userActivityMarkdown += stateContext;
       }
 
+      let loadedSteps: any[] = [];
       // Load conversation memory from conversationSteps table
       let conversationMemory = '';
       if (sessionId) {
         try {
           const { eq } = await import('drizzle-orm');
-          const steps = await db
+          loadedSteps = await db
             .select()
             .from(conversationSteps)
             .where(eq(conversationSteps.sessionId, sessionId))
             .orderBy(conversationSteps.stepNumber);
 
-          if (steps.length > 0) {
+          if (loadedSteps.length > 0) {
             conversationMemory = '\n\n## 🧠 CONVERSATION MEMORY\n\n';
             conversationMemory += 'Review what the user has ALREADY told you:\n\n';
 
-            steps.forEach((step: any) => {
+            loadedSteps.forEach((step: any) => {
               conversationMemory += `**Step ${step.stepNumber} (${step.stepName}):**\n`;
               if (step.aiQuestion) {
                 conversationMemory += `  You asked: "${step.aiQuestion.substring(0, 150)}${step.aiQuestion.length > 150 ? '...' : ''}"\n`;
@@ -978,7 +979,7 @@ ${userActivity.map((event: any, idx: number) => {
             // Add memory to user activity markdown (will be included in prompt)
             userActivityMarkdown += conversationMemory;
 
-            console.log(`[Chat Memory] Loaded ${steps.length} previous Q&A pairs for session ${sessionId}`);
+            console.log(`[Chat Memory] Loaded ${loadedSteps.length} previous Q&A pairs for session ${sessionId}`);
           }
         } catch (memoryError) {
           console.error('[Chat Memory] Failed to load conversation memory:', memoryError);
@@ -1269,6 +1270,16 @@ ${userActivity.map((event: any, idx: number) => {
               });
 
               console.log(`[Chat Memory] Saved answer for step ${currentStep} (${stepName})`);
+              
+              // Track context usage metric
+              if (loadedSteps && loadedSteps.length > 0) {
+                try {
+                  const contextUsed = measureContextUsage(fullResponse, loadedSteps);
+                  console.log(`[Chat Memory] Context usage: ${contextUsed ? "YES ✅" : "NO ❌"} - AI ${contextUsed ? "referenced" : "did not reference"} previous answers`);
+                } catch (metricError) {
+                  // Silent fail on metric tracking
+                }
+              }
             } catch (memoryError) {
               console.error('[Chat Memory] Failed to save conversation step:', memoryError);
               // Don't fail the request if memory saving fails

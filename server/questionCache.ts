@@ -160,10 +160,11 @@ export function getCacheStats(): { totalSessions: number; totalQuestions: number
   let totalQuestions = 0;
   let oldestSession: Date | null = null;
 
-  for (const questions of sessionQuestions.values()) {
+  const allQuestions = Array.from(sessionQuestions.values());
+  for (const questions of allQuestions) {
     totalQuestions += questions.length;
     if (questions.length > 0) {
-      const oldest = new Date(Math.min(...questions.map(q => q.askedAt.getTime())));
+      const oldest = new Date(Math.min(...questions.map((q: QuestionRecord) => q.askedAt.getTime())));
       if (!oldestSession || oldest < oldestSession) {
         oldestSession = oldest;
       }

@@ -328,8 +328,10 @@ export function validateStepQuestion(
     // Calculate word overlap
     const wordsAI = new Set(normalizedAI.split(' '));
     const wordsExpected = new Set(normalizedExpected.split(' '));
-    const intersection = new Set([...wordsAI].filter(x => wordsExpected.has(x)));
-    const union = new Set([...wordsAI, ...wordsExpected]);
+    const wordsAIArray = Array.from(wordsAI);
+    const wordsExpectedArray = Array.from(wordsExpected);
+    const intersection = new Set(wordsAIArray.filter(x => wordsExpected.has(x)));
+    const union = new Set([...wordsAIArray, ...wordsExpectedArray]);
     const similarity = intersection.size / union.size;
 
     maxSimilarity = Math.max(maxSimilarity, similarity);
