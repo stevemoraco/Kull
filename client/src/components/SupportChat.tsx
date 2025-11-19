@@ -104,6 +104,8 @@ interface ChatSession {
   title: string;
   messages: Message[];
   conversationState?: ConversationState;
+  lastQuickReplies?: string[];
+  lastNextMessageSeconds?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -532,8 +534,13 @@ export function SupportChat() {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const metadata = await getUserMetadata();
-        await apiRequest("POST", '/api/chat/sessions', { sessions: sessionsToSave, metadata });
-        console.log('[Chat] Saved', sessionsToSave.length, 'sessions to database');
+        const sessionsWithQuickReplies = sessionsToSave.map(session => ({
+          ...session,
+          lastQuickReplies: lastParsedQuickReplies,
+          lastNextMessageSeconds: lastParsedNextMessage,
+        }));
+        await apiRequest("POST", '/api/chat/sessions', { sessions: sessionsWithQuickReplies, metadata });
+        console.log('[Chat] Saved', sessionsWithQuickReplies.length, 'sessions to database');
       } catch (error) {
         console.error('[Chat] Failed to save sessions to database:', error);
       }
@@ -1387,6 +1394,7 @@ export function SupportChat() {
           // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
+            setLastParsedNextMessage(nextMsgSeconds);
           }
 
           // Parse and display follow-up questions
@@ -1402,6 +1410,7 @@ export function SupportChat() {
             if (newQuestions.length > 0) {
               setQuickQuestions(newQuestions);
               setShowSuggestions(true);
+              setLastParsedQuickReplies(newQuestions);
             }
           }
 
