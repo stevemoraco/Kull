@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { useCalculator } from '@/contexts/CalculatorContext';
 
 // 🔊 CYBERPUNK NOTIFICATION SOUND - Web Audio API
 function playCyberpunkDing() {
@@ -346,6 +347,9 @@ const getUserMetadata = async () => {
 };
 
 export function SupportChat() {
+  // Get calculator context
+  const calculatorContext = useCalculator();
+
   // Persist chat open state
   const [isOpen, setIsOpen] = useState(() => {
     const stored = localStorage.getItem('kull-chat-open');
@@ -1032,6 +1036,13 @@ export function SupportChat() {
             lastAiMessageTime: lastAiMessageTime,
             currentTime: Date.now(),
             sessionId: currentSessionId,
+            calculatorData: {
+              shootsPerWeek: calculatorContext.shootsPerWeek,
+              hoursPerShoot: calculatorContext.hoursPerShoot,
+              billableRate: calculatorContext.billableRate,
+              hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+              hasClickedPreset: calculatorContext.hasClickedPreset,
+            },
           }),
         });
 
@@ -1048,18 +1059,14 @@ export function SupportChat() {
         console.log('[Chat] Starting stream read...');
 
         while (true) {
-          console.log('[Chat] Waiting for chunk...');
           const { done, value } = await reader.read();
-          console.log('[Chat] Received chunk:', { done, valueLength: value?.length });
 
           if (done) {
-            console.log('[Chat] Stream done, breaking loop');
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
           chunkCount++;
-          console.log(`[Chat] Chunk #${chunkCount}:`, chunk.substring(0, 100));
 
           // Add to buffer and split by lines
           buffer += chunk;
@@ -1072,11 +1079,14 @@ export function SupportChat() {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
-                console.log('[Chat] Parsed SSE data:', data);
 
-                if (data.type === 'delta' && data.content) {
+                if (data.type === 'status' && data.message) {
+                  // Display status message in real-time
+                  flushSync(() => {
+                    setLatestGreeting(data.message);
+                  });
+                } else if (data.type === 'delta' && data.content) {
                   fullContent += data.content;
-                  console.log('[Chat] Added delta, total length now:', fullContent.length);
 
                   // STREAM TO UI - update greeting in real-time with immediate flush
                   flushSync(() => {
@@ -1085,39 +1095,29 @@ export function SupportChat() {
                 } else if (data.type === 'done') {
                   // Track when AI last responded (welcome message)
                   lastAiMessageTimeRef.current = Date.now();
-                  console.log('[Chat] Received done event');
                 } else if (data.type === 'error') {
-                  console.error('[Chat] Received error event:', data.message);
+                  console.error('[Chat] Stream error:', data.message);
                 }
               } catch (e) {
-                console.error('[Chat] Failed to parse JSON:', line, e);
+                console.error('[Chat] Failed to parse SSE:', e);
               }
             }
           }
         }
 
-        console.log('[Chat] ===== GREETING STREAM COMPLETE =====');
-        console.log('[Chat] Full content length:', fullContent.length);
-        console.log('[Chat] Full content:', fullContent);
-        console.log('[Chat] Is active?', isActive);
+        // Stream complete - minimal logging
 
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
-          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
-
-          console.log('[Chat] NEXT_MESSAGE match:', nextMessageMatch);
-          console.log('[Chat] FOLLOW_UP_QUESTIONS match:', followUpMatch);
+          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?QUICK_REPLIES:\s*([^\n]+)/i);
 
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
 
-          // Remove ALL metadata from displayed content (cut at first ␞ or FOLLOW_UP_QUESTIONS)
+          // Remove ALL metadata from displayed content (cut at first ␞ or QUICK_REPLIES)
           const cutoffIndex = fullContent.indexOf('␞');
-          const followUpIndex = fullContent.search(/\n\n?FOLLOW_UP_QUESTIONS:/);
-
-          console.log('[Chat] Cutoff index:', cutoffIndex);
-          console.log('[Chat] FollowUp index:', followUpIndex);
+          const followUpIndex = fullContent.search(/\n\n?QUICK_REPLIES:/);
 
           if (cutoffIndex !== -1) {
             cleanContent = fullContent.substring(0, cutoffIndex).trim();
@@ -1125,14 +1125,9 @@ export function SupportChat() {
             cleanContent = fullContent.substring(0, followUpIndex).trim();
           }
 
-          console.log('[Chat] Clean content:', cleanContent);
-
           // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-            console.log('[Chat] ✅ Parsed next message time:', nextMsgSeconds, 'seconds');
-          } else {
-            console.log('[Chat] ❌ No NEXT_MESSAGE found, using default 30s');
           }
 
           // Parse and display follow-up questions
@@ -1143,30 +1138,17 @@ export function SupportChat() {
               .map((q: string) => q.trim())
               .filter((q: string) => q.length > 5 && q.length < 200);
 
-            console.log('[Chat] Welcome greeting follow-up questions:', newQuestions);
-
             if (newQuestions.length > 0) {
               setQuickQuestions(newQuestions);
               setShowSuggestions(true);
             }
-          } else {
-            console.log('[Chat] No follow-up questions in welcome message');
           }
-
-          console.log('[Chat] ===== SETTING STATE =====');
-          console.log('[Chat] Generated greeting:', cleanContent.substring(0, 100));
-          console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
-          console.log('[Chat] Greeting generated?', currentGreetingGenerated);
-          console.log('[Chat] Chat open?', currentIsOpen);
 
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
-            console.log('[Chat] 🎉 First greeting - setting countdown to:', nextMsgSeconds);
             setLatestGreeting(cleanContent);
             setGreetingGenerated(true);
             setNextMessageIn(nextMsgSeconds);
-
-            console.log('[Chat] First greeting - storing and showing countdown');
 
             // 🔊 PLAY CYBERPUNK DING FOR NEW GREETING (only if tab is visible)
             if (isTabVisibleRef.current) {
@@ -1192,8 +1174,6 @@ export function SupportChat() {
               };
               setMessages(prev => [...prev, newMessage]);
               lastAiMessageTimeRef.current = Date.now();
-            } else {
-              console.log('[Chat] First greeting ready but proactive messages are paused - not adding to conversation');
             }
           } else {
             // Subsequent generations
@@ -1201,7 +1181,6 @@ export function SupportChat() {
 
             // Double-check pause state before adding message (in case pause was activated during generation)
             if (isProactiveMessagesPausedRef.current) {
-              console.log('[Chat] Greeting ready but proactive messages are paused - not adding to conversation');
               return;
             }
 
@@ -1214,10 +1193,7 @@ export function SupportChat() {
                 timestamp: new Date(),
               };
 
-              setMessages(prev => {
-                console.log('[Chat] Adding greeting to messages, current count:', prev.length);
-                return [...prev, newMessage];
-              });
+              setMessages(prev => [...prev, newMessage]);
               setNextMessageIn(nextMsgSeconds);
 
               // Update last AI message time
@@ -1439,7 +1415,7 @@ export function SupportChat() {
   // Reset timer when messages change or chat opens
   useEffect(() => {
     resetInactivityTimer();
-    
+
     // Cleanup on unmount
     return () => {
       if (inactivityTimerRef.current) {
@@ -1476,6 +1452,10 @@ export function SupportChat() {
     // Track when user last sent a message
     lastUserMessageTimeRef.current = Date.now();
 
+    // CRITICAL FIX: Clear proactive message countdown when user sends a message
+    // This prevents automated messages from interrupting active conversations
+    setNextMessageIn(null);
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -1506,20 +1486,37 @@ export function SupportChat() {
         console.error('[Chat] Request timeout after 60 seconds');
       }, 60000);
 
+      // DEEP RESEARCH LOGGING: Verify what we're sending
+      const payload = {
+        message: messageText.trim(),
+        history: messages, // Send FULL conversation history - no truncation
+        userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
+        pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
+        allSessions: sessions, // Send ALL previous sessions for this user
+        sessionId: currentSessionId,
+        sessionStartTime, // For accurate session length calculation
+        calculatorData: {
+          shootsPerWeek: calculatorContext.shootsPerWeek,
+          hoursPerShoot: calculatorContext.hoursPerShoot,
+          billableRate: calculatorContext.billableRate,
+          hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+          hasClickedPreset: calculatorContext.hasClickedPreset,
+        },
+      };
+
+      console.log('[DEEP RESEARCH] Sending to /api/chat/message:');
+      console.log('  - message length:', messageText.trim().length);
+      console.log('  - history:', messages.length, 'messages');
+      console.log('  - history[0]:', messages[0] ? JSON.stringify(messages[0]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history[last]:', messages.length > 0 ? JSON.stringify(messages[messages.length - 1]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - payload size:', JSON.stringify(payload).length, 'chars');
+
       const response = await fetch('/api/chat/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: messageText.trim(),
-          history: messages, // Send FULL conversation history - no truncation
-          userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
-          pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
-          allSessions: sessions, // Send ALL previous sessions for this user
-          sessionId: currentSessionId,
-          sessionStartTime, // For accurate session length calculation
-        }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
@@ -1587,13 +1584,24 @@ export function SupportChat() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              console.log('[Chat] Received event type:', data.type);
 
-              if (data.type === 'delta' && data.content) {
+              if (data.type === 'status' && data.message) {
+                // Display status message in real-time in the pending AI message
+                flushSync(() => {
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    const lastMsg = updated[updated.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                      lastMsg.content = data.message;
+                      lastMsg.isStreaming = true;
+                    }
+                    return updated;
+                  });
+                });
+              } else if (data.type === 'delta' && data.content) {
                 // Mark that we've received the first token
                 if (!firstTokenReceived) {
                   firstTokenReceived = true;
-                  console.log('[Chat] 🎉 First token received! Starting to stream...');
                 }
 
                 // If we already detected cutoff, ignore all further deltas
@@ -1602,29 +1610,6 @@ export function SupportChat() {
                 }
 
                 fullContent += data.content;
-                console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
-                
-                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
-                flushSync(() => {
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
-                });
-
-                // Check for first link and navigate immediately
-                if (!hasNavigated) {
-                  const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                  if (linkMatch) {
-                    const url = linkMatch[2];
-                    hasNavigated = true;
-                    // Navigate immediately!
-                    handleLinkClick(url);
-                  }
-                }
 
                 // Look for cutoff markers - check multiple patterns to ensure we catch metadata
                 let cutoffIndex = -1;
@@ -1633,12 +1618,12 @@ export function SupportChat() {
                 // 1. Unicode marker ␞ (U+241E)
                 const unicodeMarkerIdx = fullContent.indexOf('␞');
 
-                // 2. FOLLOW_UP_QUESTIONS with various formats (with or without newlines)
-                const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                // 2. QUICK_REPLIES with various formats (with or without newlines)
+                const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
                 const followUpMatch = fullContent.match(followUpPattern);
                 const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
 
-                // 3. NEXT_MESSAGE without FOLLOW_UP_QUESTIONS (in case AI skips that part)
+                // 3. NEXT_MESSAGE without QUICK_REPLIES (in case AI skips that part)
                 const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
                 const nextMsgMatch = fullContent.match(nextMsgPattern);
                 const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
@@ -1657,12 +1642,8 @@ export function SupportChat() {
                   const cleanContent = fullContent.substring(0, cutoffIndex).trim();
                   const questionsSection = fullContent.substring(cutoffIndex);
 
-                  console.log('[Chat] CUTOFF DETECTED at index:', cutoffIndex);
-                  console.log('[Chat] Clean content length:', cleanContent.length);
-                  console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
-
                   // Extract follow-up questions - look for the line after cutoff
-                  const followUpMatch = questionsSection.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+                  const followUpMatch = questionsSection.match(/QUICK_REPLIES:\s*([^\n]+)/i);
 
                   if (followUpMatch) {
                     const questionsText = followUpMatch[1];
@@ -1671,14 +1652,10 @@ export function SupportChat() {
                       .map((q: string) => q.trim())
                       .filter((q: string) => q.length > 5 && q.length < 200);
 
-                    console.log('[Chat] Extracted follow-up questions:', newQuestions);
-
                     if (newQuestions.length > 0) {
                       setQuickQuestions(newQuestions);
                       setShowSuggestions(true); // Show them by default when new questions arrive
                     }
-                  } else {
-                    console.log('[Chat] No follow-up questions found in:', questionsSection);
                   }
 
                   // Extract next message timing - ALWAYS set a countdown
@@ -1686,21 +1663,20 @@ export function SupportChat() {
                   let nextMsgSeconds = 45; // Default countdown
                   if (nextMessageMatch) {
                     nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-                    console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
-                  } else {
-                    console.log('[Chat] No NEXT_MESSAGE found, using default:', nextMsgSeconds, 'seconds');
                   }
                   // ALWAYS set the countdown
                   setNextMessageIn(nextMsgSeconds);
 
                   // Update message with clean content
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: cleanContent }
-                        : msg
-                    )
-                  );
+                  flushSync(() => {
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: cleanContent }
+                          : msg
+                      )
+                    );
+                  });
 
                   // Update fullContent so subsequent checks use clean version
                   fullContent = cleanContent;
@@ -1709,18 +1685,26 @@ export function SupportChat() {
                   continue;
                 }
 
-                // No cutoff yet, show all content - flush immediately for smooth streaming
-                console.log('[Chat] Updating message', assistantMessageId, 'with content length:', fullContent.length);
+                // Check for first link and navigate immediately (before UI update to avoid race)
+                if (!hasNavigated) {
+                  const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                  if (linkMatch) {
+                    const url = linkMatch[2];
+                    hasNavigated = true;
+                    // Navigate immediately!
+                    handleLinkClick(url);
+                  }
+                }
+
+                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
                 flushSync(() => {
-                  setMessages(prev => {
-                    const updated = prev.map(msg =>
+                  setMessages(prev =>
+                    prev.map(msg =>
                       msg.id === assistantMessageId
                         ? { ...msg, content: fullContent }
                         : msg
-                    );
-                    console.log('[Chat] Messages after update:', updated.length, 'Updated msg found:', updated.some(m => m.id === assistantMessageId));
-                    return updated;
-                  });
+                    )
+                  );
                 });
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
@@ -1737,7 +1721,7 @@ export function SupportChat() {
                 if (!cutoffDetected) {
                   // Use the same robust detection as in the stream loop
                   const unicodeMarkerIdx = fullContent.indexOf('␞');
-                  const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                  const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
                   const followUpMatch = fullContent.match(followUpPattern);
                   const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
                   const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
@@ -1748,8 +1732,6 @@ export function SupportChat() {
                   if (indices.length > 0) {
                     const cutoffIndex = Math.min(...indices);
                     const cleanContent = fullContent.substring(0, cutoffIndex).trim();
-
-                    console.log('[Chat] Final cleanup - cutoff detected at:', cutoffIndex);
 
                     setMessages(prev =>
                       prev.map(msg =>
@@ -1762,8 +1744,10 @@ export function SupportChat() {
                 }
               }
             } catch (e) {
-              // Skip invalid JSON lines
-              console.log('[Chat] Skipped invalid JSON line:', line.substring(0, 100));
+              // Skip invalid JSON lines - only log if it's actually an error
+              if (e instanceof Error) {
+                console.error('[Chat] Parse error:', e.message);
+              }
             }
           }
         }
@@ -1833,7 +1817,7 @@ export function SupportChat() {
 
     setCurrentSessionId(newSession.id);
 
-    // Reset quick questions to defaults
+    // Reset quick replies to defaults
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -1850,7 +1834,7 @@ export function SupportChat() {
   const handleSwitchSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
 
-    // Reset quick questions when switching
+    // Reset quick replies when switching
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -1880,7 +1864,7 @@ export function SupportChat() {
     // Switch to the new session
     setCurrentSessionId(newSessionId);
 
-    // Reset quick questions to defaults
+    // Reset quick replies to defaults
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -2116,6 +2100,7 @@ export function SupportChat() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
             {messages
               .filter(m => !m.content.includes('[Continue conversation naturally based on context]'))
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
               .map((message) => (
               <div
                 key={message.id}
@@ -2171,7 +2156,7 @@ export function SupportChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Questions with toggle */}
+          {/* Quick Replies with toggle */}
           <div className="border-t border-border bg-muted/30">
             <button
               onClick={() => setShowSuggestions(!showSuggestions)}
@@ -2179,7 +2164,7 @@ export function SupportChat() {
               data-testid="button-toggle-suggestions"
             >
               <p className="text-xs font-semibold text-muted-foreground">
-                Suggested Questions ({quickQuestions.length})
+                Quick Replies ({quickQuestions.length})
               </p>
               {showSuggestions ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -2212,7 +2197,13 @@ export function SupportChat() {
               <input
                 type="text"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  // CRITICAL FIX: Pause automated messages when user is typing
+                  // Update last activity time so proactive messages don't interrupt
+                  lastActivityTimeRef.current = Date.now();
+                  lastUserMessageTimeRef.current = Date.now();
+                }}
                 placeholder="Type your message..."
                 className="flex-1 bg-background border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 data-testid="input-chat-message"

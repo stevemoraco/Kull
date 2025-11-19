@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Zap, Sparkles, Star } from "lucide-react";
+import { Download, Sparkles, Star } from "lucide-react";
 import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 function getRelativeTime(dateString: string): string {
@@ -38,9 +38,9 @@ export function Hero() {
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20 text-center">
-        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4" data-testid="badge-announcement">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Start your unlimited free trial now</span>
+        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4 max-w-[90vw]" data-testid="badge-announcement">
+          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+          <span className="text-sm font-semibold text-foreground text-center leading-tight">Edit Unlimited Photoshoots<br className="md:hidden" /> With Our Risk Free Trial</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-hero-headline">
@@ -159,14 +159,23 @@ export function Hero() {
             onClick={handleStartTrial}
             data-testid="button-start-trial-hero"
           >
-            <Zap className="w-5 h-5 mr-2" />
-            Start Free Trial Now
+            <Download className="w-5 h-5 mr-2" />
+            Download Kull Free
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="text-lg h-14 px-8 min-w-[240px] bg-background/80 backdrop-blur-sm"
             data-testid="button-watch-demo"
+            onClick={() => {
+              const element = document.getElementById('features');
+              if (element) {
+                const offset = 80;
+                const elementPosition = element.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - offset;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+              }
+            }}
           >
             Watch Demo
           </Button>

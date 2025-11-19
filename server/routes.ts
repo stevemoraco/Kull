@@ -679,7 +679,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     try {
-      const { message, history, userActivity, pageVisits, allSessions, sessionId } = req.body;
+      const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
+
+      // DEEP RESEARCH LOGGING: Verify history transmission
+      console.log('[DEEP RESEARCH] /api/chat/message received:');
+      console.log('  - message length:', message?.length || 0);
+      console.log('  - history:', history ? `${history.length} messages` : 'undefined/null');
+      console.log('  - history[0]:', history?.[0] ? JSON.stringify(history[0]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history[last]:', history?.length > 0 ? JSON.stringify(history[history.length - 1]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - req.body size estimate:', JSON.stringify(req.body).length, 'chars');
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
@@ -741,6 +749,34 @@ ${recentActivity.slice(-5).map((a: any) => `  - ${a.action}: ${a.target}`).join(
 
       // Build rich markdown context for user activity (same as welcome endpoint)
       let userActivityMarkdown = userMetadataMarkdown;
+
+      // Add calculator data context
+      if (calculatorData) {
+        const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = calculatorData;
+        const annualShoots = shootsPerWeek * 52;
+        const annualHours = shootsPerWeek * hoursPerShoot * 52;
+        const annualCost = annualHours * billableRate;
+        const weeksSaved = annualHours / 40;
+
+        userActivityMarkdown += `\n\n## 💰 Calculator Data (Real-Time)
+
+User's current calculator inputs:
+- **Shoots per Week:** ${shootsPerWeek}
+- **Hours per Shoot (Culling):** ${hoursPerShoot}
+- **Billable Rate:** $${billableRate}/hour
+- **Has Manually Adjusted:** ${hasManuallyAdjusted ? 'Yes' : 'No'}
+- **Has Clicked Preset:** ${hasClickedPreset ? 'Yes' : 'No'}
+
+**Calculated Metrics:**
+- **Annual Shoots:** ${annualShoots} shoots/year
+- **Annual Hours Wasted on Culling:** ${Math.round(annualHours)} hours/year
+- **Annual Cost of Manual Culling:** $${Math.round(annualCost).toLocaleString()}/year
+- **Work Weeks Saved:** ${weeksSaved.toFixed(1)} weeks/year
+
+**IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
+`;
+      }
+
       if (userActivity && userActivity.length > 0) {
         userActivityMarkdown += `\n\n## 🖱️ User Activity History
 
@@ -776,15 +812,40 @@ ${userActivity.map((event: any, idx: number) => {
 
       // Set up Server-Sent Events headers
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if present
+      // Send initial newline to establish connection
+      res.write('\n');
+      res.flushHeaders(); // Ensure headers are sent immediately
+
+      // Disable TCP Nagle's algorithm for immediate transmission
+      if (res.socket) {
+        res.socket.setNoDelay(true);
+      }
+
+      // Step 1: Collecting user context
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '📊 collecting your activity data...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
+
+      // Step 2: Building prompt
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '📝 appending to cached prompt...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
 
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
 
-      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId);
+      // Step 3: Calling OpenAI
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '🤖 calling openai with cached context...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
+      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string) => {
+        // Callback for chatService to send status updates
+        res.write(`data: ${JSON.stringify({ type: 'status', message: status })}\n\n`);
+        if (res.socket) res.socket.uncork();
+      });
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -794,6 +855,7 @@ ${userActivity.map((event: any, idx: number) => {
       let tokensOut = 0;
       let cachedTokensIn = 0;
       let cost = 0;
+      let firstTokenReceived = false;
 
       try {
         // Stream processing
@@ -829,9 +891,18 @@ ${userActivity.map((event: any, idx: number) => {
                   
                   // Extract content delta
                   if (choice.delta?.content) {
+                    // First token received!
+                    if (!firstTokenReceived) {
+                      res.write(`data: ${JSON.stringify({ type: 'status', message: '✨ streaming reply...' })}\n\n`);
+                      if (res.socket) res.socket.uncork();
+                      firstTokenReceived = true;
+                    }
+
                     fullResponse += choice.delta.content;
                     // Forward to client immediately
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
+                    // Force immediate transmission - bypass Node.js buffering
+                    if (res.socket) res.socket.uncork();
                   }
                   
                   // Check for finish_reason and usage data (silent)
@@ -857,6 +928,8 @@ ${userActivity.map((event: any, idx: number) => {
                 if (data.error) {
                   const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  // Force immediate transmission
+                  if (res.socket) res.socket.uncork();
                 }
               } catch (e) {
                 // Skip invalid JSON lines (silent)
@@ -866,7 +939,7 @@ ${userActivity.map((event: any, idx: number) => {
         }
 
         // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
         const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
         const hasUnicodeMarker = fullResponse.includes('␞');
 
@@ -876,6 +949,8 @@ ${userActivity.map((event: any, idx: number) => {
 
         // Signal completion
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
 
         // Track support query in database
         const userEmail = req.user?.claims?.email;
@@ -974,6 +1049,8 @@ ${userActivity.map((event: any, idx: number) => {
       } catch (streamError) {
         console.error('[Chat] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
         res.end();
       }
     } catch (error: any) {
@@ -987,7 +1064,7 @@ ${userActivity.map((event: any, idx: number) => {
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context, history, lastAiMessageTime, currentTime, sessionId } = req.body;
+      const { context, history, lastAiMessageTime, currentTime, sessionId, calculatorData } = req.body;
 
       // Silent mode - only log errors
 
@@ -1152,6 +1229,25 @@ ${context.webglRenderer !== 'unknown' ? `- **GPU:** ${context.webglRenderer}` : 
 - **Local Storage:** ${context.localStorageAvailable ? 'Available' : 'Blocked'}
 - **Session Storage:** ${context.sessionStorageAvailable ? 'Available' : 'Blocked'}
 
+${calculatorData ? `
+## 💰 Calculator Data (Real-Time)
+
+User's current calculator inputs:
+- **Shoots per Week:** ${calculatorData.shootsPerWeek}
+- **Hours per Shoot (Culling):** ${calculatorData.hoursPerShoot}
+- **Billable Rate:** $${calculatorData.billableRate}/hour
+- **Has Manually Adjusted:** ${calculatorData.hasManuallyAdjusted ? 'Yes' : 'No'}
+- **Has Clicked Preset:** ${calculatorData.hasClickedPreset ? 'Yes' : 'No'}
+
+**Calculated Metrics:**
+- **Annual Shoots:** ${calculatorData.shootsPerWeek * 52} shoots/year
+- **Annual Hours Wasted on Culling:** ${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52)} hours/year
+- **Annual Cost of Manual Culling:** $${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52 * calculatorData.billableRate).toLocaleString()}/year
+- **Work Weeks Saved:** ${((calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52) / 40).toFixed(1)} weeks/year
+
+**IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
+` : ''}
+
 ## 🖱️ User Activity History
 ${context.userActivity && context.userActivity.length > 0 ? `
 Recent interactions (last ${context.userActivity.length} events):
@@ -1310,12 +1406,12 @@ You have access to:
 **REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP):**
 You MUST ALWAYS end EVERY response with these EXACT TWO lines:
 
-␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
+␞QUICK_REPLIES: question1 | question2 | question3 | question4
 ␞NEXT_MESSAGE: X
 
 CRITICAL REQUIREMENTS:
 - Start each line with the exact character "␞" (Unicode U+241E) - NO EXCEPTIONS
-- FOLLOW_UP_QUESTIONS = These are questions the USER would TYPE INTO THE CHAT to ask YOU (the AI assistant)
+- QUICK_REPLIES = These are questions the USER would TYPE INTO THE CHAT to ask YOU (the AI assistant)
 - Think: "What questions might the user want to ask me next based on what they're viewing?"
 - These are NOT questions you're asking the user - they're questions FOR the user TO ASK you
 - Format them as if the user is typing them: "How does X work?" NOT "How many X do you have?"
@@ -1327,11 +1423,11 @@ CRITICAL REQUIREMENTS:
 CORRECT EXAMPLE - Questions user asks YOU:
 Your 1-2 sentence message here...
 
-␞FOLLOW_UP_QUESTIONS: How does AI culling work? | What are the pricing options? | Can I try it for free? | Does it work with Lightroom?
+␞QUICK_REPLIES: How does AI culling work? | What are the pricing options? | Can I try it for free? | Does it work with Lightroom?
 ␞NEXT_MESSAGE: 45
 
 WRONG EXAMPLE - DO NOT DO THIS:
-␞FOLLOW_UP_QUESTIONS: How many shoots do you run weekly? | How long does culling take you now? | Want me to run an ROI estimate? | What's your budget?
+␞QUICK_REPLIES: How many shoots do you run weekly? | How long does culling take you now? | Want me to run an ROI estimate? | What's your budget?
 (These are backwards - you're asking the user, not the user asking you!)
 
 **Examples of VARIED, specific messages (NEVER repeat same angle):**
@@ -1410,10 +1506,18 @@ ${repoContent}
 
 ${contextMarkdown}`;
 
-      // Pass empty history array since we've already included it in the prompt
+      // CRITICAL FIX: Pass the actual history array so AI can track conversation properly
+      // Convert history to ChatMessage format expected by getChatResponseStream
+      const formattedHistory = history && Array.isArray(history)
+        ? history.map((msg: any) => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: msg.content
+          }))
+        : [];
+
       const stream = await getChatResponseStream(
         fullContextMarkdown,
-        [],
+        formattedHistory, // FIXED: Pass actual history, not empty array
         preferredModel,
         undefined, // userActivityMarkdown
         undefined, // pageVisits
@@ -1423,8 +1527,17 @@ ${contextMarkdown}`;
       );
 
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if present
+      // Send initial newline to establish connection
+      res.write('\n');
+      res.flushHeaders(); // Ensure headers are sent immediately
+
+      // Disable TCP Nagle's algorithm for immediate transmission
+      if (res.socket) {
+        res.socket.setNoDelay(true);
+      }
 
       // Track the full response for analytics
       let fullResponse = '';
@@ -1471,6 +1584,8 @@ ${contextMarkdown}`;
                   if (choice.delta?.content) {
                     fullResponse += choice.delta.content;
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
+                    // Force immediate transmission - bypass Node.js buffering
+                    if (res.socket) res.socket.uncork();
                   }
                   
                   // Stream finished - no logging needed
@@ -1488,6 +1603,8 @@ ${contextMarkdown}`;
                   console.error('[Welcome] OpenAI error:', data.error);
                   const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  // Force immediate transmission
+                  if (res.socket) res.socket.uncork();
                 }
               } catch (e) {
                 console.error('[Welcome] JSON parse error:', e, 'Line:', line);
@@ -1497,7 +1614,7 @@ ${contextMarkdown}`;
         }
 
         // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
         const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
         const hasUnicodeMarker = fullResponse.includes('␞');
 
@@ -1506,6 +1623,8 @@ ${contextMarkdown}`;
         }
 
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
 
         // Track welcome greeting in database
         const userEmail = req.user?.claims?.email;
@@ -1598,6 +1717,8 @@ ${contextMarkdown}`;
       } catch (streamError) {
         console.error('[Welcome] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
         res.end();
       }
     } catch (error: any) {
