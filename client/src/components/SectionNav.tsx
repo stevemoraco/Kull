@@ -91,21 +91,10 @@ export function SectionNav() {
     return () => observer.disconnect();
   }, []);
 
-  // Show mobile nav and auto-collapse when scrolling
+  // Show mobile nav immediately
   useEffect(() => {
-    // Show nav immediately
     setShowMobileNav(true);
-
-    const handleScroll = () => {
-      // Auto-collapse when scrolling
-      if (isMobileExpanded) {
-        setIsMobileExpanded(false);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobileExpanded]);
+  }, []);
 
   // Close mobile nav when clicking outside
   useEffect(() => {
@@ -187,7 +176,7 @@ export function SectionNav() {
 
       {/* Mobile floating side navigation */}
       {showMobileNav && (
-        <nav className="xl:hidden fixed left-0 top-1/2 -translate-y-1/2 z-40" ref={mobileNavRef}>
+        <nav className="xl:hidden fixed left-0 top-[70%] -translate-y-1/2 z-40" ref={mobileNavRef}>
           {isMobileExpanded ? (
             // Expanded state - show all sections with labels
             <div className="bg-card/60 backdrop-blur-md border-r border-t border-b border-border/30 rounded-r-2xl py-2 pl-2 pr-1 shadow-2xl animate-in fade-in zoom-in duration-200">
