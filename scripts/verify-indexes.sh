@@ -100,7 +100,7 @@ echo "--------------------------------------"
 psql "$DATABASE_URL" -c "
 SELECT
     schemaname,
-    tablename,
+    relname as tablename,
     seq_scan as sequential_scans,
     seq_tup_read as rows_read_sequentially,
     idx_scan as index_scans,
@@ -111,7 +111,7 @@ SELECT
     END as index_usage_percentage
 FROM pg_stat_user_tables
 WHERE schemaname = 'public'
-    AND tablename IN (
+    AND relname IN (
         'chat_sessions', 'support_queries', 'page_visits',
         'credit_transactions', 'device_sessions', 'referrals',
         'shoot_reports', 'shoot_progress'
@@ -128,7 +128,7 @@ SELECT
     pg_size_pretty(SUM(pg_relation_size(indexrelid))::bigint) as total_size
 FROM pg_stat_user_indexes
 WHERE schemaname = 'public'
-    AND tablename IN (
+    AND relname IN (
         'chat_sessions', 'support_queries', 'page_visits',
         'credit_transactions', 'device_sessions', 'referrals',
         'shoot_reports', 'shoot_progress'

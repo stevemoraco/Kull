@@ -70,7 +70,7 @@ function isResponseDuplicate(sessionId: string, content: string): { isDuplicate:
   deduplicationStats.totalChecks++;
 
   // Clean old entries
-  for (const [k, v] of recentMessageCache.entries()) {
+  for (const [k, v] of Array.from(recentMessageCache.entries())) {
     if (now - v.timestamp > DUPLICATE_WINDOW_MS) {
       recentMessageCache.delete(k);
     }
@@ -745,9 +745,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
-    try {
-      const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
+    // Extract request body variables outside try block for catch block access
+    const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
 
+    // Initialize preferredModel outside try block for catch block access
+    let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
+
+    try {
       // Request received - minimal logging
 
       if (!message || typeof message !== 'string') {
@@ -756,7 +760,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get chat model - priority: global setting > user preference > default
       const userId = req.user?.claims?.sub;
-      let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
 
       try {
         // First check global admin setting (platform-wide)

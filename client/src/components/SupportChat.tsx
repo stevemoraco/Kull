@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2, Play, Pause } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2, Play, Pause, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -359,6 +360,7 @@ export function SupportChat() {
   // Load all chat sessions
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const loadedSessions = loadSessions();
+    console.log(`[Chat] Initial load: ${loadedSessions.length} sessions from localStorage`);
     if (loadedSessions.length === 0) {
       // Create initial persistent session with empty messages - greetings will be added via popover
       const initialSession: ChatSession = {
@@ -514,6 +516,7 @@ export function SupportChat() {
         // Also save back to DB to sync any local-only sessions
         await saveSessionsToDatabase(mergedSessions);
         console.log(`[Chat] Loaded and merged ${mergedSessions.length} sessions from database`);
+        console.log(`[Chat] DB sessions: ${dbSessions.length}, Local: ${localSessions.length}, Merged: ${mergedSessions.length}`);
       }
     } catch (error) {
       console.error('[Chat] Failed to load sessions from database:', error);
@@ -552,6 +555,7 @@ export function SupportChat() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isProactiveMessagesPaused, setIsProactiveMessagesPaused] = useState(false);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const isProactiveMessagesPausedRef = useRef(false); // Ref to access current pause state
   const lastAiMessageTimeRef = useRef<number>(Date.now()); // Track when AI last spoke
 
@@ -1082,11 +1086,42 @@ export function SupportChat() {
                 const data = JSON.parse(line.slice(6));
 
                 if (data.type === 'status' && data.message) {
-                  // Display status message in real-time
+                  console.log('[WELCOME STATUS]', data.message);
+                  // Concatenate status messages so user sees timeline
                   flushSync(() => {
-                    setLatestGreeting(data.message);
+                    setLatestGreeting(prev => {
+                      // Start fresh if we have actual content already (not status)
+                      // Status emojis: 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
+                      const hasRealContent = prev &&
+                        !prev.includes('📊') &&
+                        !prev.includes('📝') &&
+                        !prev.includes('✅') &&
+                        !prev.includes('🤖') &&
+                        !prev.includes('⏳') &&
+                        !prev.includes('🗂️') &&
+                        !prev.includes('⚠️');
+
+                      console.log('[WELCOME STATUS] Current greeting:', prev);
+                      console.log('[WELCOME STATUS] hasRealContent:', hasRealContent);
+
+                      if (hasRealContent) {
+                        console.log('[WELCOME STATUS] Real content detected, starting fresh');
+                        return data.message + '\n';
+                      }
+                      // Append to existing status messages
+                      const newGreeting = (prev || '') + data.message + '\n';
+                      console.log('[WELCOME STATUS] New greeting:', newGreeting);
+                      return newGreeting;
+                    });
                   });
                 } else if (data.type === 'delta' && data.content) {
+                  // Clear status messages when first real content arrives
+                  if (fullContent.includes('📊') || fullContent.includes('📝') || fullContent.includes('✅') ||
+                      fullContent.includes('🤖') || fullContent.includes('⏳') || fullContent.includes('🗂️') ||
+                      fullContent.includes('⚠️')) {
+                    fullContent = '';
+                  }
+
                   fullContent += data.content;
 
                   // STREAM TO UI - update greeting in real-time with immediate flush
@@ -1158,6 +1193,7 @@ export function SupportChat() {
 
             // Show popover if chat is closed
             if (!currentIsOpen) {
+              console.log('[Chat] Showing initial greeting popover - chat is closed');
               setPopoverGreeting(cleanContent);
               setShowGreetingPopover(true);
 
@@ -1165,44 +1201,37 @@ export function SupportChat() {
               setTimeout(() => {
                 if (isActive) setShowGreetingPopover(false);
               }, 10000);
-            } else if (!isProactiveMessagesPausedRef.current) {
-              // Chat is open and not paused - add as first message
-              const newMessage: Message = {
-                id: 'context-' + Date.now(),
-                role: 'assistant',
-                content: cleanContent,
-                timestamp: new Date(),
-              };
-              setMessages(prev => [...prev, newMessage]);
-              lastAiMessageTimeRef.current = Date.now();
+            } else {
+              // Chat is open - DON'T send greeting immediately
+              // User just opened chat, let them browse/read first
+              console.log('[Chat] Initial greeting skipped - chat is open, waiting for user inactivity');
             }
           } else {
             // Subsequent generations
             const timeSinceLastUserMessage = Date.now() - lastUserMessageTimeRef.current;
+            const timeSinceLastActivity = Date.now() - lastActivityTimeRef.current;
+            const ONE_MINUTE = 60000; // 60 seconds in milliseconds
 
             // Double-check pause state before adding message (in case pause was activated during generation)
             if (isProactiveMessagesPausedRef.current) {
+              console.log('[Chat] Greeting blocked - proactive messages paused');
               return;
             }
 
-            if (currentIsOpen && timeSinceLastUserMessage > 20000) {
-              // Chat is open: add as new message to conversation
-              const newMessage: Message = {
-                id: 'context-' + Date.now(),
-                role: 'assistant',
-                content: cleanContent,
-                timestamp: new Date(),
-              };
+            // Only send greetings if user has been inactive for at least 1 minute
+            const userIsInactive = timeSinceLastUserMessage > ONE_MINUTE && timeSinceLastActivity > ONE_MINUTE;
 
-              setMessages(prev => [...prev, newMessage]);
-              setNextMessageIn(nextMsgSeconds);
+            if (!userIsInactive) {
+              console.log('[Chat] Greeting blocked - user active recently (last message: ' +
+                Math.round(timeSinceLastUserMessage / 1000) + 's ago, last activity: ' +
+                Math.round(timeSinceLastActivity / 1000) + 's ago)');
+              return;
+            }
 
-              // Update last AI message time
-              lastAiMessageTimeRef.current = Date.now();
-
-              // Note: Welcome messages don't auto-navigate, only user chat responses do
-              // No toast notifications - rely on popover when chat is closed
-            } else if (!currentIsOpen) {
+            // Only show greeting if chat is CLOSED
+            // Don't interrupt user when chat is open - they're engaged!
+            if (!currentIsOpen) {
+              console.log('[Chat] Showing greeting popover - chat closed and user inactive for 1+ minute');
               // Chat is closed: show popover instead
               setPopoverGreeting(cleanContent);
               setShowGreetingPopover(true);
@@ -1212,6 +1241,8 @@ export function SupportChat() {
               setTimeout(() => {
                 if (isActive) setShowGreetingPopover(false);
               }, 10000);
+            } else {
+              console.log('[Chat] Greeting blocked - chat is open (user may be reading)');
             }
           }
         }
@@ -1464,7 +1495,15 @@ export function SupportChat() {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // CRITICAL FIX: Add user message and capture FRESH state in one step
+    // This ensures we get the absolute latest state including the new message
+    let freshHistory: Message[] = [];
+    setMessages(prev => {
+      const updated = [...prev, userMessage];
+      freshHistory = updated; // Capture fresh state
+      return updated;
+    });
+
     setInputValue('');
     setIsLoading(true);
 
@@ -1490,7 +1529,7 @@ export function SupportChat() {
       // DEEP RESEARCH LOGGING: Verify what we're sending
       const payload = {
         message: messageText.trim(),
-        history: messages, // Send FULL conversation history - no truncation
+        history: freshHistory, // ✅ Send FRESH history including the new user message!
         userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
         pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
         allSessions: sessions, // Send ALL previous sessions for this user
@@ -1507,15 +1546,18 @@ export function SupportChat() {
 
       console.log('[DEEP RESEARCH] Sending to /api/chat/message:');
       console.log('  - message length:', messageText.trim().length);
-      console.log('  - history:', messages.length, 'messages');
-      console.log('  - history[0]:', messages[0] ? JSON.stringify(messages[0]).substring(0, 100) + '...' : 'N/A');
-      console.log('  - history[last]:', messages.length > 0 ? JSON.stringify(messages[messages.length - 1]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history:', freshHistory.length, 'messages (FRESH - captured at millisecond precision)');
+      console.log('  - VERIFICATION: Last message in history IS the user message just sent:',
+        freshHistory[freshHistory.length - 1]?.content === messageText.trim() ? '✅ YES' : '❌ NO - STALE!');
+      console.log('  - history[0]:', freshHistory[0] ? JSON.stringify(freshHistory[0]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history[last]:', freshHistory.length > 0 ? JSON.stringify(freshHistory[freshHistory.length - 1]).substring(0, 100) + '...' : 'N/A');
       console.log('  - payload size:', JSON.stringify(payload).length, 'chars');
 
       const response = await fetch('/api/chat/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+        credentials: 'include', // Include auth cookies
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -1587,13 +1629,43 @@ export function SupportChat() {
               const data = JSON.parse(line.slice(6));
 
               if (data.type === 'status' && data.message) {
-                // Display status message in real-time in the pending AI message
+                console.log('[STATUS UPDATE]', data.message);
+                // Concatenate status messages to show full timeline
                 flushSync(() => {
                   setMessages(prev => {
                     const updated = [...prev];
                     const lastMsg = updated[updated.length - 1];
                     if (lastMsg && lastMsg.role === 'assistant') {
-                      lastMsg.content = data.message;
+                      // Check if content already has real text (not status or thinking marker)
+                      // Status emojis: 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
+                      const isStatusOrThinking = !lastMsg.content ||
+                        lastMsg.content === '__THINKING__' ||
+                        lastMsg.content.includes('📊') ||
+                        lastMsg.content.includes('📝') ||
+                        lastMsg.content.includes('✅') ||
+                        lastMsg.content.includes('🤖') ||
+                        lastMsg.content.includes('⏳') ||
+                        lastMsg.content.includes('🗂️') ||
+                        lastMsg.content.includes('⚠️');
+
+                      console.log('[STATUS] Current content:', lastMsg.content);
+                      console.log('[STATUS] isStatusOrThinking:', isStatusOrThinking);
+
+                      if (!isStatusOrThinking) {
+                        // Real content has started, ignore further status updates
+                        console.log('[STATUS] Ignoring - real content detected');
+                        return updated;
+                      }
+
+                      // Replace __THINKING__ with first status, or append to existing status
+                      if (lastMsg.content === '__THINKING__') {
+                        console.log('[STATUS] Replacing __THINKING__ with first status');
+                        lastMsg.content = data.message + '\n';
+                      } else {
+                        console.log('[STATUS] Appending to existing status');
+                        lastMsg.content = (lastMsg.content || '') + data.message + '\n';
+                      }
+                      console.log('[STATUS] New content:', lastMsg.content);
                     }
                     return updated;
                   });
@@ -1602,6 +1674,8 @@ export function SupportChat() {
                 // Mark that we've received the first token
                 if (!firstTokenReceived) {
                   firstTokenReceived = true;
+                  // Clear status messages when real content starts
+                  fullContent = '';
                 }
 
                 // If we already detected cutoff, ignore all further deltas
@@ -2037,40 +2111,83 @@ export function SupportChat() {
                     <span className="text-xs font-medium">History</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 z-[10000]">
-                  <DropdownMenuLabel>Chat History</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-80 max-h-[500px] z-[10000]">
+                  <DropdownMenuLabel>Chat History ({sessions.length} total)</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+
+                  {/* Search Input */}
+                  <div className="px-2 pb-2">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search conversations..."
+                        value={sessionSearchQuery}
+                        onChange={(e) => setSessionSearchQuery(e.target.value)}
+                        className="pl-8 h-9"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+
                   <DropdownMenuItem onClick={handleNewSession} data-testid="button-new-chat">
                     <Plus className="w-4 h-4 mr-2" />
                     New Chat
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  {sessions.length > 0 ? (
-                    sessions
-                      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                      .map((session) => (
-                        <DropdownMenuItem
-                          key={session.id}
-                          onClick={() => handleSwitchSession(session.id)}
-                          className={session.id === currentSessionId ? 'bg-accent' : ''}
-                          data-testid={`session-${session.id}`}
-                        >
-                          <div className="flex flex-col gap-1 w-full">
-                            <div className="font-medium truncate">{session.title}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(session.updatedAt).toLocaleDateString([], {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))
-                  ) : (
-                    <DropdownMenuItem disabled>No chat history</DropdownMenuItem>
-                  )}
+
+                  {/* Scrollable Session List */}
+                  <div className="max-h-[350px] overflow-y-auto">
+                    {sessions.length > 0 ? (
+                      (() => {
+                        const filteredSessions = sessions
+                          .filter((session) =>
+                            sessionSearchQuery.trim() === '' ||
+                            session.title.toLowerCase().includes(sessionSearchQuery.toLowerCase()) ||
+                            session.messages.some(m =>
+                              m.content.toLowerCase().includes(sessionSearchQuery.toLowerCase())
+                            )
+                          )
+                          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+                        return filteredSessions.length > 0 ? (
+                          filteredSessions.map((session) => (
+                            <DropdownMenuItem
+                              key={session.id}
+                              onClick={() => {
+                                handleSwitchSession(session.id);
+                                setSessionSearchQuery(''); // Clear search on select
+                              }}
+                              className={session.id === currentSessionId ? 'bg-accent' : ''}
+                              data-testid={`session-${session.id}`}
+                            >
+                              <div className="flex flex-col gap-1 w-full">
+                                <div className="font-medium truncate">{session.title}</div>
+                                <div className="text-xs text-muted-foreground flex items-center justify-between">
+                                  <span>
+                                    {new Date(session.updatedAt).toLocaleDateString([], {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </span>
+                                  <span className="text-xs opacity-60">
+                                    {session.messages.length} msg{session.messages.length !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))
+                        ) : (
+                          <DropdownMenuItem disabled>
+                            No sessions match "{sessionSearchQuery}"
+                          </DropdownMenuItem>
+                        );
+                      })()
+                    ) : (
+                      <DropdownMenuItem disabled>No chat history</DropdownMenuItem>
+                    )}
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
@@ -2081,7 +2198,7 @@ export function SupportChat() {
                 data-testid="button-reset-chat"
               >
                 <RotateCcw className="w-4 h-4 mr-1.5" />
-                <span className="text-xs font-medium">Clear Chat</span>
+                <span className="text-xs font-medium">New Chat</span>
               </Button>
               <Button
                 variant="ghost"
@@ -2122,11 +2239,20 @@ export function SupportChat() {
                           <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
                           <span className="text-teal-700 italic">Generating your personalized greeting...</span>
                         </div>
-                      ) : message.content === '__THINKING__' ? (
-                        // Special rendering for thinking placeholder
+                      ) : message.content === '__THINKING__' ||
+                          message.content.includes('📊') ||
+                          message.content.includes('📝') ||
+                          message.content.includes('✅') ||
+                          message.content.includes('🤖') ||
+                          message.content.includes('⏳') ||
+                          message.content.includes('🗂️') ||
+                          message.content.includes('⚠️') ? (
+                        // Special rendering for status messages - show actual status text with timestamps
                         <div className="flex items-start gap-3 border-l-4 border-teal-400 pl-3 py-1 bg-teal-50/50 rounded-r">
                           <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-teal-700 italic">Thinking...</span>
+                          <span className="text-teal-700 text-xs font-mono whitespace-pre-wrap">
+                            {message.content === '__THINKING__' ? 'Thinking...' : message.content}
+                          </span>
                         </div>
                       ) : message.content.length === 0 ? (
                         // Waiting for first token

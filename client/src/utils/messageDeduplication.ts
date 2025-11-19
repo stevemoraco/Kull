@@ -53,7 +53,7 @@ class MessageDeduplicationManager {
     }
 
     // Check for near-duplicates in recent messages (same content, close timing)
-    for (const [id, recentMsg] of this.recentMessages.entries()) {
+    for (const [id, recentMsg] of Array.from(this.recentMessages.entries())) {
       if (areMessagesDuplicate(message, recentMsg)) {
         this.duplicateCount++;
         console.warn('[Dedup] Duplicate message detected by similarity to:', id);
@@ -68,7 +68,9 @@ class MessageDeduplicationManager {
     // Limit memory usage - keep only last 100 messages
     if (this.recentMessages.size > 100) {
       const oldestKey = this.recentMessages.keys().next().value;
-      this.recentMessages.delete(oldestKey);
+      if (oldestKey !== undefined) {
+        this.recentMessages.delete(oldestKey);
+      }
     }
 
     return false;

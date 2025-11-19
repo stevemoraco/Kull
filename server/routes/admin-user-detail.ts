@@ -95,7 +95,7 @@ router.get('/:userId/details', async (req: Request, res: Response) => {
         timestamp: visit.createdAt,
         data: { page: visit.page, referrer: visit.referrer }
       })),
-      ...sessionsWithDetails.map(session => ({
+      ...sessionsWithDetails.map((session: any) => ({
         type: 'chat_session',
         timestamp: session.createdAt,
         data: { title: session.title, messageCount: session.messageCount }
@@ -116,7 +116,7 @@ router.get('/:userId/details', async (req: Request, res: Response) => {
       mentions: [] as any[]
     };
 
-    sessionsWithDetails.forEach(session => {
+    sessionsWithDetails.forEach((session: any) => {
       session.messages.forEach((msg: any) => {
         if (msg.role === 'user') {
           const content = msg.content.toLowerCase();

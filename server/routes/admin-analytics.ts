@@ -73,36 +73,36 @@ router.get('/aggregate', async (req, res) => {
     const calculatorMetrics = {
       totalInteractions: calculatorData.length,
       averageShootsPerWeek: calculatorData.length > 0
-        ? calculatorData.reduce((sum, row) => sum + row.shootsPerWeek, 0) / calculatorData.length
+        ? calculatorData.reduce((sum: number, row: any) => sum + row.shootsPerWeek, 0) / calculatorData.length
         : 0,
       averageHoursPerShoot: calculatorData.length > 0
-        ? calculatorData.reduce((sum, row) => sum + row.hoursPerShoot, 0) / calculatorData.length
+        ? calculatorData.reduce((sum: number, row: any) => sum + row.hoursPerShoot, 0) / calculatorData.length
         : 0,
       averageBillableRate: calculatorData.length > 0
-        ? calculatorData.reduce((sum, row) => sum + row.billableRate, 0) / calculatorData.length
+        ? calculatorData.reduce((sum: number, row: any) => sum + row.billableRate, 0) / calculatorData.length
         : 0,
       percentageManuallyAdjusted: calculatorData.length > 0
-        ? (calculatorData.filter(row => row.hasManuallyAdjusted).length / calculatorData.length) * 100
+        ? (calculatorData.filter((row: any) => row.hasManuallyAdjusted).length / calculatorData.length) * 100
         : 0,
       percentageClickedPresets: calculatorData.length > 0
-        ? (calculatorData.filter(row => row.hasClickedPreset).length / calculatorData.length) * 100
+        ? (calculatorData.filter((row: any) => row.hasClickedPreset).length / calculatorData.length) * 100
         : 0,
       presetDistribution: {
-        less: calculatorData.filter(row => row.presetClicked === 'less').length,
-        more: calculatorData.filter(row => row.presetClicked === 'more').length,
-        none: calculatorData.filter(row => !row.presetClicked).length,
+        less: calculatorData.filter((row: any) => row.presetClicked === 'less').length,
+        more: calculatorData.filter((row: any) => row.presetClicked === 'more').length,
+        none: calculatorData.filter((row: any) => !row.presetClicked).length,
       },
       // Value distributions (for histograms)
       shootsPerWeekDistribution: getDistribution(
-        calculatorData.map(r => r.shootsPerWeek),
+        calculatorData.map((r: any) => r.shootsPerWeek),
         [0, 1, 2, 3, 4, 5, 10, 20]
       ),
       hoursPerShootDistribution: getDistribution(
-        calculatorData.map(r => r.hoursPerShoot),
+        calculatorData.map((r: any) => r.hoursPerShoot),
         [0, 0.5, 1, 1.5, 2, 3, 4, 6, 8]
       ),
       billableRateDistribution: getDistribution(
-        calculatorData.map(r => r.billableRate),
+        calculatorData.map((r: any) => r.billableRate),
         [0, 20, 35, 50, 75, 100, 150, 200, 500, 1000]
       ),
     };
@@ -124,7 +124,7 @@ router.get('/aggregate', async (req, res) => {
       .execute();
 
     // Group steps by session
-    const stepsBySession = steps.reduce((acc, step) => {
+    const stepsBySession = steps.reduce((acc: Record<string, typeof steps>, step: any) => {
       if (!acc[step.sessionId]) acc[step.sessionId] = [];
       acc[step.sessionId].push(step);
       return acc;
@@ -135,22 +135,22 @@ router.get('/aggregate', async (req, res) => {
     const stepDropoffs: Record<number, number> = {};
 
     for (let i = 1; i <= 15; i++) {
-      stepCounts[i] = steps.filter(s => s.stepNumber === i).length;
+      stepCounts[i] = steps.filter((s: any) => s.stepNumber === i).length;
     }
 
     // Calculate drop-offs (users who reached step N but not N+1)
     for (let i = 1; i < 15; i++) {
       const reachedThisStep = Object.values(stepsBySession).filter(
-        sessionSteps => sessionSteps.some(s => s.stepNumber === i)
+        (sessionSteps: any) => sessionSteps.some((s: any) => s.stepNumber === i)
       ).length;
       const reachedNextStep = Object.values(stepsBySession).filter(
-        sessionSteps => sessionSteps.some(s => s.stepNumber === i + 1)
+        (sessionSteps: any) => sessionSteps.some((s: any) => s.stepNumber === i + 1)
       ).length;
       stepDropoffs[i] = reachedThisStep - reachedNextStep;
     }
 
     // Calculate average messages per session
-    const messagesPerSession = sessions.map(session => {
+    const messagesPerSession = sessions.map((session: any) => {
       try {
         const messages = JSON.parse(session.messages);
         return Array.isArray(messages) ? messages.length : 0;
@@ -160,22 +160,22 @@ router.get('/aggregate', async (req, res) => {
     });
 
     const avgMessagesPerSession = messagesPerSession.length > 0
-      ? messagesPerSession.reduce((sum, count) => sum + count, 0) / messagesPerSession.length
+      ? messagesPerSession.reduce((sum: number, count: number) => sum + count, 0) / messagesPerSession.length
       : 0;
 
     // Calculate average script step reached
-    const maxStepBySession = Object.values(stepsBySession).map(sessionSteps => {
+    const maxStepBySession = Object.values(stepsBySession).map((sessionSteps: any) => {
       return sessionSteps.length > 0
-        ? Math.max(...sessionSteps.map(s => s.stepNumber))
+        ? Math.max(...sessionSteps.map((s: any) => s.stepNumber))
         : 0;
     });
 
     const avgStepReached = maxStepBySession.length > 0
-      ? maxStepBySession.reduce((sum, max) => sum + max, 0) / maxStepBySession.length
+      ? maxStepBySession.reduce((sum: number, max: number) => sum + max, 0) / maxStepBySession.length
       : 0;
 
     // Conversion rate (reached step 15)
-    const reachedStep15 = maxStepBySession.filter(max => max >= 15).length;
+    const reachedStep15 = maxStepBySession.filter((max: number) => max >= 15).length;
     const conversionRate = sessions.length > 0
       ? (reachedStep15 / sessions.length) * 100
       : 0;
@@ -202,8 +202,8 @@ router.get('/aggregate', async (req, res) => {
 
     // Active users (had any activity in date range)
     const activeUserIds = new Set([
-      ...calculatorData.map(r => r.userId).filter(Boolean),
-      ...sessions.map(s => s.userId).filter(Boolean),
+      ...calculatorData.map((r: any) => r.userId).filter(Boolean),
+      ...sessions.map((s: any) => s.userId).filter(Boolean),
     ]);
 
     // Get support queries
@@ -215,21 +215,21 @@ router.get('/aggregate', async (req, res) => {
 
     // Calculate session duration from supportQueries
     const sessionLengths = supportQueriesData
-      .map(q => q.sessionLength)
+      .map((q: any) => q.sessionLength)
       .filter(Boolean) as number[];
 
     const avgSessionDuration = sessionLengths.length > 0
-      ? sessionLengths.reduce((sum, len) => sum + len, 0) / sessionLengths.length
+      ? sessionLengths.reduce((sum: number, len: number) => sum + len, 0) / sessionLengths.length
       : 0;
 
     // Repeat users (users with multiple sessions)
     const sessionsByUser: Record<string, number> = {};
-    sessions.forEach(session => {
+    sessions.forEach((session: any) => {
       const identifier = session.userId || session.ipAddress || 'anonymous';
       sessionsByUser[identifier] = (sessionsByUser[identifier] || 0) + 1;
     });
 
-    const repeatUsers = Object.values(sessionsByUser).filter(count => count > 1).length;
+    const repeatUsers = Object.values(sessionsByUser).filter((count: number) => count > 1).length;
     const totalUniqueUsers = Object.keys(sessionsByUser).length;
     const repeatUserRate = totalUniqueUsers > 0
       ? (repeatUsers / totalUniqueUsers) * 100
@@ -243,11 +243,11 @@ router.get('/aggregate', async (req, res) => {
       repeatUserCount: repeatUsers,
       totalUniqueUsers,
       // Device/browser breakdown
-      deviceBreakdown: getBreakdown(sessions.map(s => s.device).filter(Boolean)),
-      browserBreakdown: getBreakdown(sessions.map(s => s.browser).filter(Boolean)),
+      deviceBreakdown: getBreakdown(sessions.map((s: any) => s.device).filter(Boolean)),
+      browserBreakdown: getBreakdown(sessions.map((s: any) => s.browser).filter(Boolean)),
       locationBreakdown: {
-        countries: getBreakdown(sessions.map(s => s.country).filter(Boolean)),
-        states: getBreakdown(sessions.map(s => s.state).filter(Boolean)),
+        countries: getBreakdown(sessions.map((s: any) => s.country).filter(Boolean)),
+        states: getBreakdown(sessions.map((s: any) => s.state).filter(Boolean)),
       },
     };
 
@@ -259,9 +259,9 @@ router.get('/aggregate', async (req, res) => {
     const dailyConversions = groupByDateWithCondition(
       sessions,
       'createdAt',
-      (session) => {
+      (session: any) => {
         const sessionSteps = stepsBySession[session.id] || [];
-        return sessionSteps.some(s => s.stepNumber >= 15);
+        return sessionSteps.some((s: any) => s.stepNumber >= 15);
       }
     );
 
@@ -319,7 +319,7 @@ function getDistribution(values: number[], buckets: number[]): Record<string, nu
  */
 function getBreakdown(values: string[]): Record<string, number> {
   const breakdown: Record<string, number> = {};
-  values.forEach(value => {
+  values.forEach((value: string) => {
     breakdown[value] = (breakdown[value] || 0) + 1;
   });
   return breakdown;
@@ -331,7 +331,7 @@ function getBreakdown(values: string[]): Record<string, number> {
 function groupByDate(data: any[], dateField: string): Array<{ date: string; count: number }> {
   const grouped: Record<string, number> = {};
 
-  data.forEach(item => {
+  data.forEach((item: any) => {
     const date = item[dateField];
     if (date) {
       const dateStr = new Date(date).toISOString().split('T')[0];
@@ -340,7 +340,7 @@ function groupByDate(data: any[], dateField: string): Array<{ date: string; coun
   });
 
   return Object.entries(grouped)
-    .map(([date, count]) => ({ date, count }))
+    .map(([date, count]: [string, number]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -354,7 +354,7 @@ function groupByDateWithCondition(
 ): Array<{ date: string; count: number }> {
   const grouped: Record<string, number> = {};
 
-  data.filter(condition).forEach(item => {
+  data.filter(condition).forEach((item: any) => {
     const date = item[dateField];
     if (date) {
       const dateStr = new Date(date).toISOString().split('T')[0];
@@ -363,7 +363,7 @@ function groupByDateWithCondition(
   });
 
   return Object.entries(grouped)
-    .map(([date, count]) => ({ date, count }))
+    .map(([date, count]: [string, number]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
