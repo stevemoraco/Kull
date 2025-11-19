@@ -746,7 +746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     // Extract request body variables outside try block for catch block access
-    const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
+    const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData, sectionHistory } = req.body;
 
     // Initialize preferredModel outside try block for catch block access
     let preferredModel: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano';
@@ -1882,6 +1882,24 @@ You can SEND USERS TO ANY PAGE on the site by including markdown links in your r
   * ANY other page on the site - just link it
 
 Example usage: "want to see what others are saying? [check out these case studies](/testimonials)"
+
+**LOGIN STATUS AWARENESS (IMPORTANT):**
+
+Check the "Login Status" field in the User Information section above.
+
+**If user is 🔴 Not Logged In:**
+- This is a welcome/exploration chat - they're browsing, learning about Kull
+- They might want to engage more deeply but haven't signed in yet
+- If they ask detailed questions or seem seriously interested, subtly encourage sign-in:
+  * "curious to see your actual ROI? [sign in quick](/api/login) and i can save your numbers for you"
+  * "btw this won't save if you leave - [takes 10s to sign in](/api/login) so you can come back anytime"
+  * "want to try the calculator with your real numbers? [sign in here](/api/login) to save your progress"
+
+**If user is 🟢 Logged In:**
+- Great! They're more engaged and their activity is being tracked
+- Their chat history is saved automatically
+- No need to mention sign-in
+- Focus on helping them understand value and ROI
 
 **🚨 REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP) 🚨**
 You MUST ALWAYS end EVERY response with these EXACT TWO lines:

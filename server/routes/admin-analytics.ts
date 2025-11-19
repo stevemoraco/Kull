@@ -424,7 +424,7 @@ router.get('/script-compliance', async (req, res) => {
     }, {} as Record<string, any[]>);
 
     // Simple repetition detection: if same question asked twice in same session
-    for (const sessionSteps of Object.values(stepsBySession)) {
+    for (const sessionSteps of Object.values(stepsBySession) as any[][]) {
       const questions = sessionSteps
         .map((s: any) => s.aiQuestion)
         .filter(Boolean);
