@@ -66,7 +66,7 @@ export async function generateNarrative(input: GenerateReportInput, apiKey?: str
   if (!apiKey) return base;
   try {
     const body = {
-      model: "gpt-5",
+      model: "gpt-5-nano",
       input: [
         {
           role: "user",

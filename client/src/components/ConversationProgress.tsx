@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Check, Circle, ChevronRight } from 'lucide-react';
+import { SALES_SCRIPT_QUESTIONS } from '@/../../shared/salesScript';
 
 interface ConversationProgressProps {
   questionsAsked: Array<{ step: number; question: string }>;
@@ -23,17 +24,21 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
   // Find current question
   const currentQuestion = questionsAsked.find(q => q.step === currentStep);
 
-  // Get next 2 upcoming questions
-  const upcomingQuestions = questionsAsked
+  // Get ALL upcoming questions from the sales script (not just the ones asked)
+  const allUpcomingQuestions = SALES_SCRIPT_QUESTIONS
     .filter(q => q.step > currentStep)
-    .slice(0, 2);
+    .map(q => ({ step: q.step, question: q.question }));
+
+  // Get next 2 upcoming questions
+  const upcomingQuestions = allUpcomingQuestions.slice(0, 2);
 
   // Remaining questions after showing 2
-  const remainingCount = Math.max(0, upcomingCount - upcomingQuestions.length);
+  const remainingQuestions = allUpcomingQuestions.slice(2);
+  const remainingCount = remainingQuestions.length;
 
   return (
-    <div className="p-5 transition-all duration-300 bg-transparent">
-      <div className="border-2 border-green-500 rounded-lg shadow-2xl bg-white overflow-hidden backdrop-blur-sm">
+    <div className="transition-all duration-300 bg-transparent">
+      <div className="m-5 border-2 border-cyan-500 rounded-lg shadow-xl bg-white overflow-hidden">
       {/* Header - Compact collapsed state */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -97,7 +102,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
               {questionsAnswered.map((qa, index) => (
                 <div
                   key={`answered-${qa.step}`}
-                  className="group bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg p-2.5 transition-all duration-300 hover:shadow-md animate-slideIn"
+                  className="group bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg p-2.5 transition-all duration-300 hover:shadow-md animate-slideIn"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-start gap-2">
@@ -122,21 +127,21 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
 
           {/* Current question */}
           {currentQuestion && (
-            <div className="relative bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg p-2.5 animate-pulse-subtle">
+            <div className="relative bg-gradient-to-r from-amber-400 to-yellow-500 rounded-lg p-2.5 animate-pulse-subtle">
               <div className="flex items-start gap-2">
                 <div className="flex-shrink-0 mt-0.5">
-                  <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center animate-pulse">
-                    <Circle className="w-2.5 h-2.5 text-white fill-current" />
+                  <div className="w-5 h-5 rounded-full bg-amber-900/20 flex items-center justify-center animate-pulse">
+                    <Circle className="w-2.5 h-2.5 text-amber-900 fill-current" />
                   </div>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-white uppercase tracking-wide">
+                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                       You are here
                     </span>
-                    <div className="flex-1 h-px bg-white/40" />
+                    <div className="flex-1 h-px bg-amber-900/40" />
                   </div>
-                  <p className="text-xs font-semibold text-white">
+                  <p className="text-xs font-semibold text-amber-900">
                     {currentQuestion.question}
                   </p>
                 </div>
@@ -188,27 +193,23 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
                 )}
               </button>
 
-              {showUpcoming && (
-                <div className="mt-1.5 space-y-1.5 max-h-48 overflow-y-auto overflow-x-hidden animate-slideDown">
-                  {questionsAsked
-                    .filter(q => q.step > currentStep)
-                    .slice(2) // Skip the first 2 (already shown above)
-                    .map((q, index) => (
-                      <div
-                        key={`upcoming-${q.step}`}
-                        className="bg-gradient-to-r from-gray-300 to-gray-400 rounded-lg p-2.5 opacity-60"
-                        style={{ animationDelay: `${index * 30}ms` }}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className="flex-shrink-0 mt-0.5">
-                            <div className="w-4 h-4 rounded-full border-2 border-white/60 flex items-center justify-center">
-                              <span className="text-xs text-white font-semibold">{q.step}</span>
-                            </div>
+              {showUpcoming && remainingQuestions.length > 0 && (
+                <div className="mt-1.5 space-y-1.5 max-h-48 overflow-y-auto overflow-x-hidden bg-white border border-gray-200 rounded-lg p-2">
+                  {remainingQuestions.map((q, index) => (
+                    <div
+                      key={`upcoming-${q.step}`}
+                      className="bg-gradient-to-r from-gray-300 to-gray-400 rounded-lg p-2.5"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <div className="w-4 h-4 rounded-full border-2 border-white/60 flex items-center justify-center">
+                            <span className="text-xs text-white font-semibold">{q.step}</span>
                           </div>
-                          <p className="text-xs text-white">{q.question}</p>
                         </div>
+                        <p className="text-xs text-white">{q.question}</p>
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -251,10 +252,10 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
 
         @keyframes pulseSubtle {
           0%, 100% {
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
           }
           50% {
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
           }
         }
 

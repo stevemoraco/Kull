@@ -141,7 +141,7 @@ async function runMigrations() {
         user_message TEXT,
         ai_response TEXT NOT NULL,
         message_hash VARCHAR(16),
-        model VARCHAR NOT NULL DEFAULT 'gpt-4o-mini',
+        model VARCHAR NOT NULL DEFAULT 'gpt-5-nano',
         input_tokens INTEGER NOT NULL DEFAULT 0,
         output_tokens INTEGER NOT NULL DEFAULT 0,
         total_tokens INTEGER NOT NULL DEFAULT 0,

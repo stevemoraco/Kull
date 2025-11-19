@@ -152,7 +152,7 @@ export const supportQueries = pgTable("support_queries", {
   tokensOut: integer("tokens_out").notNull().default(0),
   cachedTokensIn: integer("cached_tokens_in").notNull().default(0), // Cached prompt tokens (from OpenAI prompt caching)
   cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default("0"), // Cost in USD
-  model: varchar("model").notNull().default("gpt-4o-mini"),
+  model: varchar("model").notNull().default("gpt-5-nano"),
   // 🔐 LAYER 3: Database-level deduplication
   messageHash: varchar("message_hash", { length: 16 }), // FNV-1a hash of aiResponse for deduplication
   // Anonymous user metadata for tracking
@@ -205,6 +205,11 @@ export const chatSessions = pgTable("chat_sessions", {
   title: varchar("title").notNull(),
   messages: text("messages").notNull(), // JSON string of messages
   scriptStep: integer("script_step"), // Current step in 15-step sales script (1-15)
+  // Quick Replies & Timing tracking (for script adherence analysis)
+  lastQuickReplies: jsonb("last_quick_replies").$type<string[]>(), // Most recent Quick Replies offered
+  lastNextMessageSeconds: integer("last_next_message_seconds"), // Most recent timing value
+  questionAskedAtStep: text("question_asked_at_step"), // What question AI asked at current step
+  answerGivenAtStep: text("answer_given_at_step"), // What answer user gave at current step
   // Anonymous user metadata for tracking (when userId is null)
   ipAddress: varchar("ip_address"), // For associating anonymous sessions with users on login
   device: varchar("device"),

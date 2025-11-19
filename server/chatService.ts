@@ -199,11 +199,77 @@ User previously answered: "about 50 hours"
 - If they told you before → don't ask for it again
 - Reference their previous answers: "to hit your 150-shoot goal..." not "what's your goal?"
 
+**🧠 MEMORY USAGE REQUIREMENTS (CRITICAL):**
+
+You will receive a CONVERSATION MEMORY section showing all previous Q&A pairs.
+
+BEFORE asking your next question:
+1. **Review the CONVERSATION MEMORY section carefully**
+2. **Extract keywords from their previous answers** (meaningful words >4 characters)
+3. **Reference those keywords in your new question**
+4. **NEVER ask for information they already provided**
+
+**GOOD vs BAD Context Usage Examples:**
+
+✅ GOOD (references previous answer):
+  Memory shows: User said "I want to grow to 150 shoots"
+  Your question: "to hit your 150-shoot goal, how many hours per week are you working now?"
+  → You referenced "150-shoot goal" from their previous answer
+
+✅ GOOD (uses their exact words):
+  Memory shows: User said "I'm drowning in culling work"
+  Your question: "so the culling bottleneck is what's keeping you from scaling — how many hours does it take per shoot?"
+  → You referenced "culling" and "bottleneck" from their words
+
+❌ BAD (asking again):
+  Memory shows: User said "I want to grow to 150 shoots"
+  Your question: "what's your goal for annual shoots?"
+  → WRONG! They already told you: 150 shoots
+
+❌ BAD (ignoring previous context):
+  Memory shows: User said "I'm working 60 hour weeks"
+  Your question: "how many hours per week are you working?"
+  → WRONG! They already told you: 60 hours
+
+**HOW TO BUILD CONTEXT-AWARE QUESTIONS:**
+
+Step 1: Look at CONVERSATION MEMORY
+Step 2: Extract what they said (e.g., "I want 200 shoots", "I work 60 hours/week")
+Step 3: Pull keywords (e.g., "200 shoots", "60 hours")
+Step 4: Build new question using those keywords
+Step 5: Example result: "to get from 104 to 200 shoots while working less than 60 hours/week, what needs to change?"
+
+This shows you REMEMBER what they said and are building on it, not starting over.
+
 **ALWAYS SOUND HUMAN:**
 - Use lowercase, casual language ("haha", "lol", "totally", "i get it")
 - Acknowledge their tone (if they're excited, match it; if skeptical, validate it)
 - Never sound robotic or scripted
 - Talk like you're texting a friend who happens to be a photographer
+
+---
+
+**🚫 CRITICAL: NEVER REPEAT QUESTIONS**
+
+Before asking ANY question, CHECK if you've already asked it in this conversation.
+
+Questions you've ALREADY ASKED in this conversation:
+{{QUESTIONS_ALREADY_ASKED}}
+
+DO NOT ask ANY of these questions again.
+DO NOT rephrase them and ask them again.
+DO NOT ask for information the user has already provided.
+
+If the user didn't answer properly:
+- DON'T repeat the question
+- DO acknowledge their response and move forward: "no worries, let's keep going..."
+- DO ask the NEXT question in the script sequence
+
+NEXT question you should ask (based on current step {{CURRENT_STEP}}):
+"{{EXPECTED_NEXT_QUESTION}}"
+
+Use this EXACT question or a natural variation that matches the user's context.
+If they've already answered something similar, skip to the next step.
 
 ---
 
@@ -360,7 +426,9 @@ export async function getChatResponseStream(
   allSessions?: any[],
   sessionId?: string,
   userId?: string,
-  statusCallback?: (status: string, timing?: number) => void
+  statusCallback?: (status: string, timing?: number) => void,
+  calculatorData?: any,
+  currentStep?: number
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -378,8 +446,31 @@ export async function getChatResponseStream(
     const repoTime = Date.now() - repoStart;
     statusCallback?.(`✅ codebase loaded in ${repoTime}ms`, repoTime);
 
+    // Extract all questions asked so far from conversation history
+    const { extractQuestions } = await import('./questionCache');
+    const questionsAlreadyAsked = history
+      .filter(msg => msg.role === 'assistant')
+      .flatMap(msg => extractQuestions(msg.content))
+      .filter((q, i, arr) => arr.indexOf(q) === i); // Dedupe
+
+    // Get the expected next question based on current step
+    const { getNextQuestion } = await import('./conversationStateManager');
+    const step = currentStep || 1;
+    const expectedNextQuestion = getNextQuestion(step, calculatorData);
+
+    // Build question list for prompt
+    const questionListText = questionsAlreadyAsked.length > 0
+      ? questionsAlreadyAsked.map((q, i) => `${i + 1}. "${q}"`).join('\n')
+      : '(none yet - this is the first message)';
+
     // Build STATIC system message (repo content + instructions) - goes first for caching
-    const staticInstructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
+    // Replace placeholders with actual values
+    let promptWithQuestions = PROMPT_PREFIX
+      .replace('{{QUESTIONS_ALREADY_ASKED}}', questionListText)
+      .replace('{{CURRENT_STEP}}', String(step))
+      .replace('{{EXPECTED_NEXT_QUESTION}}', expectedNextQuestion);
+
+    const staticInstructions = `${promptWithQuestions}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
 
     // Build DYNAMIC context (user-specific data) - goes at end, not cached
     let dynamicContext = '';

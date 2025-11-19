@@ -2444,6 +2444,17 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
     // Switch to the new session
     setCurrentSessionId(newSessionId);
 
+    // Clear the old greeting and trigger a fresh generation immediately
+    setLatestGreeting(null);
+    setGreetingGenerated(false);
+
+    // Trigger immediate greeting generation by calling the background function
+    // (The background greeting effect will handle the actual generation)
+    setTimeout(() => {
+      // This will be picked up by the greeting generation effect
+      console.log('[Chat] New chat started - triggering fresh greeting generation');
+    }, 100);
+
     // Reset quick replies to defaults
     setQuickQuestions([
       "How do I install Kull?",
@@ -2720,21 +2731,23 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
             </div>
           </div>
 
-          {/* Conversation Progress - pinned to top */}
+          {/* Conversation Progress - ABSOLUTE floating over messages, relative to chat window */}
           {(conversationState.questionsAsked.length > 0 || conversationState.questionsAnswered.length > 0) && (
-            <div className="sticky top-0 z-30">
-              <ConversationProgress
-                questionsAsked={conversationState.questionsAsked}
-                questionsAnswered={conversationState.questionsAnswered}
-                currentStep={conversationState.currentStep}
-                totalSteps={conversationState.totalSteps}
-              />
+            <div className="absolute top-[22%] left-1/2 transform -translate-x-1/2 z-50 pointer-events-none w-[85%]">
+              <div className="pointer-events-auto">
+                <ConversationProgress
+                  questionsAsked={conversationState.questionsAsked}
+                  questionsAnswered={conversationState.questionsAnswered}
+                  currentStep={conversationState.currentStep}
+                  totalSteps={conversationState.totalSteps}
+                />
+              </div>
             </div>
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background overscroll-contain">
-            {/* Chat messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-card overscroll-contain">
+            {/* Chat messages - no padding, let them scroll behind progress */}
             {messages
               .filter(m => !m.content.includes('[Continue conversation naturally based on context]'))
               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -2824,7 +2837,10 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
                   Quick Replies ({quickQuestions.length})
                 </p>
               )}
-              <div className={showSuggestions ? 'w-full flex justify-end' : ''}>
+              <div className={showSuggestions ? 'w-full flex justify-end items-center gap-2' : ''}>
+                {showSuggestions && (
+                  <span className="text-xs text-gray-500">Collapse Quick Replies</span>
+                )}
                 {showSuggestions ? (
                   <ChevronUp className="w-4 h-4 text-gray-600" />
                 ) : (

@@ -10,7 +10,7 @@ import {
   cancelDripCampaign,
   processPendingEmails,
 } from "./emailService";
-import { insertRefundSurveySchema, supportQueries, users, type User } from "@shared/schema";
+import { insertRefundSurveySchema, supportQueries, users, conversationSteps, type User } from "@shared/schema";
 import { db } from "./db";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
@@ -42,6 +42,7 @@ import { initiateDeviceLink, approveDeviceLink, claimDeviceLink } from "./servic
 import { telemetryStore } from "./services/batchTelemetry";
 import { emitShootCompletedNotification } from "./services/reportNotifications";
 import { createContentHash } from "@shared/utils/messageFingerprint";
+import { measureContextUsage } from "./contextUsageMetric";
 
 // 🔐 LAYER 2: Backend Deduplication - In-memory cache for recent message hashes
 const recentMessageCache = new Map<string, { timestamp: number; response: string }>();
@@ -942,7 +943,60 @@ ${userActivity.map((event: any, idx: number) => {
         userActivityMarkdown += stateContext;
       }
 
+      // Load conversation memory from conversationSteps table
+      let conversationMemory = '';
+      if (sessionId) {
+        try {
+          const { eq } = await import('drizzle-orm');
+          const steps = await db
+            .select()
+            .from(conversationSteps)
+            .where(eq(conversationSteps.sessionId, sessionId))
+            .orderBy(conversationSteps.stepNumber);
+
+          if (steps.length > 0) {
+            conversationMemory = '\n\n## 🧠 CONVERSATION MEMORY\n\n';
+            conversationMemory += 'Review what the user has ALREADY told you:\n\n';
+
+            steps.forEach((step: any) => {
+              conversationMemory += `**Step ${step.stepNumber} (${step.stepName}):**\n`;
+              if (step.aiQuestion) {
+                conversationMemory += `  You asked: "${step.aiQuestion.substring(0, 150)}${step.aiQuestion.length > 150 ? '...' : ''}"\n`;
+              }
+              if (step.userResponse) {
+                conversationMemory += `  They said: "${step.userResponse}"\n`;
+              }
+              conversationMemory += '\n';
+            });
+
+            conversationMemory += '\n**CRITICAL MEMORY USAGE RULES:**\n';
+            conversationMemory += '- DO NOT ask for information they already provided above\n';
+            conversationMemory += '- DO reference their previous answers in your new questions\n';
+            conversationMemory += '- Example: "to hit your 150-shoot goal..." NOT "what\'s your goal?"\n';
+            conversationMemory += '- If they said "I want 200 shoots", later say "your 200-shoot goal" not "how many shoots?"\n\n';
+
+            // Add memory to user activity markdown (will be included in prompt)
+            userActivityMarkdown += conversationMemory;
+
+            console.log(`[Chat Memory] Loaded ${steps.length} previous Q&A pairs for session ${sessionId}`);
+          }
+        } catch (memoryError) {
+          console.error('[Chat Memory] Failed to load conversation memory:', memoryError);
+          // Don't fail the request if memory loading fails
+        }
+      }
+
       timings.contextCollected = Date.now() - timings.start;
+
+      // Prepare calculator data with computed values
+      const enrichedCalculatorData = calculatorData ? {
+        ...calculatorData,
+        annualShoots: calculatorData.shootsPerWeek * 44,
+        annualCost: Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44 * calculatorData.billableRate)
+      } : undefined;
+
+      // Get current step from conversation state
+      const currentStep = conversationState?.currentStep || 1;
 
       // getChatResponseStream will send its own status updates:
       // - 🗂️ loading codebase...
@@ -957,7 +1011,7 @@ ${userActivity.map((event: any, idx: number) => {
         const msg = timing !== undefined ? `${status} (${timing}ms)` : status;
         res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
         if (res.socket) res.socket.uncork();
-      });
+      }, enrichedCalculatorData, currentStep);
       const apiTime = Date.now() - apiStart;
       timings.apiCalled = Date.now() - timings.start;
 
@@ -1070,6 +1124,27 @@ ${userActivity.map((event: any, idx: number) => {
         console.log(`[Chat Timings] Total: ${totalTime}ms | Context: ${timings.contextCollected}ms | Prompt: ${timings.promptBuilt - timings.contextCollected}ms | API: ${timings.apiCalled - timings.promptBuilt}ms | TTFT: ${timings.firstToken - timings.apiCalled}ms | FirstToken: ${timings.firstToken}ms`);
         console.log(`[Chat Tokens] In: ${tokensIn} | Out: ${tokensOut} | Cached: ${cachedTokensIn} | Cost: $${cost.toFixed(4)}`);
 
+        // Post-response validation: Check for duplicate questions
+        if (sessionId && fullResponse) {
+          try {
+            const { extractQuestions, hasAskedBefore, addQuestion } = await import('./questionCache');
+            const newQuestions = extractQuestions(fullResponse);
+
+            for (const question of newQuestions) {
+              const isDuplicate = hasAskedBefore(sessionId, question);
+              if (isDuplicate) {
+                console.warn(`[QuestionCache] 🚫 REPEAT DETECTED in AI response: "${question.substring(0, 80)}..."`);
+                // Log to database for monitoring (optional - implement later)
+              }
+              // Add question to cache for future checks
+              addQuestion(sessionId, question);
+            }
+          } catch (cacheError) {
+            console.error('[QuestionCache] Error during post-response validation:', cacheError);
+            // Don't fail the request if cache fails
+          }
+        }
+
         // Track support query in database
         const userEmail = req.user?.claims?.email;
         const userId = req.user?.claims?.sub;
@@ -1149,6 +1224,57 @@ ${userActivity.map((event: any, idx: number) => {
             });
           }
 
+          // Save user answer to conversationSteps table
+          if (sessionId && message && history && history.length > 0) {
+            try {
+              // Get the previous AI message (the question user is answering)
+              const previousMessages = history.filter((m: any) => m.role === 'assistant');
+              const previousAIMessage = previousMessages.length > 0
+                ? previousMessages[previousMessages.length - 1].content
+                : '';
+
+              // Get current script step from conversation state
+              const currentStep = conversationState?.currentStep || 1;
+
+              // Determine step name based on step number
+              const stepNames: Record<number, string> = {
+                1: 'current_reality',
+                2: 'validate_ambition',
+                3: 'current_workload',
+                4: 'challenge_growth',
+                5: 'current_workflow',
+                6: 'specific_targets',
+                7: 'motivation',
+                8: 'paint_outcome',
+                9: 'identify_bottleneck',
+                10: 'position_solution',
+                11: 'gauge_commitment',
+                12: 'create_urgency',
+                13: 'introduce_price',
+                14: 'state_price',
+                15: 'discount_close'
+              };
+              const stepName = stepNames[currentStep] || 'unknown_step';
+
+              // Save to conversationSteps table
+              await db.insert(conversationSteps).values({
+                sessionId: sessionId,
+                userId: userId || null,
+                userEmail: userEmail || null,
+                stepNumber: currentStep,
+                stepName: stepName,
+                aiQuestion: previousAIMessage,
+                userResponse: message,
+                completedAt: new Date(),
+              });
+
+              console.log(`[Chat Memory] Saved answer for step ${currentStep} (${stepName})`);
+            } catch (memoryError) {
+              console.error('[Chat Memory] Failed to save conversation step:', memoryError);
+              // Don't fail the request if memory saving fails
+            }
+          }
+
           // Update conversation state after response
           if (conversationState && fullResponse) {
             const { updateStateAfterInteraction } = await import('./conversationStateManager');
@@ -1156,6 +1282,59 @@ ${userActivity.map((event: any, idx: number) => {
             await storage.updateConversationState(sessionId, updatedState);
 
             console.log(`[Chat State] Session ${sessionId} - Step: ${updatedState.currentStep}/15, Answered: ${updatedState.questionsAnswered.length}, Off-topic: ${updatedState.offTopicCount}`);
+          }
+
+          // Check if we should progress to the next script step
+          if (sessionId && fullResponse) {
+            try {
+              // Get current session data to check scriptStep
+              const sessions = await storage.getChatSessions();
+              const currentSession = sessions.find((s: any) => s.id === sessionId);
+
+              if (currentSession) {
+                const currentScriptStep = currentSession.scriptStep || 1;
+
+                // Get the last assistant message (question AI asked before user responded)
+                const previousMessages = history.filter((m: any) => m.role === 'assistant');
+                const lastAssistantMessage = previousMessages.length > 0
+                  ? previousMessages[previousMessages.length - 1].content
+                  : '';
+
+                // Check if user answered the question and should progress
+                const { shouldProgressToNextStep, validateStepQuestion } = await import('./conversationStateManager');
+                const shouldProgress = shouldProgressToNextStep(message, lastAssistantMessage, currentScriptStep);
+
+                if (shouldProgress) {
+                  const newScriptStep = currentScriptStep < 15 ? currentScriptStep + 1 : 15;
+
+                  // Validate if AI response matches expected question for current step
+                  const validation = validateStepQuestion(fullResponse, currentScriptStep, calculatorData);
+
+                  if (!validation.isValid) {
+                    console.warn(`[Script Validation] AI off-script at step ${currentScriptStep}. Expected: "${validation.expectedQuestion}", Similarity: ${(validation.similarity * 100).toFixed(1)}%`);
+                  } else {
+                    console.log(`[Script Validation] AI on-script at step ${currentScriptStep} (${(validation.similarity * 100).toFixed(1)}% match)`);
+                  }
+
+                  // Update chatSession with new script step
+                  await db.update(chatSessions)
+                    .set({
+                      scriptStep: newScriptStep,
+                      questionAskedAtStep: fullResponse,
+                      answerGivenAtStep: message,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(chatSessions.id, sessionId));
+
+                  console.log(`[Script Progression] Session ${sessionId} progressed from step ${currentScriptStep} → ${newScriptStep}`);
+                } else {
+                  console.log(`[Script Progression] Session ${sessionId} staying at step ${currentScriptStep} (user didn't answer)`);
+                }
+              }
+            } catch (progressError) {
+              console.error('[Script Progression] Failed to update script step:', progressError);
+              // Don't fail the request if progression tracking fails
+            }
           }
 
           // Broadcast to admin panels for live updates
@@ -1678,6 +1857,16 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
           }))
         : [];
 
+      // Prepare calculator data with computed values
+      const enrichedCalculatorData = calculatorData ? {
+        ...calculatorData,
+        annualShoots: calculatorData.shootsPerWeek * 44,
+        annualCost: Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44 * calculatorData.billableRate)
+      } : undefined;
+
+      // Get current step from conversation state
+      const currentStepNumber = conversationState?.currentStep || 1;
+
       const stream = await getChatResponseStream(
         fullContextMarkdown,
         formattedHistory, // FIXED: Pass actual history, not empty array
@@ -1686,7 +1875,10 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         undefined, // pageVisits
         undefined, // allSessions
         sessionId,
-        userId
+        userId,
+        undefined, // statusCallback
+        enrichedCalculatorData,
+        currentStepNumber
       );
 
       res.setHeader('Content-Type', 'text/event-stream');
