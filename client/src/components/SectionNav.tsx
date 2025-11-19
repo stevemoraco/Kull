@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Home, AlertCircle, Zap, Star, DollarSign, Gift, Download, HelpCircle } from "lucide-react";
 
 interface Section {
@@ -22,6 +22,7 @@ export function SectionNav() {
   const [activeSection, setActiveSection] = useState("top");
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [showMobileNav, setShowMobileNav] = useState(false);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observerOptions = {
@@ -90,20 +91,34 @@ export function SectionNav() {
     return () => observer.disconnect();
   }, []);
 
-  // Show mobile nav after user scrolls past hero
+  // Show mobile nav and auto-collapse when scrolling
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setShowMobileNav(scrollY > 300);
+    // Show nav immediately
+    setShowMobileNav(true);
 
+    const handleScroll = () => {
       // Auto-collapse when scrolling
-      if (scrollY > 300 && isMobileExpanded) {
+      if (isMobileExpanded) {
         setIsMobileExpanded(false);
       }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobileExpanded]);
+
+  // Close mobile nav when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target as Node)) {
+        setIsMobileExpanded(false);
+      }
+    };
+
+    if (isMobileExpanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
   }, [isMobileExpanded]);
 
   const scrollToSection = (id: string) => {
@@ -172,10 +187,10 @@ export function SectionNav() {
 
       {/* Mobile floating side navigation */}
       {showMobileNav && (
-        <nav className="xl:hidden fixed right-4 top-1/2 -translate-y-1/2 z-40">
+        <nav className="xl:hidden fixed left-0 top-1/2 -translate-y-1/2 z-40" ref={mobileNavRef}>
           {isMobileExpanded ? (
-            // Expanded state - show all sections
-            <div className="bg-card/95 backdrop-blur-lg border border-border/40 rounded-2xl p-2 shadow-2xl animate-in fade-in zoom-in duration-200">
+            // Expanded state - show all sections with labels
+            <div className="bg-card/60 backdrop-blur-md border-r border-t border-b border-border/30 rounded-r-2xl py-2 pl-2 pr-1 shadow-2xl animate-in fade-in zoom-in duration-200">
               <div className="space-y-1">
                 {sections.map((section) => {
                   const Icon = section.icon;
@@ -189,7 +204,7 @@ export function SectionNav() {
                         setIsMobileExpanded(false);
                       }}
                       className={`
-                        w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
+                        w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium
                         transition-all duration-200
                         ${
                           isActive
@@ -199,33 +214,44 @@ export function SectionNav() {
                       `}
                       data-testid={`section-nav-mobile-${section.id}`}
                     >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className="whitespace-nowrap">{section.label}</span>
+                      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="whitespace-nowrap text-[10px]">{section.label}</span>
                     </button>
                   );
                 })}
               </div>
-              {/* Close button */}
-              <button
-                onClick={() => setIsMobileExpanded(false)}
-                className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground py-2"
-              >
-                Close
-              </button>
             </div>
           ) : (
-            // Collapsed state - floating pill with current section
-            <button
-              onClick={() => setIsMobileExpanded(true)}
-              className="bg-primary text-primary-foreground rounded-full p-4 shadow-2xl hover:scale-110 transition-all duration-200 animate-in fade-in slide-in-from-right"
-              data-testid="mobile-nav-toggle"
-            >
-              {(() => {
-                const currentSection = sections.find(s => s.id === activeSection);
-                const Icon = currentSection?.icon || Home;
-                return <Icon className="w-5 h-5" />;
-              })()}
-            </button>
+            // Collapsed state - show all icons stacked vertically
+            <div className="bg-card/60 backdrop-blur-md border-r border-t border-b border-border/30 rounded-r-2xl py-1.5 pl-1.5 pr-1 shadow-2xl animate-in fade-in slide-in-from-left duration-200">
+              <div className="flex flex-col gap-0.5">
+                {sections.map((section) => {
+                  const Icon = section.icon;
+                  const isActive = activeSection === section.id;
+
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => {
+                        scrollToSection(section.id);
+                        setIsMobileExpanded(true);
+                      }}
+                      className={`
+                        p-1.5 rounded-lg transition-all duration-200 block
+                        ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }
+                      `}
+                      data-testid={`section-nav-mobile-icon-${section.id}`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
         </nav>
       )}
