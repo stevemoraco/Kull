@@ -817,8 +817,8 @@ ${recentActivity.slice(-5).map((a: any) => `  - ${a.action}: ${a.target}`).join(
       // Add calculator data context
       if (calculatorData) {
         const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = calculatorData;
-        const annualShoots = shootsPerWeek * 52;
-        const annualHours = shootsPerWeek * hoursPerShoot * 52;
+        const annualShoots = shootsPerWeek * 44;
+        const annualHours = shootsPerWeek * hoursPerShoot * 44;
         const annualCost = annualHours * billableRate;
         const weeksSaved = annualHours / 40;
 
@@ -897,42 +897,69 @@ ${userActivity.map((event: any, idx: number) => {
         firstToken: 0,
       };
 
-      // Step 1: Collecting user context
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '📊 collecting your activity data...' })}\n\n`);
+      // Server received request - show what was sent from client
+      // Break down user activity by type
+      const clicks = userActivity ? userActivity.filter((e: any) => e.type === 'click').length : 0;
+      const hovers = userActivity ? userActivity.filter((e: any) => e.type === 'hover').length : 0;
+      const inputs = userActivity ? userActivity.filter((e: any) => e.type === 'input').length : 0;
+      const selects = userActivity ? userActivity.filter((e: any) => e.type === 'select').length : 0;
+      const scrolls = userActivity ? userActivity.filter((e: any) => e.type === 'scroll').length : 0;
+      const totalEvents = userActivity ? userActivity.length : 0;
+
+      const eventBreakdown = totalEvents > 0
+        ? `${totalEvents} events (${clicks} clicks, ${scrolls} scrolls, ${hovers} hovers, ${inputs} inputs, ${selects} selects)`
+        : '0 events';
+
+      res.write(`data: ${JSON.stringify({
+        type: 'status',
+        message: `✅ server received: ${history?.length || 0} messages, ${eventBreakdown}`
+      })}\n\n`);
       if (res.socket) res.socket.uncork();
 
-      const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
+      // Send status immediately before loading modules
+      res.write(`data: ${JSON.stringify({
+        type: 'status',
+        message: `⚙️ initializing AI engine...`
+      })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
+      const { getChatResponseStream } = await import('./chatService');
+
+      // Send status before database query
+      res.write(`data: ${JSON.stringify({
+        type: 'status',
+        message: `📊 loading conversation history...`
+      })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
+      // Load conversation state for this session
+      const conversationState = await storage.getConversationState(sessionId);
+      const { generateStateContext } = await import('./conversationStateManager');
+      const stateContext = conversationState ? generateStateContext(conversationState) : '';
+
+      // Add state context to user activity markdown
+      if (stateContext) {
+        userActivityMarkdown += stateContext;
+      }
+
       timings.contextCollected = Date.now() - timings.start;
-      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ context collected (${timings.contextCollected}ms)` })}\n\n`);
-      if (res.socket) res.socket.uncork();
 
-      // Step 2: Building prompt
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '📝 building prompt...' })}\n\n`);
-      if (res.socket) res.socket.uncork();
-
-      const promptStart = Date.now();
-      // Build full prompt markdown for debugging
-      const fullPrompt = await buildFullPromptMarkdown(message, history || []);
-      const promptTime = Date.now() - promptStart;
-      timings.promptBuilt = Date.now() - timings.start;
-      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ prompt built (${promptTime}ms)` })}\n\n`);
-      if (res.socket) res.socket.uncork();
-
-      // Step 3: Calling OpenAI
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '🤖 calling openai api...' })}\n\n`);
-      if (res.socket) res.socket.uncork();
-
+      // getChatResponseStream will send its own status updates:
+      // - 🗂️ loading codebase...
+      // - ✅ codebase loaded (Xms)
+      // - 📝 building prompt with [details]...
+      // - 🤖 calling openai api...
+      // - ✅ api responded (Xms)
+      // - ⏳ openai thinking...
       const apiStart = Date.now();
       const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string, timing?: number) => {
         // Callback for chatService to send status updates with timing
-        const msg = timing ? `${status} (${timing}ms)` : status;
+        const msg = timing !== undefined ? `${status} (${timing}ms)` : status;
         res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
         if (res.socket) res.socket.uncork();
       });
       const apiTime = Date.now() - apiStart;
       timings.apiCalled = Date.now() - timings.start;
-      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ api responded (${apiTime}ms)` })}\n\n`);
-      if (res.socket) res.socket.uncork();
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -1108,7 +1135,6 @@ ${userActivity.map((event: any, idx: number) => {
               userId,
               userMessage: message,
               aiResponse: fullResponse,
-              fullPrompt,
               tokensIn,
               tokensOut,
               cachedTokensIn,
@@ -1121,6 +1147,15 @@ ${userActivity.map((event: any, idx: number) => {
               country,
               sessionLength,
             });
+          }
+
+          // Update conversation state after response
+          if (conversationState && fullResponse) {
+            const { updateStateAfterInteraction } = await import('./conversationStateManager');
+            const updatedState = updateStateAfterInteraction(conversationState, message, fullResponse);
+            await storage.updateConversationState(sessionId, updatedState);
+
+            console.log(`[Chat State] Session ${sessionId} - Step: ${updatedState.currentStep}/15, Answered: ${updatedState.questionsAnswered.length}, Off-topic: ${updatedState.offTopicCount}`);
           }
 
           // Broadcast to admin panels for live updates
@@ -1361,10 +1396,10 @@ User's current calculator inputs:
 - **Has Clicked Preset:** ${calculatorData.hasClickedPreset ? 'Yes' : 'No'}
 
 **Calculated Metrics:**
-- **Annual Shoots:** ${calculatorData.shootsPerWeek * 52} shoots/year
-- **Annual Hours Wasted on Culling:** ${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52)} hours/year
-- **Annual Cost of Manual Culling:** $${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52 * calculatorData.billableRate).toLocaleString()}/year
-- **Work Weeks Saved:** ${((calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52) / 40).toFixed(1)} weeks/year
+- **Annual Shoots:** ${calculatorData.shootsPerWeek * 44} shoots/year
+- **Annual Hours Wasted on Culling:** ${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44)} hours/year
+- **Annual Cost of Manual Culling:** $${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44 * calculatorData.billableRate).toLocaleString()}/year
+- **Work Weeks Saved:** ${((calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44) / 40).toFixed(1)} weeks/year
 
 **IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
 ` : ''}
@@ -1614,6 +1649,11 @@ Now respond to their most recent activity (check the user activity log above) an
       const { getChatResponseStream } = await import('./chatService');
       const { getRepoContent } = await import('./fetchRepo');
 
+      // Load conversation state for this session (if it exists from previous messages)
+      const conversationState = await storage.getConversationState(sessionId);
+      const { generateStateContext } = await import('./conversationStateManager');
+      const stateContext = conversationState ? generateStateContext(conversationState) : '';
+
       // Build full context with repo + session data + conversation history
       const repoContent = await getRepoContent();
 
@@ -1625,7 +1665,9 @@ ${repoContent}
 
 ---
 
-${contextMarkdown}`;
+${contextMarkdown}
+
+${stateContext ? `---\n${stateContext}` : ''}`;
 
       // CRITICAL FIX: Pass the actual history array so AI can track conversation properly
       // Convert history to ChatMessage format expected by getChatResponseStream
@@ -1823,6 +1865,21 @@ ${contextMarkdown}`;
               country,
               sessionLength: 0,
             });
+          }
+
+          // Initialize conversation state for new session with welcome message
+          if (fullResponse && sessionId) {
+            const { updateStateAfterInteraction } = await import('./conversationStateManager');
+            const initialState = {
+              questionsAsked: [],
+              questionsAnswered: [],
+              currentStep: 1,
+              offTopicCount: 0
+            };
+            const updatedState = updateStateAfterInteraction(initialState, '', fullResponse);
+            await storage.updateConversationState(sessionId, updatedState);
+
+            console.log(`[Welcome State] Session ${sessionId} - Step: ${updatedState.currentStep}/15, Questions asked: ${updatedState.questionsAsked.length}`);
           }
 
           // Broadcast to admin panels for live updates
@@ -2888,8 +2945,8 @@ ${contextMarkdown}`;
         .filter(session => session.calculatorData)
         .map(session => {
           const calc = session.calculatorData as any;
-          const annualShoots = calc.shootsPerWeek * 52;
-          const annualHours = calc.shootsPerWeek * calc.hoursPerShoot * 52;
+          const annualShoots = calc.shootsPerWeek * 44;
+          const annualHours = calc.shootsPerWeek * calc.hoursPerShoot * 44;
           const annualCost = annualHours * calc.billableRate;
           const weeksSaved = annualHours / 40;
 

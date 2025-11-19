@@ -191,7 +191,7 @@ export default function AdminUserDetail() {
   };
 
   const calculatedSavings = data.calculatorValues.shootsPerWeek && data.calculatorValues.hoursPerShoot && data.calculatorValues.billableRate
-    ? (data.calculatorValues.shootsPerWeek * data.calculatorValues.hoursPerShoot * data.calculatorValues.billableRate * 52)
+    ? (data.calculatorValues.shootsPerWeek * data.calculatorValues.hoursPerShoot * data.calculatorValues.billableRate * 44)
     : null;
 
   return (

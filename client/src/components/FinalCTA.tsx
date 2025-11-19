@@ -156,15 +156,15 @@ export function FinalCTA() {
       <div className="max-w-7xl mx-auto text-center relative z-10">
         <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Start your unlimited free trial now</span>
+          <span className="text-sm font-semibold text-foreground">Start your unlimited free trial&nbsp;now</span>
         </div>
 
         <h2 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-final-cta-headline">
-          Start rating photos in seconds, not hours.
+          Start rating photos in seconds, not&nbsp;hours.
         </h2>
 
         <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-          Join thousands who've discovered Kull, and get started completely risk free.
+          Join thousands who've discovered Kull, and get started completely risk&nbsp;free.
         </p>
 
         <div className="max-w-6xl mx-auto mb-8">
@@ -207,8 +207,8 @@ export function FinalCTA() {
                     <span className="text-2xl">⭐</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5 stars</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">All images starred in seconds based on your custom, sharable prompt</p>
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5&nbsp;stars</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">All images starred in seconds based on your custom, sharable&nbsp;prompt</p>
                   </div>
                 </div>
 
@@ -227,8 +227,8 @@ export function FinalCTA() {
                     <span className="text-2xl">🔄</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <h3 className="text-lg font-bold text-foreground leading-tight">Re-rank & Re-organize</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">Get more or less strict selects instantly</p>
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Re-rank &amp;&nbsp;Re-organize</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Get more or less strict selects&nbsp;instantly</p>
                   </div>
                 </div>
               </div>
@@ -470,7 +470,7 @@ export function FinalCTA() {
             <div className="text-center pt-4 border-t border-primary/20">
               <p className="text-sm font-bold text-foreground flex items-center justify-center gap-2">
                 <Shield className="w-4 h-4 text-primary" />
-                100% Risk-Free Trial • Cancel Anytime
+                100% Risk-Free Trial&nbsp;&bull; Cancel&nbsp;Anytime
               </p>
             </div>
           </div>
@@ -530,7 +530,7 @@ export function FinalCTA() {
         {/* FAQ Cards */}
         <div className="max-w-7xl mx-auto" id="faq">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-12 text-foreground">
-            Frequently Asked Questions
+            Frequently Asked&nbsp;Questions
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {faqs.map((faq, index) => (

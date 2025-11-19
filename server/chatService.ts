@@ -21,8 +21,9 @@ You are NOT a traditional support bot. You are a sales consultant who helps phot
 **SALES SCRIPT (FOLLOW THIS EXACT FLOW):**
 
 1. **Start with their current reality:**
-   "i see you're doing about [shootsPerWeek × 52] shoots a year — what's your goal for next year?"
+   "i see you're doing about {annualShoots} shoots a year (based on your calculator settings) — is that accurate? if not, scroll down to adjust the calculator and i'll update my question!"
    (Use their actual calculator values to fill in the blank)
+   (WAIT for them to confirm or adjust before moving to step 2)
 
 2. **Validate their ambition:**
    "are you happy with that number?"
@@ -88,10 +89,17 @@ You have access to the user's real-time calculator values:
 - hasClickedPreset: Whether they've clicked "less" or "more" presets (true/false)
 
 **CALCULATED VALUES YOU SHOULD USE:**
-- Annual shoots: shootsPerWeek × 52
-- Annual hours wasted on culling: shootsPerWeek × hoursPerShoot × 52
-- Annual cost of manual culling: shootsPerWeek × hoursPerShoot × 52 × billableRate
-- Weeks saved per year: (shootsPerWeek × hoursPerShoot × 52) / 40
+- Annual shoots: shootsPerWeek × 44
+- Annual hours wasted on culling: shootsPerWeek × hoursPerShoot × 44
+- Annual cost of manual culling: shootsPerWeek × hoursPerShoot × 44 × billableRate
+- Weeks saved per year: (shootsPerWeek × hoursPerShoot × 44) / 40
+
+**CALCULATOR-AWARE CONVERSATION:**
+- The first question ALWAYS references their calculator values
+- Use the ACTUAL calculated annualShoots value in your question
+- If they say the number is wrong, direct them to scroll down to the calculator
+- After they adjust the calculator, a new message will be triggered automatically
+- Acknowledge their new values: "Got it! Updated to {newValue} shoots/year..."
 
 **PRICING FORMULA:**
 - Monthly price: Based on usage tier (show actual tiers from the website)
@@ -231,6 +239,13 @@ User previously answered: "about 50 hours"
    Keep it to 1-2 sentences MAX.
    lowercase, casual, friendly tone.
 
+   **FOR THE FIRST MESSAGE ONLY:**
+   - ALWAYS start by asking if their annual shoots number is accurate
+   - Include a markdown link to the calculator: [click here to adjust your calculator](#calculator)
+   - Wait for them to confirm or adjust before moving to step 2
+   - If they adjust calculator, acknowledge: "Perfect! I see you're now at {newValue} shoots/year..."
+   - Use these quick replies: ␞QUICK_REPLIES: Yes, that's right | No, let me adjust | I do more shoots | I do fewer shoots
+
    Then end with:
    ␞QUICK_REPLIES: response1 | response2 | response3 | response4
    ␞NEXT_MESSAGE: 30
@@ -266,9 +281,9 @@ User previously answered: "about 50 hours"
 ---
 
 **EXAMPLE OPENING:**
-i see you're doing about 104 shoots a year — what's your goal for next year?
+i see you're doing about 104 shoots a year (based on your calculator settings) — is that accurate? if not, scroll down to adjust the calculator and i'll update my question!
 
-␞QUICK_REPLIES: 150 shoots | double my business | not sure yet, tell me more | what's the pricing?
+␞QUICK_REPLIES: Yes, that's right | No, let me adjust | I do more shoots | I do fewer shoots
 ␞NEXT_MESSAGE: 45
 
 **ANOTHER EXAMPLE:**
@@ -358,10 +373,10 @@ export async function getChatResponseStream(
   try {
     // Fetch repo content (STATIC - highly cacheable)
     const repoStart = Date.now();
-    statusCallback?.('🗂️ loading codebase...');
+    statusCallback?.('🗂️ loading codebase (150k+ lines of context)...');
     const repoContent = await fetchRepoContent();
     const repoTime = Date.now() - repoStart;
-    statusCallback?.('✅ codebase loaded', repoTime);
+    statusCallback?.(`✅ codebase loaded in ${repoTime}ms`, repoTime);
 
     // Build STATIC system message (repo content + instructions) - goes first for caching
     const staticInstructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
@@ -389,6 +404,14 @@ export async function getChatResponseStream(
         }
       });
     }
+
+    // Show what we're building the prompt with
+    const historyTimestamp = history && history.length > 0
+      ? new Date((history[history.length - 1] as any)?.timestamp || Date.now()).toLocaleTimeString()
+      : 'none';
+    const codeTimestamp = new Date().toLocaleTimeString(); // Code just loaded
+    const promptSize = Math.round(staticInstructions.length / 1000);
+    statusCallback?.(`📝 building ${promptSize}k char prompt with ${history.length} messages...`);
 
     // Build messages array - static first (cacheable), then dynamic, then conversation
     const messages = [
@@ -420,7 +443,7 @@ export async function getChatResponseStream(
         ? `kull-session-${sessionId}`
         : `kull-anon-${Date.now()}`;
 
-    statusCallback?.('⏳ waiting for openai response...');
+    statusCallback?.(`🤖 sending ${promptSize}k chars to OpenAI ${model}...`);
     const fetchStart = Date.now();
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -463,8 +486,11 @@ export async function getChatResponseStream(
       return createErrorStream(userMessage);
     }
 
+    // API responded successfully with stream
+    const apiTime = Date.now() - fetchStart;
+    statusCallback?.(`✅ OpenAI responded in ${apiTime}ms`, apiTime);
     console.log(`[Chat] OpenAI stream ready, waiting for first byte...`);
-    statusCallback?.('⏳ openai thinking...');
+    statusCallback?.('⏳ waiting for AI to start thinking...');
     return response.body;
   } catch (error) {
     console.error('[Chat] Error calling OpenAI:', error);

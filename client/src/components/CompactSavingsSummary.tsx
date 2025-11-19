@@ -12,7 +12,7 @@ export function CompactSavingsSummary() {
   const [isHovered, setIsHovered] = useState(false);
   const [isButtonHovered, setIsButtonHovered] = useState(false);
 
-  const weeksPerYear = 52;
+  const weeksPerYear = 44;
   const totalHoursPerYear = shootsPerWeek * hoursPerShoot * weeksPerYear * teamSize;
   const totalCostPerYear = totalHoursPerYear * billableRate;
   const workweeksSaved = totalHoursPerYear / 40;
@@ -26,7 +26,7 @@ export function CompactSavingsSummary() {
   const savingsByEndOfYear = Math.round(totalCostPerYear * yearProgressRatio);
   const hoursByEndOfYear = Math.round(totalHoursPerYear * yearProgressRatio);
 
-  const standardWorkingHoursPerYear = 40 * 52;
+  const standardWorkingHoursPerYear = 40 * 44;
   const percentageOfWorkYear = ((totalHoursPerYear / standardWorkingHoursPerYear) * 100).toFixed(1);
 
   const handleStartTrial = () => {
@@ -45,10 +45,10 @@ export function CompactSavingsSummary() {
   };
 
   const headerText = hasManuallyAdjusted
-    ? "Culling manually is wasting your most precious productive hours. Instead you could save..."
+    ? "Culling manually is wasting your most precious productive hours. Instead you could&nbsp;save..."
     : hasClickedPreset
-    ? "You could be saving as much as..."
-    : "The average Kull customer saves...";
+    ? "You could be saving as much&nbsp;as..."
+    : "The average Kull customer&nbsp;saves...";
 
   return (
     <div className="max-w-4xl mx-auto mt-16 px-4 pb-8">
@@ -122,15 +122,15 @@ export function CompactSavingsSummary() {
 
           <div className="bg-black/50 backdrop-blur-sm border border-white/40 rounded-xl p-4 mb-6 space-y-3">
             <p className="text-sm text-center text-white font-bold">
-              <span className="text-white drop-shadow">Reclaim {workweeksSaved.toFixed(1)} weeks <span className="underline font-black italic">every year</span></span> for family or creative work you love
+              <span className="text-white drop-shadow">Reclaim {workweeksSaved.toFixed(1)}&nbsp;weeks <span className="underline font-black italic">every&nbsp;year</span></span> for family or creative work you&nbsp;love
             </p>
             <p className="text-xs text-center text-white/95 leading-relaxed border-t border-white/40 pt-3">
-              By end of {today.getFullYear()}: save <span className="font-bold">${savingsByEndOfYear.toLocaleString()}</span> and gain <span className="font-bold">{hoursByEndOfYear} hours</span> for editing your best shots.{" "}
+              By end of {today.getFullYear()}: save <span className="font-bold">${savingsByEndOfYear.toLocaleString()}</span> and gain <span className="font-bold">{hoursByEndOfYear}&nbsp;hours</span> for editing your best&nbsp;shots.{" "}
               <button
                 onClick={scrollToCalculator}
                 className="text-white font-bold hover:underline cursor-pointer underline decoration-2 decoration-white/60"
               >
-                Sound incorrect? Try our calculator
+                Sound incorrect? Try our&nbsp;calculator
               </button>
             </p>
           </div>
@@ -138,7 +138,7 @@ export function CompactSavingsSummary() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs text-white font-semibold">
               <Shield className="w-5 h-5 text-white drop-shadow flex-shrink-0" />
-              <span>Risk-Free Trial • Cancel Anytime</span>
+              <span>Risk-Free Trial&nbsp;&bull; Cancel&nbsp;Anytime</span>
             </div>
             <Button
               onClick={handleStartTrial}

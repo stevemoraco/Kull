@@ -67,8 +67,8 @@ export function ProblemSection() {
   const problems = [
     {
       icon: Clock,
-      title: "Hours Wasted on Manual Rating",
-      description: "Spending hours sorting through thousands of photos from a single shoot"
+      title: "Hours Wasted on Manual&nbsp;Rating",
+      description: "Spending hours sorting through thousands of photos from a single&nbsp;shoot"
     },
     {
       icon: Eye,
@@ -77,18 +77,18 @@ export function ProblemSection() {
     },
     {
       icon: Frown,
-      title: "Delayed Deliveries",
-      description: "Clients waiting days or weeks for their photos because culling takes forever"
+      title: "Delayed&nbsp;Deliveries",
+      description: "Clients waiting days or weeks for their photos because culling takes&nbsp;forever"
     },
     {
       icon: XCircle,
-      title: "Missing Revenue",
-      description: "Can't take on more clients because you're stuck in the editing workflow bottleneck"
+      title: "Missing&nbsp;Revenue",
+      description: "Can't take on more clients because you're stuck in the editing workflow&nbsp;bottleneck"
     }
   ];
 
   // Calculate totals
-  const weeksPerYear = 52;
+  const weeksPerYear = 44;
   const totalHoursPerYear = shootsPerWeek * hoursPerShoot * weeksPerYear * teamSize;
   const totalCostPerYear = totalHoursPerYear * billableRate;
   const workweeksSaved = totalHoursPerYear / 40; // 40 hours per workweek
@@ -105,7 +105,7 @@ export function ProblemSection() {
   const hoursByEndOfYear = Math.round(totalHoursPerYear * yearProgressRatio);
 
   // Calculate percentage of total working hours
-  const standardWorkingHoursPerYear = 40 * 52; // 2,080 hours
+  const standardWorkingHoursPerYear = 40 * 44; // 1,760 hours
   const percentageOfWorkYear = ((totalHoursPerYear / standardWorkingHoursPerYear) * 100).toFixed(1);
   const weeksReclaimed = (totalHoursPerYear / 40).toFixed(1);
 
@@ -114,9 +114,9 @@ export function ProblemSection() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-problem-headline">
-            The Photo Rating Nightmare
+            The Photo Rating&nbsp;Nightmare
             <br />
-            Every Photographer Knows
+            Every Photographer&nbsp;Knows
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
             You love capturing moments, not spending hours staring at thumbnails deciding which shots make the cut.
@@ -157,10 +157,10 @@ export function ProblemSection() {
                   </span>
                 </div>
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground mb-3 leading-tight">
-                  Manual culling is a pain.
+                  Manual culling is a&nbsp;pain.
                 </h2>
                 <p className="text-xl md:text-2xl text-muted-foreground">
-                  Why waste another minute of your time & your creativity?
+                  Why waste another minute of your time &amp;&nbsp;your&nbsp;creativity?
                 </p>
               </div>
 
@@ -237,7 +237,7 @@ export function ProblemSection() {
                         ${totalCostPerYear.toLocaleString()}
                       </p>
                       <p className="text-sm text-white/80 leading-snug">
-                        worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
+                        worth of billable, working hours out of 1,760 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
                         {!hasBillableRateChanged && (
                           <span className="inline-block">(
                           <button
@@ -477,7 +477,7 @@ export function ProblemSection() {
                             ${totalCostPerYear.toLocaleString()}
                           </p>
                           <p className="text-sm text-white/80 leading-snug">
-                            worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
+                            worth of billable, working hours out of 1,760 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
                             {!hasBillableRateChanged && (
                               <span className="inline-block">(
                               <button

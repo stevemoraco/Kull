@@ -82,6 +82,26 @@ export interface CreditSummary {
   ledger: CreditLedger[];
 }
 
+export interface QuestionRecord {
+  step: number;
+  question: string;
+  timestamp: Date;
+}
+
+export interface AnswerRecord {
+  step: number;
+  question: string;
+  answer: string;
+  timestamp: Date;
+}
+
+export interface ConversationState {
+  questionsAsked: QuestionRecord[];
+  questionsAnswered: AnswerRecord[];
+  currentStep: number;
+  offTopicCount: number;
+}
+
 export interface IStorage {
   // User operations (required for Replit Auth / authentication)
   getUser(id: string): Promise<User | undefined>;
@@ -159,6 +179,10 @@ export interface IStorage {
   saveChatSession(session: InsertChatSession): Promise<ChatSession>;
   getChatSessions(userId?: string): Promise<ChatSession[]>;
   deleteChatSession(sessionId: string): Promise<void>;
+
+  // Conversation state tracking operations
+  updateConversationState(sessionId: string, state: ConversationState): Promise<void>;
+  getConversationState(sessionId: string): Promise<ConversationState | null>;
 
   // Prompt marketplace operations (website prompts)
   createPrompt(prompt: InsertPrompt): Promise<Prompt>;
@@ -1641,6 +1665,37 @@ export class DatabaseStorage implements IStorage {
       .from(notificationPreferences)
       .where(eq(notificationPreferences.userId, userId));
     return prefs;
+  }
+
+  // Conversation state tracking - stored in memory for session duration
+  private conversationStates = new Map<string, ConversationState>();
+
+  async updateConversationState(sessionId: string, state: ConversationState): Promise<void> {
+    this.conversationStates.set(sessionId, {
+      ...state,
+      questionsAsked: state.questionsAsked.map(q => ({
+        ...q,
+        timestamp: q.timestamp instanceof Date ? q.timestamp : new Date(q.timestamp)
+      })),
+      questionsAnswered: state.questionsAnswered.map(a => ({
+        ...a,
+        timestamp: a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp)
+      }))
+    });
+  }
+
+  async getConversationState(sessionId: string): Promise<ConversationState | null> {
+    const state = this.conversationStates.get(sessionId);
+    if (!state) {
+      // Initialize default state if none exists
+      return {
+        questionsAsked: [],
+        questionsAnswered: [],
+        currentStep: 1,
+        offTopicCount: 0
+      };
+    }
+    return state;
   }
 }
 

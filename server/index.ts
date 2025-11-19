@@ -13,6 +13,7 @@ import { bootstrapNotificationAdapters } from "./services/bootstrapNotifications
 import transcribeRouter from "./routes/transcribe";
 import notificationsRouter from "./routes/notifications";
 import xmpExportRouter from "./routes/xmp-export";
+import { runMigrations } from "./migrate";
 
 const app = express();
 
@@ -76,6 +77,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runMigrations();
   bootstrapNotificationAdapters();
   const server = await registerRoutes(app);
 

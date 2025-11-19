@@ -16,6 +16,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { useCalculator } from '@/contexts/CalculatorContext';
+import { ConversationProgress } from '@/components/ConversationProgress';
 
 // 🔊 CYBERPUNK NOTIFICATION SOUND - Web Audio API
 function playCyberpunkDing() {
@@ -91,10 +92,18 @@ interface Message {
   timestamp: Date;
 }
 
+interface ConversationState {
+  questionsAsked: Array<{ step: number; question: string }>;
+  questionsAnswered: Array<{ step: number; question: string; answer: string }>;
+  currentStep: number;
+  totalSteps: number;
+}
+
 interface ChatSession {
   id: string;
   title: string;
   messages: Message[];
+  conversationState?: ConversationState;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -347,6 +356,45 @@ const getUserMetadata = async () => {
   }
 };
 
+// Helper to parse conversation state from messages
+function parseConversationState(messages: Message[], currentState?: ConversationState): ConversationState {
+  const questionsAsked: Array<{ step: number; question: string }> = [];
+  const questionsAnswered: Array<{ step: number; question: string; answer: string }> = [];
+
+  // Simple heuristic: AI messages ending with "?" are questions
+  // User messages following questions are answers
+  let stepCounter = 1;
+  let lastQuestion: { step: number; question: string } | null = null;
+
+  messages.forEach((message, index) => {
+    if (message.role === 'assistant') {
+      // Look for questions (messages ending with ?)
+      const questionMatch = message.content.match(/([^.!?]*\?)/g);
+      if (questionMatch && questionMatch.length > 0) {
+        // Take the last question in the message
+        const question = questionMatch[questionMatch.length - 1].trim();
+        lastQuestion = { step: stepCounter, question };
+        questionsAsked.push(lastQuestion);
+        stepCounter++;
+      }
+    } else if (message.role === 'user' && lastQuestion) {
+      // This is an answer to the last question
+      questionsAnswered.push({
+        ...lastQuestion,
+        answer: message.content,
+      });
+      lastQuestion = null;
+    }
+  });
+
+  return {
+    questionsAsked,
+    questionsAnswered,
+    currentStep: questionsAnswered.length + 1,
+    totalSteps: currentState?.totalSteps || 15,
+  };
+}
+
 export function SupportChat() {
   // Get calculator context
   const calculatorContext = useCalculator();
@@ -367,6 +415,12 @@ export function SupportChat() {
         id: 'main-session-persistent', // Fixed ID for persistence across page loads
         title: 'Chat with Kull',
         messages: [],
+        conversationState: {
+          questionsAsked: [],
+          questionsAnswered: [],
+          currentStep: 1,
+          totalSteps: 15,
+        },
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -408,12 +462,21 @@ export function SupportChat() {
   // Get current session
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const messages = currentSession?.messages || [];
+  const conversationState = currentSession?.conversationState || {
+    questionsAsked: [],
+    questionsAnswered: [],
+    currentStep: 1,
+    totalSteps: 15,
+  };
 
   const setMessages = (newMessages: Message[] | ((prev: Message[]) => Message[])) => {
     setSessions(prevSessions => {
       const updatedSessions = prevSessions.map(session => {
         if (session.id === currentSessionId) {
           const updatedMessages = typeof newMessages === 'function' ? newMessages(session.messages) : newMessages;
+
+          // Parse conversation state from messages
+          const newConversationState = parseConversationState(updatedMessages, session.conversationState);
 
           // ALWAYS generate title from most recent message (user or AI)
           let title = session.title;
@@ -436,6 +499,7 @@ export function SupportChat() {
           return {
             ...session,
             messages: updatedMessages,
+            conversationState: newConversationState,
             title,
             updatedAt: new Date(),
           };
@@ -549,6 +613,7 @@ export function SupportChat() {
   }, []); // Empty deps - only create interval once
   const [, setLocation] = useLocation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [transcriptSent, setTranscriptSent] = useState(false);
   const [nextMessageIn, setNextMessageIn] = useState<number | null>(null);
@@ -749,6 +814,134 @@ export function SupportChat() {
       document.removeEventListener('mouseup', handleTextSelect, true);
       document.removeEventListener('keyup', handleTextSelect, true);
       clearTimeout(hoverTimeout);
+    };
+  }, []);
+
+  // Track current section and scroll pauses for contextual awareness
+  useEffect(() => {
+    interface SectionData {
+      id: string;
+      title: string;
+      fullText: string;
+      timeEntered: number;
+      totalTimeSpent: number;
+    }
+
+    let currentSection: string | null = null;
+    let sectionEnterTime: number = Date.now();
+    const sectionTimeSpent = new Map<string, number>();
+
+    const getSectionData = (): SectionData[] => {
+      try {
+        const stored = sessionStorage.getItem('kull-section-tracking');
+        return stored ? JSON.parse(stored) : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const saveSectionData = (data: SectionData[]) => {
+      try {
+        sessionStorage.setItem('kull-section-tracking', JSON.stringify(data));
+      } catch (e) {
+        console.error('Failed to save section data:', e);
+      }
+    };
+
+    const saveCurrentSection = (sectionId: string, sectionTitle: string, sectionText: string) => {
+      try {
+        sessionStorage.setItem('kull-current-section', JSON.stringify({
+          id: sectionId,
+          title: sectionTitle,
+          fullText: sectionText,
+          timestamp: new Date().toISOString(),
+        }));
+      } catch (e) {
+        console.error('Failed to save current section:', e);
+      }
+    };
+
+    // Find all major sections on the page
+    const sections = document.querySelectorAll('section, [data-section], main > div[id], main > div[class*="section"]');
+
+    if (sections.length === 0) {
+      console.log('[Section Tracking] No sections found on page');
+      return;
+    }
+
+    // Intersection Observer to track which section is visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            const section = entry.target as HTMLElement;
+            const sectionId = section.id || section.dataset.section || section.className.split(' ')[0] || 'unknown';
+
+            // Get section title (h1, h2, or first heading)
+            const titleElement = section.querySelector('h1, h2, h3');
+            const sectionTitle = titleElement?.textContent?.trim() || sectionId;
+
+            // Get full text content of section
+            const sectionText = section.textContent?.trim().substring(0, 2000) || ''; // Limit to 2000 chars
+
+            // Track time spent in previous section
+            if (currentSection && currentSection !== sectionId) {
+              const timeSpent = Date.now() - sectionEnterTime;
+              const existing = sectionTimeSpent.get(currentSection) || 0;
+              sectionTimeSpent.set(currentSection, existing + timeSpent);
+
+              // Save section data
+              const sectionData = getSectionData();
+              const existingSection = sectionData.find(s => s.id === currentSection);
+              if (existingSection) {
+                existingSection.totalTimeSpent += timeSpent;
+              } else {
+                sectionData.push({
+                  id: currentSection,
+                  title: sectionTitle,
+                  fullText: sectionText,
+                  timeEntered: sectionEnterTime,
+                  totalTimeSpent: timeSpent,
+                });
+              }
+              saveSectionData(sectionData.slice(-20)); // Keep last 20 sections
+            }
+
+            // Update current section
+            currentSection = sectionId;
+            sectionEnterTime = Date.now();
+            saveCurrentSection(sectionId, sectionTitle, sectionText);
+
+            console.log('[Section Tracking] Now viewing:', sectionTitle, `(${sectionId})`);
+          }
+        });
+      },
+      {
+        threshold: [0.5], // Trigger when 50% of section is visible
+        rootMargin: '-10% 0px -10% 0px', // Focus on center of viewport
+      }
+    );
+
+    // Observe all sections
+    sections.forEach((section) => observer.observe(section));
+
+    // Cleanup
+    return () => {
+      observer.disconnect();
+
+      // Save final time spent in current section
+      if (currentSection) {
+        const timeSpent = Date.now() - sectionEnterTime;
+        const existing = sectionTimeSpent.get(currentSection) || 0;
+        sectionTimeSpent.set(currentSection, existing + timeSpent);
+
+        const sectionData = getSectionData();
+        const existingSection = sectionData.find(s => s.id === currentSection);
+        if (existingSection) {
+          existingSection.totalTimeSpent += timeSpent;
+        }
+        saveSectionData(sectionData);
+      }
     };
   }, []);
 
@@ -1031,6 +1224,17 @@ export function SupportChat() {
         console.log('[Chat] Latest 3 messages:', fullChatHistory.slice(-3));
         console.log('[Chat] Last AI message was at:', new Date(lastAiMessageTime).toISOString());
 
+        // Get current section for logging
+        const currentSectionData = (() => {
+          try {
+            const stored = sessionStorage.getItem('kull-current-section');
+            return stored ? JSON.parse(stored) : null;
+          } catch {
+            return null;
+          }
+        })();
+        console.log('[Chat] Current section:', currentSectionData?.title || 'none');
+
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1048,6 +1252,23 @@ export function SupportChat() {
               hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
               hasClickedPreset: calculatorContext.hasClickedPreset,
             },
+            // Current section and scroll behavior
+            currentSection: (() => {
+              try {
+                const stored = sessionStorage.getItem('kull-current-section');
+                return stored ? JSON.parse(stored) : null;
+              } catch {
+                return null;
+              }
+            })(),
+            sectionHistory: (() => {
+              try {
+                const stored = sessionStorage.getItem('kull-section-tracking');
+                return stored ? JSON.parse(stored) : [];
+              } catch {
+                return [];
+              }
+            })(),
           }),
         });
 
@@ -1091,8 +1312,9 @@ export function SupportChat() {
                   flushSync(() => {
                     setLatestGreeting(prev => {
                       // Start fresh if we have actual content already (not status)
-                      // Status emojis: 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
+                      // Status emojis: 📤 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
                       const hasRealContent = prev &&
+                        !prev.includes('📤') &&
                         !prev.includes('📊') &&
                         !prev.includes('📝') &&
                         !prev.includes('✅') &&
@@ -1116,9 +1338,9 @@ export function SupportChat() {
                   });
                 } else if (data.type === 'delta' && data.content) {
                   // Clear status messages when first real content arrives
-                  if (fullContent.includes('📊') || fullContent.includes('📝') || fullContent.includes('✅') ||
-                      fullContent.includes('🤖') || fullContent.includes('⏳') || fullContent.includes('🗂️') ||
-                      fullContent.includes('⚠️')) {
+                  if (fullContent.includes('📤') || fullContent.includes('📊') || fullContent.includes('📝') ||
+                      fullContent.includes('✅') || fullContent.includes('🤖') || fullContent.includes('⏳') ||
+                      fullContent.includes('🗂️') || fullContent.includes('⚠️')) {
                     fullContent = '';
                   }
 
@@ -1146,7 +1368,8 @@ export function SupportChat() {
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
-          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?QUICK_REPLIES:\s*([^\n]+)/i);
+          // Stop at newline, ␞, or NEXT_MESSAGE to prevent metadata leakage
+          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?QUICK_REPLIES:\s*([^␞\n]+?)(?:\s*␞|\s*NEXT_MESSAGE|$)/i);
 
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
@@ -1168,10 +1391,12 @@ export function SupportChat() {
 
           // Parse and display follow-up questions
           if (followUpMatch) {
-            const questionsText = followUpMatch[1];
+            const questionsText = followUpMatch[1].trim();
             const newQuestions = questionsText
               .split('|')
               .map((q: string) => q.trim())
+              // Remove any trailing metadata that slipped through
+              .map((q: string) => q.replace(/␞.*$/, '').replace(/NEXT_MESSAGE.*$/i, '').trim())
               .filter((q: string) => q.length > 5 && q.length < 200);
 
             if (newQuestions.length > 0) {
@@ -1526,15 +1751,53 @@ export function SupportChat() {
         console.error('[Chat] Request timeout after 60 seconds');
       }, 60000);
 
+      // Collect data to send
+      const userActivity = JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]');
+      const pageVisits = JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]');
+
+      // Show client-side preparation status
+      let historyTimestamp = 'now';
+      try {
+        const lastMsg = freshHistory[freshHistory.length - 1];
+        if (lastMsg?.timestamp) {
+          historyTimestamp = new Date(lastMsg.timestamp).toLocaleTimeString();
+        }
+      } catch (e) {
+        historyTimestamp = 'now';
+      }
+
+      // Break down events by type
+      const clicks = userActivity.filter((e: any) => e.type === 'click').length;
+      const scrolls = userActivity.filter((e: any) => e.type === 'scroll').length;
+      const hovers = userActivity.filter((e: any) => e.type === 'hover').length;
+      const inputs = userActivity.filter((e: any) => e.type === 'input').length;
+      const selects = userActivity.filter((e: any) => e.type === 'select').length;
+      const eventBreakdown = userActivity.length > 0
+        ? `${userActivity.length} events (${clicks} clicks, ${scrolls} scrolls, ${hovers} hovers, ${inputs} inputs, ${selects} selects)`
+        : '0 events';
+
+      flushSync(() => {
+        setMessages(prev => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg && lastMsg.role === 'assistant') {
+            lastMsg.content = `📤 sending chat history (${freshHistory.length} msgs from ${historyTimestamp})...\n`;
+            lastMsg.content += `📤 sending ${eventBreakdown}...\n`;
+          }
+          return updated;
+        });
+      });
+
       // DEEP RESEARCH LOGGING: Verify what we're sending
       const payload = {
         message: messageText.trim(),
         history: freshHistory, // ✅ Send FRESH history including the new user message!
-        userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
-        pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
+        userActivity,
+        pageVisits,
         allSessions: sessions, // Send ALL previous sessions for this user
         sessionId: currentSessionId,
         sessionStartTime, // For accurate session length calculation
+        conversationState: conversationState, // Send current conversation progress
         calculatorData: {
           shootsPerWeek: calculatorContext.shootsPerWeek,
           hoursPerShoot: calculatorContext.hoursPerShoot,
@@ -1542,11 +1805,30 @@ export function SupportChat() {
           hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
           hasClickedPreset: calculatorContext.hasClickedPreset,
         },
+        // Current section and scroll behavior
+        currentSection: (() => {
+          try {
+            const stored = sessionStorage.getItem('kull-current-section');
+            return stored ? JSON.parse(stored) : null;
+          } catch {
+            return null;
+          }
+        })(),
+        sectionHistory: (() => {
+          try {
+            const stored = sessionStorage.getItem('kull-section-tracking');
+            return stored ? JSON.parse(stored) : [];
+          } catch {
+            return [];
+          }
+        })(),
       };
 
       console.log('[DEEP RESEARCH] Sending to /api/chat/message:');
       console.log('  - message length:', messageText.trim().length);
       console.log('  - history:', freshHistory.length, 'messages (FRESH - captured at millisecond precision)');
+      console.log('  - currentSection:', payload.currentSection?.title || 'none');
+      console.log('  - sectionHistory:', payload.sectionHistory.length, 'sections visited');
       console.log('  - VERIFICATION: Last message in history IS the user message just sent:',
         freshHistory[freshHistory.length - 1]?.content === messageText.trim() ? '✅ YES' : '❌ NO - STALE!');
       console.log('  - history[0]:', freshHistory[0] ? JSON.stringify(freshHistory[0]).substring(0, 100) + '...' : 'N/A');
@@ -1637,15 +1919,18 @@ export function SupportChat() {
                     const lastMsg = updated[updated.length - 1];
                     if (lastMsg && lastMsg.role === 'assistant') {
                       // Check if content already has real text (not status or thinking marker)
-                      // Status emojis: 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
+                      // Status emojis: 📤 📊 📝 ✅ 🤖 ⏳ 🗂️ ⚠️
                       const isStatusOrThinking = !lastMsg.content ||
                         lastMsg.content === '__THINKING__' ||
+                        lastMsg.content.includes('📤') ||
                         lastMsg.content.includes('📊') ||
                         lastMsg.content.includes('📝') ||
                         lastMsg.content.includes('✅') ||
                         lastMsg.content.includes('🤖') ||
                         lastMsg.content.includes('⏳') ||
                         lastMsg.content.includes('🗂️') ||
+                        lastMsg.content.includes('⚙️') ||
+                        lastMsg.content.includes('✨') ||
                         lastMsg.content.includes('⚠️');
 
                       console.log('[STATUS] Current content:', lastMsg.content);
@@ -1717,13 +2002,16 @@ export function SupportChat() {
                   const questionsSection = fullContent.substring(cutoffIndex);
 
                   // Extract follow-up questions - look for the line after cutoff
-                  const followUpMatch = questionsSection.match(/QUICK_REPLIES:\s*([^\n]+)/i);
+                  // Stop at newline, ␞, or NEXT_MESSAGE
+                  const followUpMatch = questionsSection.match(/QUICK_REPLIES:\s*([^␞\n]+?)(?:\s*␞|\s*NEXT_MESSAGE|$)/i);
 
                   if (followUpMatch) {
-                    const questionsText = followUpMatch[1];
+                    const questionsText = followUpMatch[1].trim();
                     const newQuestions = questionsText
                       .split('|')
                       .map((q: string) => q.trim())
+                      // Remove any trailing metadata that slipped through
+                      .map((q: string) => q.replace(/␞.*$/, '').replace(/NEXT_MESSAGE.*$/i, '').trim())
                       .filter((q: string) => q.length > 5 && q.length < 200);
 
                     if (newQuestions.length > 0) {
@@ -1860,6 +2148,218 @@ export function SupportChat() {
     }
   };
 
+  // Automated message sender for system events (calculator changes, etc.)
+  const sendAutomatedMessage = useCallback(async (systemPrompt: string) => {
+    // Only send if chat has been opened and user has interacted
+    if (!isOpen || messages.length === 0) {
+      console.log('[Chat] Skipping automated message - chat not active');
+      return;
+    }
+
+    // Don't interrupt if already loading
+    if (isLoading) {
+      console.log('[Chat] Skipping automated message - already loading');
+      return;
+    }
+
+    console.log('[Chat] Sending automated message:', systemPrompt);
+
+    // Track as automated message
+    lastAiMessageTimeRef.current = Date.now();
+
+    // Create placeholder assistant message with "Thinking..." indicator
+    const assistantMessageId = Date.now().toString();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '__THINKING__',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+    setIsLoading(true);
+
+    try {
+      // Create an AbortController with 60 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.error('[Chat] Automated message timeout after 60 seconds');
+      }, 60000);
+
+      // Collect data to send
+      const userActivity = JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]');
+      const pageVisits = JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]');
+
+      // Get fresh history
+      let freshHistory: Message[] = [];
+      setMessages(prev => {
+        freshHistory = prev;
+        return prev;
+      });
+
+      const payload = {
+        message: systemPrompt, // System prompt for AI to acknowledge calculator change
+        history: freshHistory,
+        userActivity,
+        pageVisits,
+        allSessions: sessions,
+        sessionId: currentSessionId,
+        sessionStartTime,
+        conversationState: conversationState,
+        calculatorData: {
+          shootsPerWeek: calculatorContext.shootsPerWeek,
+          hoursPerShoot: calculatorContext.hoursPerShoot,
+          billableRate: calculatorContext.billableRate,
+          hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+          hasClickedPreset: calculatorContext.hasClickedPreset,
+        },
+        currentSection: (() => {
+          try {
+            const stored = sessionStorage.getItem('kull-current-section');
+            return stored ? JSON.parse(stored) : null;
+          } catch {
+            return null;
+          }
+        })(),
+        sectionHistory: (() => {
+          try {
+            const stored = sessionStorage.getItem('kull-section-tracking');
+            return stored ? JSON.parse(stored) : [];
+          } catch {
+            return [];
+          }
+        })(),
+      };
+
+      console.log('[Chat] Automated message payload prepared');
+
+      const response = await fetch('/api/chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'credentials': 'include',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error('Failed to get automated response');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  fullContent += parsed.content;
+                  flushSync(() => {
+                    setMessages(prev => {
+                      const updated = [...prev];
+                      const lastMsg = updated[updated.length - 1];
+                      if (lastMsg && lastMsg.role === 'assistant') {
+                        lastMsg.content = fullContent;
+                      }
+                      return updated;
+                    });
+                  });
+                }
+              } catch (e) {
+                console.error('[Chat] Error parsing automated message SSE:', e);
+              }
+            }
+          }
+        }
+      }
+
+      // Play notification sound for automated messages
+      if (isTabVisibleRef.current) {
+        playCyberpunkDing();
+      }
+
+      console.log('[Chat] Automated message completed:', fullContent.substring(0, 100) + '...');
+    } catch (error: any) {
+      console.error('[Chat] Error in sendAutomatedMessage:', error);
+      // Remove the failed assistant message silently
+      setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isOpen, messages.length, isLoading, sessions, currentSessionId, sessionStartTime, conversationState, calculatorContext]);
+
+  // Listen for calculator changes and trigger automated AI acknowledgment
+  useEffect(() => {
+    const handleCalculatorChange = (values: { shootsPerWeek: number; hoursPerShoot: number; billableRate: number }) => {
+      console.log('[Chat] Calculator values changed:', values);
+
+      // Only trigger if chat is open and user has had at least 1 interaction
+      if (messages.length > 0 && isOpen) {
+        const annualShoots = values.shootsPerWeek * 44;
+        const annualHours = annualShoots * values.hoursPerShoot;
+        const annualRevenue = annualHours * values.billableRate;
+
+        // Send system message to AI to acknowledge the change
+        const systemPrompt = `[CALCULATOR UPDATE] User adjusted calculator values:
+- ${annualShoots} shoots/year (${values.shootsPerWeek} per week)
+- ${values.hoursPerShoot} hours per shoot
+- $${values.billableRate}/hour billable rate
+- ${annualHours.toFixed(0)} hours/year spent culling
+- $${annualRevenue.toLocaleString()} annual revenue lost
+
+Please acknowledge this change naturally in 1-2 sentences and relate it to our conversation.`;
+
+        sendAutomatedMessage(systemPrompt);
+      }
+    };
+
+    // Register the listener
+    const unregister = calculatorContext.registerChangeListener(handleCalculatorChange);
+
+    // Cleanup on unmount
+    return () => {
+      unregister();
+    };
+  }, [calculatorContext, messages.length, isOpen, sendAutomatedMessage]);
+
+  // Click outside to close chat
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chatWindowRef.current && !chatWindowRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    // Add a small delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await sendMessage(inputValue);
@@ -1872,13 +2372,19 @@ export function SupportChat() {
     "Can I cancel my trial?",
   ]);
 
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const handleNewSession = () => {
     const newSession: ChatSession = {
       id: Date.now().toString(),
       title: 'New Chat',
       messages: [],
+      conversationState: {
+        questionsAsked: [],
+        questionsAnswered: [],
+        currentStep: 1,
+        totalSteps: 15,
+      },
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -2040,6 +2546,7 @@ export function SupportChat() {
       {/* Chat Window */}
       {isOpen && (
         <div
+          ref={chatWindowRef}
           className={`fixed bg-card border border-card-border rounded-2xl shadow-2xl flex flex-col z-[9999] overflow-hidden transition-all duration-300 ${
             isFullscreen
               ? 'inset-4 md:inset-8'
@@ -2197,7 +2704,7 @@ export function SupportChat() {
                 className="text-primary-foreground bg-primary-foreground/30 hover:bg-primary-foreground/40 no-default-hover-elevate"
                 data-testid="button-reset-chat"
               >
-                <RotateCcw className="w-4 h-4 mr-1.5" />
+                <Plus className="w-4 h-4 mr-1.5" />
                 <span className="text-xs font-medium">New Chat</span>
               </Button>
               <Button
@@ -2213,8 +2720,21 @@ export function SupportChat() {
             </div>
           </div>
 
+          {/* Conversation Progress - pinned to top */}
+          {(conversationState.questionsAsked.length > 0 || conversationState.questionsAnswered.length > 0) && (
+            <div className="sticky top-0 z-30">
+              <ConversationProgress
+                questionsAsked={conversationState.questionsAsked}
+                questionsAnswered={conversationState.questionsAnswered}
+                currentStep={conversationState.currentStep}
+                totalSteps={conversationState.totalSteps}
+              />
+            </div>
+          )}
+
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background overscroll-contain">
+            {/* Chat messages */}
             {messages
               .filter(m => !m.content.includes('[Continue conversation naturally based on context]'))
               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -2240,19 +2760,29 @@ export function SupportChat() {
                           <span className="text-teal-700 italic">Generating your personalized greeting...</span>
                         </div>
                       ) : message.content === '__THINKING__' ||
+                          message.content.includes('📤') ||
                           message.content.includes('📊') ||
                           message.content.includes('📝') ||
                           message.content.includes('✅') ||
                           message.content.includes('🤖') ||
                           message.content.includes('⏳') ||
                           message.content.includes('🗂️') ||
+                          message.content.includes('⚙️') ||
+                          message.content.includes('✨') ||
                           message.content.includes('⚠️') ? (
-                        // Special rendering for status messages - show actual status text with timestamps
-                        <div className="flex items-start gap-3 border-l-4 border-teal-400 pl-3 py-1 bg-teal-50/50 rounded-r">
-                          <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-teal-700 text-xs font-mono whitespace-pre-wrap">
-                            {message.content === '__THINKING__' ? 'Thinking...' : message.content}
-                          </span>
+                        // Special rendering for status messages - LARGE, PROMINENT display
+                        <div className="flex flex-col gap-2 border-l-4 border-teal-500 pl-4 py-3 bg-gradient-to-r from-teal-50 to-transparent rounded-r shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <Loader2 className="w-5 h-5 animate-spin text-teal-600 flex-shrink-0" />
+                            <span className="text-sm font-semibold text-teal-800">
+                              {message.content === '__THINKING__' ? 'Preparing your response...' : 'Processing...'}
+                            </span>
+                          </div>
+                          <div className="text-xs font-mono text-teal-700 whitespace-pre-wrap leading-relaxed pl-8">
+                            {message.content === '__THINKING__'
+                              ? 'Loading context from repository and building AI prompt...'
+                              : message.content}
+                          </div>
                         </div>
                       ) : message.content.length === 0 ? (
                         // Waiting for first token
@@ -2282,24 +2812,26 @@ export function SupportChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Replies with toggle */}
-          <div className="border-t border-border bg-muted/30">
+          {/* Quick Replies with toggle - dark aqua gradient, transparent when closed, scrollable when open */}
+          <div className={`border-t ${showSuggestions ? 'border-slate-700/50 bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm' : 'border-transparent'}`}>
             <button
               onClick={() => setShowSuggestions(!showSuggestions)}
-              className="w-full px-4 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors"
+              className={`w-full px-4 py-3 flex items-center justify-between transition-all ${
+                showSuggestions ? 'hover:bg-slate-700/30' : 'hover:bg-slate-800/20'
+              }`}
               data-testid="button-toggle-suggestions"
             >
-              <p className="text-xs font-semibold text-muted-foreground">
+              <p className={`text-xs font-semibold ${showSuggestions ? 'text-cyan-300' : 'text-muted-foreground'}`}>
                 Quick Replies ({quickQuestions.length})
               </p>
               {showSuggestions ? (
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                <ChevronUp className="w-4 h-4 text-cyan-300" />
               ) : (
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               )}
             </button>
             {showSuggestions && quickQuestions.length > 0 && (
-              <div className="px-4 pb-2 flex flex-wrap gap-2">
+              <div className="px-4 pb-4 pt-2 max-h-40 overflow-y-auto flex flex-wrap gap-2">
                 {quickQuestions.map((question, idx) => (
                   <button
                     key={idx}
@@ -2307,7 +2839,7 @@ export function SupportChat() {
                       console.log('[Chat] Quick question clicked:', question);
                       sendMessage(question);
                     }}
-                    className="text-xs bg-background border border-border rounded-full px-3 py-1 hover-elevate active-elevate-2 text-foreground"
+                    className="text-xs bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white border border-cyan-400/30 rounded-full px-4 py-2 hover-elevate active-elevate-2 transition-all shadow-lg shadow-cyan-500/20"
                     data-testid={`button-quick-question-${idx}`}
                   >
                     {question}

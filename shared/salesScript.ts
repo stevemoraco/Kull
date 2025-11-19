@@ -18,7 +18,7 @@ export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
   {
     step: 1,
     shortLabel: "Your goal",
-    question: "i see you're doing about [shootsPerWeek × 52] shoots a year — what's your goal for next year?",
+    question: "i see you're doing about [shootsPerWeek × 44] shoots a year — what's your goal for next year?",
     category: "discovery",
     required: true,
     interpolate: true
@@ -168,7 +168,7 @@ export const areAllRequiredQuestionsAnswered = (answeredSteps: number[]): boolea
 
 /**
  * Interpolate dynamic values into question text
- * Example: "[shootsPerWeek × 52]" becomes "104" if shootsPerWeek = 2
+ * Example: "[shootsPerWeek × 44]" becomes "88" if shootsPerWeek = 2
  */
 export const interpolateQuestion = (
   question: string,
@@ -176,10 +176,10 @@ export const interpolateQuestion = (
 ): string => {
   let interpolated = question;
 
-  // Replace [shootsPerWeek × 52] pattern
+  // Replace [shootsPerWeek × 44] pattern
   if (values.shootsPerWeek) {
-    const annualShoots = Number(values.shootsPerWeek) * 52;
-    interpolated = interpolated.replace(/\[shootsPerWeek × 52\]/g, String(annualShoots));
+    const annualShoots = Number(values.shootsPerWeek) * 44;
+    interpolated = interpolated.replace(/\[shootsPerWeek × 44\]/g, String(annualShoots));
   }
 
   // Replace any other [variable] patterns

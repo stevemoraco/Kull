@@ -42,10 +42,10 @@ export function FAQSection() {
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-faq-headline">
-            Frequently Asked Questions
+            Frequently Asked&nbsp;Questions
           </h2>
           <p className="text-lg text-muted-foreground">
-            Everything you need to know about Kull
+            Everything you need to know about&nbsp;Kull
           </p>
         </div>
 

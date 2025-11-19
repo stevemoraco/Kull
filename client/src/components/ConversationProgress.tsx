@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Check, Circle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, Circle, ChevronRight } from 'lucide-react';
 
 interface ConversationProgressProps {
   questionsAsked: Array<{ step: number; question: string }>;
@@ -14,7 +14,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
   currentStep,
   totalSteps,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showUpcoming, setShowUpcoming] = useState(false);
 
   const progressPercentage = Math.round((questionsAnswered.length / totalSteps) * 100);
@@ -23,61 +23,59 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
   // Find current question
   const currentQuestion = questionsAsked.find(q => q.step === currentStep);
 
+  // Get next 2 upcoming questions
+  const upcomingQuestions = questionsAsked
+    .filter(q => q.step > currentStep)
+    .slice(0, 2);
+
+  // Remaining questions after showing 2
+  const remainingCount = Math.max(0, upcomingCount - upcomingQuestions.length);
+
   return (
-    <div className="mb-6 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-md">
-      {/* Header */}
+    <div className="transition-all duration-300">
+      {/* Header - Compact collapsed state */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/50 transition-colors duration-200"
+        className="w-full px-2 py-1 flex items-center justify-between bg-blue-500/90 backdrop-blur-sm hover:bg-blue-600/90 transition-colors duration-200 rounded-md shadow-sm"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="relative">
-            {/* Circular progress indicator */}
-            <svg className="w-10 h-10 transform -rotate-90">
+            {/* Circular progress indicator - smaller */}
+            <svg className="w-4 h-4 transform -rotate-90">
               <circle
-                cx="20"
-                cy="20"
-                r="16"
+                cx="8"
+                cy="8"
+                r="6"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2"
                 fill="none"
-                className="text-gray-200"
+                className="text-white/30"
               />
               <circle
-                cx="20"
-                cy="20"
-                r="16"
+                cx="8"
+                cy="8"
+                r="6"
                 stroke="currentColor"
-                strokeWidth="3"
+                strokeWidth="2"
                 fill="none"
-                strokeDasharray={`${2 * Math.PI * 16}`}
-                strokeDashoffset={`${2 * Math.PI * 16 * (1 - progressPercentage / 100)}`}
-                className="text-green-500 transition-all duration-500"
+                strokeDasharray={`${2 * Math.PI * 6}`}
+                strokeDashoffset={`${2 * Math.PI * 6 * (1 - progressPercentage / 100)}`}
+                className="text-white transition-all duration-500"
                 strokeLinecap="round"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-700">
-              {progressPercentage}%
-            </span>
           </div>
 
           <div className="text-left">
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              Conversation Progress
+            <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
+              Progress: {questionsAnswered.length}/{totalSteps}
               {isExpanded ? (
-                <ChevronUp className="w-4 h-4 text-gray-500" />
+                <ChevronUp className="w-3 h-3 text-white/80" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="w-3 h-3 text-white/80" />
               )}
             </h3>
-            <p className="text-sm text-gray-600">
-              {questionsAnswered.length} of {totalSteps} questions answered
-            </p>
           </div>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 text-sm text-gray-500">
-          <span>{progressPercentage}% complete</span>
         </div>
       </button>
 
@@ -87,7 +85,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
           isExpanded ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
         } overflow-hidden`}
       >
-        <div className="px-6 pb-6 space-y-3">
+        <div className="px-6 pb-6 pt-3 space-y-3 bg-gradient-to-br from-gray-50 to-gray-100 rounded-b-xl shadow-sm border-x border-b border-gray-200">
           {/* Answered questions */}
           {questionsAnswered.length > 0 && (
             <div className="space-y-2">
@@ -141,8 +139,32 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
             </div>
           )}
 
-          {/* Upcoming questions */}
-          {upcomingCount > 0 && (
+          {/* Next 2 upcoming questions */}
+          {upcomingQuestions.length > 0 && (
+            <div className="space-y-2">
+              {upcomingQuestions.map((q, index) => (
+                <div
+                  key={`preview-${q.step}`}
+                  className="bg-white/50 rounded-lg p-3 border border-gray-200/60 opacity-60"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500 border-l-2 border-gray-300 pl-2">
+                        {index === 0 ? 'Next: ' : 'Coming soon: '}
+                        {q.question}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Remaining questions (collapsible) */}
+          {remainingCount > 0 && (
             <div className="mt-4">
               <button
                 onClick={() => setShowUpcoming(!showUpcoming)}
@@ -151,7 +173,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Circle className="w-4 h-4 text-gray-400" />
                   <span className="font-medium">
-                    {upcomingCount} more question{upcomingCount !== 1 ? 's' : ''}...
+                    {remainingCount} more question{remainingCount !== 1 ? 's' : ''}...
                   </span>
                 </div>
                 {showUpcoming ? (
@@ -165,6 +187,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
                 <div className="mt-2 space-y-2 animate-slideDown">
                   {questionsAsked
                     .filter(q => q.step > currentStep)
+                    .slice(2) // Skip the first 2 (already shown above)
                     .map((q, index) => (
                       <div
                         key={`upcoming-${q.step}`}

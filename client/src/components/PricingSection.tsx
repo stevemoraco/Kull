@@ -40,14 +40,14 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-pricing-headline">
-            Choose Your Plan
+            Choose Your&nbsp;Plan
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground mb-4">
-            All plans include a 1-day unlimited free trial
+            All plans include a 1-day unlimited free&nbsp;trial
           </p>
           <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2">
             <Zap className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">24-Hour Bonus: Get 3 extra months free on annual plans</span>
+            <span className="text-sm font-semibold text-foreground">24-Hour Bonus: Get 3&nbsp;extra months free on annual&nbsp;plans</span>
           </div>
         </div>
 
@@ -56,7 +56,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
           <div className="bg-card border border-card-border rounded-2xl p-8 md:p-10 hover-elevate" data-testid="card-pricing-professional">
             <div className="mb-6">
               <h3 className="text-2xl font-bold mb-2 text-card-foreground">Professional</h3>
-              <p className="text-muted-foreground">Perfect for individual photographers</p>
+              <p className="text-muted-foreground">Perfect for individual&nbsp;photographers</p>
             </div>
 
             <div className="mb-6">
@@ -97,7 +97,7 @@ export function PricingSection({ onSelectPlan }: PricingSectionProps) {
 
             <div className="mb-6">
               <h3 className="text-2xl font-bold mb-2 text-foreground">Studio</h3>
-              <p className="text-muted-foreground">For studios and high-volume photographers</p>
+              <p className="text-muted-foreground">For studios and high-volume&nbsp;photographers</p>
             </div>
 
             <div className="mb-6">

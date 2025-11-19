@@ -40,14 +40,14 @@ export function Hero() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20 text-center">
         <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4 max-w-[90vw]" data-testid="badge-announcement">
           <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold text-foreground text-center leading-tight">Edit Unlimited Photoshoots<br className="md:hidden" /> With Our Risk Free Trial</span>
+          <span className="text-sm font-semibold text-foreground text-center leading-tight">Edit Unlimited&nbsp;Photoshoots<br className="md:hidden" /> With Our Risk&nbsp;Free&nbsp;Trial</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-hero-headline">
-          Find All Your 5-Star <span className="inline-flex gap-1">⭐⭐⭐⭐⭐</span> Images In Seconds{" "}
-          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">even if you have</span>{" "}
-          <span className="text-primary">10,000+ photos</span>{" "}
-          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">across multiple photoshoots</span>
+          Find All Your 5-Star <span className="inline-flex gap-1">⭐⭐⭐⭐⭐</span> Images In&nbsp;Seconds{" "}
+          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">even if you&nbsp;have</span>{" "}
+          <span className="text-primary">10,000+&nbsp;photos</span>{" "}
+          <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">across multiple&nbsp;photoshoots</span>
         </h1>
 
         <div className="max-w-6xl mx-auto mb-8" data-testid="text-hero-subheadline">
@@ -90,8 +90,8 @@ export function Hero() {
                     <span className="text-2xl">⭐</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5 stars</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">All images starred in seconds based on your custom, sharable prompt</p>
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Rate 1-5&nbsp;stars</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">All images starred in seconds based on your custom, sharable&nbsp;prompt</p>
                   </div>
                 </div>
 
@@ -110,8 +110,8 @@ export function Hero() {
                     <span className="text-2xl">🔄</span>
                   </div>
                   <div className="flex-1 text-left">
-                    <h3 className="text-lg font-bold text-foreground leading-tight">Re-rank & Re-organize</h3>
-                    <p className="text-sm text-muted-foreground leading-snug mt-1">Get more or less strict selects instantly</p>
+                    <h3 className="text-lg font-bold text-foreground leading-tight">Re-rank &amp;&nbsp;Re-organize</h3>
+                    <p className="text-sm text-muted-foreground leading-snug mt-1">Get more or less strict selects&nbsp;instantly</p>
                   </div>
                 </div>
               </div>
@@ -206,7 +206,7 @@ export function Hero() {
 
         {/* AI Model badges */}
         <div className="mt-10 pt-6 border-t border-border/40">
-          <p className="text-sm text-muted-foreground mb-6 uppercase tracking-wide font-semibold">Powered by your preference from the latest AI models</p>
+          <p className="text-sm text-muted-foreground mb-6 uppercase tracking-wide font-semibold">Powered by your preference from the latest AI&nbsp;models</p>
           <div className="flex flex-wrap justify-center gap-6 max-w-6xl mx-auto">
             {/* OpenAI GPT-5.1 */}
             <div className="group relative bg-gradient-to-br from-gray-950 via-gray-900 to-black border border-gray-700/50 rounded-2xl px-6 py-4 shadow-xl hover:shadow-2xl transition-all hover:scale-105 hover:border-emerald-500/50" data-testid="badge-ai-gpt">
