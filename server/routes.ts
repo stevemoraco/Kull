@@ -10,9 +10,9 @@ import {
   cancelDripCampaign,
   processPendingEmails,
 } from "./emailService";
-import { insertRefundSurveySchema, supportQueries, users, conversationSteps, type User } from "@shared/schema";
+import { insertRefundSurveySchema, supportQueries, users, conversationSteps, chatSessions, type User } from "@shared/schema";
 import { db } from "./db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import Stripe from "stripe";
 import promptsRouter from "./routes/prompts";
 import deviceAuthRouter from "./routes/device-auth";
@@ -205,7 +205,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { db } = await import('./db');
       const { users } = await import('@shared/schema');
-      const { eq } = await import('drizzle-orm');
 
       await db.update(users)
         .set({ preferredChatModel: model, updatedAt: new Date() })
@@ -948,7 +947,6 @@ ${userActivity.map((event: any, idx: number) => {
       let conversationMemory = '';
       if (sessionId) {
         try {
-          const { eq } = await import('drizzle-orm');
           loadedSteps = await db
             .select()
             .from(conversationSteps)

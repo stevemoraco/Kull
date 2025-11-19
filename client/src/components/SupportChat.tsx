@@ -2374,6 +2374,10 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
 
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Track parsed Quick Replies and timing for persistence
+  const [lastParsedQuickReplies, setLastParsedQuickReplies] = useState<string[]>([]);
+  const [lastParsedNextMessage, setLastParsedNextMessage] = useState<number>(45);
+
   const handleNewSession = () => {
     const newSession: ChatSession = {
       id: Date.now().toString(),
