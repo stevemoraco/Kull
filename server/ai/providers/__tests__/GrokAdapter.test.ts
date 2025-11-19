@@ -943,7 +943,10 @@ describe('GrokAdapter', () => {
       expect(options.headers['Content-Type']).toBe('application/json');
       expect(options.headers['Authorization']).toContain('Bearer');
       expect(body.model).toBe('grok-2-vision-1212');
-      expect(body.response_format.type).toBe('json_object');
+      expect(body.response_format.type).toBe('json_schema');
+      expect(body.response_format.json_schema.name).toBe('photo_rating');
+      expect(body.response_format.json_schema.strict).toBe(true);
+      expect(body.response_format.json_schema.schema).toBeDefined();
       expect(body.max_tokens).toBe(2000);
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe('system');

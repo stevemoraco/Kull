@@ -103,7 +103,7 @@ export async function extractExif(input: string | Buffer | ArrayBuffer | Uint8Ar
         latitude: exif.GPSLatitude,
         longitude: exif.GPSLongitude,
         altitude: exif.GPSAltitude,
-        nearbyVenues: [] // Empty array by default, can be enriched later by ExifGeoContextService
+        nearbyVenues: undefined // Can be enriched later by ExifGeoContextService
       };
     }
 

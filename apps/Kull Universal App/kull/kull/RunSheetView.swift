@@ -14,7 +14,7 @@ struct RunSheetView: View {
     @State private var estimatedImageCount: Int = 0
     @StateObject private var runner = RunController()
     @StateObject private var cloudService = CloudAIService.shared
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
 
     var body: some View {
         if horizontalSizeClass == .regular {

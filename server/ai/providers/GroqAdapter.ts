@@ -62,6 +62,64 @@ export class GroqAdapter extends BaseProviderAdapter {
 
 CRITICAL RAW IMAGE REMINDER: These are RAW images. Exposure and white balance are FULLY correctable in post-processing - do not penalize for these. However, focus accuracy and moment timing CANNOT be fixed later - these are permanent.`;
 
+    const responseSchema = {
+      type: 'object',
+      properties: {
+        imageId: { type: 'string' },
+        filename: { type: 'string' },
+        starRating: { type: 'integer', minimum: 1, maximum: 5 },
+        colorLabel: { type: 'string', enum: ['red', 'yellow', 'green', 'blue', 'purple', 'none'] },
+        keepReject: { type: 'string', enum: ['keep', 'reject', 'maybe'] },
+        tags: { type: 'array', items: { type: 'string' } },
+        description: { type: 'string' },
+        technicalQuality: {
+          type: 'object',
+          properties: {
+            focusAccuracy: { type: 'integer', minimum: 1, maximum: 1000 },
+            exposureQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            compositionScore: { type: 'integer', minimum: 1, maximum: 1000 },
+            lightingQuality: { type: 'integer', minimum: 1, maximum: 1000 },
+            colorHarmony: { type: 'integer', minimum: 1, maximum: 1000 },
+            noiseLevel: { type: 'integer', minimum: 1, maximum: 1000 },
+            sharpnessDetail: { type: 'integer', minimum: 1, maximum: 1000 },
+            dynamicRange: { type: 'integer', minimum: 1, maximum: 1000 },
+            overallTechnical: { type: 'integer', minimum: 1, maximum: 1000 }
+          },
+          required: ['focusAccuracy', 'exposureQuality', 'compositionScore', 'lightingQuality',
+                     'colorHarmony', 'noiseLevel', 'sharpnessDetail', 'dynamicRange', 'overallTechnical']
+        },
+        subjectAnalysis: {
+          type: 'object',
+          properties: {
+            primarySubject: { type: 'string' },
+            emotionIntensity: { type: 'integer', minimum: 1, maximum: 1000 },
+            eyesOpen: { type: 'boolean' },
+            eyeContact: { type: 'boolean' },
+            genuineExpression: { type: 'integer', minimum: 1, maximum: 1000 },
+            facialSharpness: { type: 'integer', minimum: 1, maximum: 1000 },
+            bodyLanguage: { type: 'integer', minimum: 1, maximum: 1000 },
+            momentTiming: { type: 'integer', minimum: 1, maximum: 1000 },
+            storyTelling: { type: 'integer', minimum: 1, maximum: 1000 },
+            uniqueness: { type: 'integer', minimum: 1, maximum: 1000 }
+          },
+          required: ['primarySubject', 'emotionIntensity', 'eyesOpen', 'eyeContact',
+                     'genuineExpression', 'facialSharpness', 'bodyLanguage', 'momentTiming',
+                     'storyTelling', 'uniqueness']
+        },
+        shootContext: {
+          type: 'object',
+          properties: {
+            eventType: { type: 'string' },
+            shootPhase: { type: 'string' },
+            timeOfDay: { type: 'string' },
+            location: { type: 'string' }
+          }
+        }
+      },
+      required: ['starRating', 'colorLabel', 'keepReject', 'description', 'technicalQuality', 'subjectAnalysis'],
+      additionalProperties: false
+    };
+
     const body = {
       model: this.modelName,
       messages: [
@@ -86,7 +144,12 @@ CRITICAL RAW IMAGE REMINDER: These are RAW images. Exposure and white balance ar
         }
       ],
       response_format: {
-        type: 'json_object'
+        type: 'json_schema',
+        json_schema: {
+          name: 'photo_rating',
+          strict: true,
+          schema: responseSchema
+        }
       },
       max_tokens: 2000,
       temperature: 0.7

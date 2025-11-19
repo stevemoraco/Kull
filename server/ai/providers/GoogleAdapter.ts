@@ -69,7 +69,7 @@ export class GoogleAdapter extends BaseProviderAdapter {
               }
             },
             {
-              text: `${request.systemPrompt}\n\n${request.userPrompt}`
+              text: `${request.systemPrompt}\n\n${request.userPrompt}\n\nREMINDER: These are RAW images - exposure and white balance are fully correctable in post-production. Rate exposure quality based on whether detail is retained, not current brightness. Focus accuracy and moment timing cannot be fixed - prioritize these heavily.`
             }
           ]
         }

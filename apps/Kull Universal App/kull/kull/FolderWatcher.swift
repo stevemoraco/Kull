@@ -1,5 +1,6 @@
 import Foundation
 import Dispatch
+import OSLog
 
 #if os(macOS)
 import Darwin

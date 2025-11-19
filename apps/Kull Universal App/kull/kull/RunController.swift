@@ -9,10 +9,10 @@ final class RunController: ObservableObject {
     @Published var total = 0
     @Published var currentCost = 0.0
 
-    private let apple = AppleIntelligenceService()
-    private let cloudService = CloudAIService.shared
-    private let notifier = RunNotifier()
-    private let logger = Logger(subsystem: "com.kull.app", category: "RunController")
+    internal let apple = AppleIntelligenceService()
+    internal let cloudService = CloudAIService.shared
+    internal let notifier = RunNotifier()
+    internal let logger = Logger(subsystem: "com.kull.app", category: "RunController")
 
     func runCulling(
         folderURL: URL,

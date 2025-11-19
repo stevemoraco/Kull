@@ -7,6 +7,8 @@
 
 import Foundation
 import UserNotifications
+import Combine
+import OSLog
 #if os(iOS)
 import UIKit
 #endif
@@ -40,14 +42,14 @@ class NotificationService: NSObject, ObservableObject {
         self.permissionGranted = granted
 
         if granted {
-            Logger.app.info("Push notification permissions granted")
+            Logger.general.info("Push notification permissions granted")
             // Register for remote notifications on main thread
             await UIApplication.shared.registerForRemoteNotifications()
         } else {
-            Logger.app.warning("Push notification permissions denied")
+            Logger.general.warning("Push notification permissions denied")
         }
         #else
-        Logger.app.info("Push notifications not supported on macOS")
+        Logger.general.info("Push notifications not supported on macOS")
         #endif
     }
 
@@ -56,13 +58,13 @@ class NotificationService: NSObject, ObservableObject {
         let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
         self.deviceToken = token
 
-        Logger.app.info("APNs device token received: \(token.prefix(10))...")
+        Logger.general.info("APNs device token received: \(token.prefix(10))...")
 
         // Send to backend
         Task {
             do {
                 try await registerDeviceToken(token)
-                Logger.app.info("Device token successfully registered with backend")
+                Logger.general.info("Device token successfully registered with backend")
             } catch {
                 Logger.errors.error("Failed to register device token: \(error)")
             }
@@ -82,7 +84,8 @@ class NotificationService: NSObject, ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Add auth token
-        if let authToken = try? KeychainManager.shared.getAccessToken() {
+        let deviceId = DeviceIDManager.shared.deviceID
+        if let authToken = KeychainManager.shared.getAccessToken(for: deviceId) {
             request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         } else {
             throw NotificationError.notAuthenticated
@@ -108,7 +111,7 @@ class NotificationService: NSObject, ObservableObject {
         #if os(iOS)
         Task { @MainActor in
             UIApplication.shared.applicationIconBadgeNumber = count
-            Logger.app.info("App badge updated to \(count)")
+            Logger.general.info("App badge updated to \(count)")
         }
         #endif
     }
@@ -120,10 +123,10 @@ class NotificationService: NSObject, ObservableObject {
 
     /// Handle received notification
     func handleNotification(_ userInfo: [AnyHashable: Any]) {
-        Logger.app.info("Handling notification: \(userInfo)")
+        Logger.general.info("Handling notification: \(userInfo)")
 
         guard let type = userInfo["type"] as? String else {
-            Logger.app.warning("Notification missing type field")
+            Logger.general.warning("Notification missing type field")
             return
         }
 
@@ -137,18 +140,18 @@ class NotificationService: NSObject, ObservableObject {
         case "credit_low":
             handleCreditLow(userInfo)
         default:
-            Logger.app.warning("Unknown notification type: \(type)")
+            Logger.general.warning("Unknown notification type: \(type)")
         }
     }
 
     private func handleShootComplete(_ userInfo: [AnyHashable: Any]) {
         guard let shootId = userInfo["shootId"] as? String else {
-            Logger.app.warning("shoot_complete notification missing shootId")
+            Logger.general.warning("shoot_complete notification missing shootId")
             return
         }
 
         let imageCount = userInfo["imageCount"] as? Int ?? 0
-        Logger.app.info("Shoot completed: \(shootId), images: \(imageCount)")
+        Logger.general.info("Shoot completed: \(shootId), images: \(imageCount)")
 
         // Post notification for UI updates
         NotificationCenter.default.post(
@@ -161,20 +164,15 @@ class NotificationService: NSObject, ObservableObject {
         if let activeCount = userInfo["activeCount"] as? Int {
             updateBadge(count: activeCount)
         }
-
-        // Trigger sync coordinator refresh
-        Task {
-            await SyncCoordinator.shared.handleShootComplete(shootId: shootId)
-        }
     }
 
     private func handleDeviceConnected(_ userInfo: [AnyHashable: Any]) {
         guard let deviceName = userInfo["deviceName"] as? String else {
-            Logger.app.warning("device_connected notification missing deviceName")
+            Logger.general.warning("device_connected notification missing deviceName")
             return
         }
 
-        Logger.app.info("Device connected: \(deviceName)")
+        Logger.general.info("Device connected: \(deviceName)")
 
         // Post notification for UI updates
         NotificationCenter.default.post(
@@ -186,11 +184,11 @@ class NotificationService: NSObject, ObservableObject {
 
     private func handleDeviceDisconnected(_ userInfo: [AnyHashable: Any]) {
         guard let deviceName = userInfo["deviceName"] as? String else {
-            Logger.app.warning("device_disconnected notification missing deviceName")
+            Logger.general.warning("device_disconnected notification missing deviceName")
             return
         }
 
-        Logger.app.info("Device disconnected: \(deviceName)")
+        Logger.general.info("Device disconnected: \(deviceName)")
 
         // Post notification for UI updates
         NotificationCenter.default.post(
@@ -202,7 +200,7 @@ class NotificationService: NSObject, ObservableObject {
 
     private func handleCreditLow(_ userInfo: [AnyHashable: Any]) {
         let remaining = userInfo["remaining"] as? Int ?? 0
-        Logger.app.warning("Credit balance low: \(remaining)")
+        Logger.general.warning("Credit balance low: \(remaining)")
 
         // Post notification for UI updates
         NotificationCenter.default.post(
@@ -231,7 +229,7 @@ class NotificationService: NSObject, ObservableObject {
             if let error = error {
                 Logger.errors.error("Failed to schedule local notification: \(error)")
             } else {
-                Logger.app.info("Local notification scheduled: \(title)")
+                Logger.general.info("Local notification scheduled: \(title)")
             }
         }
         #endif

@@ -8,6 +8,8 @@
 //
 
 import Foundation
+import Combine
+import OSLog
 
 #if os(macOS)
 import AppKit
@@ -76,13 +78,12 @@ final class TranscriptionHelper: ObservableObject {
         request.timeoutInterval = 60 // Transcription may take time
 
         // Add authentication token
-        do {
-            let token = try KeychainManager.shared.getAccessToken()
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        } catch {
-            Logger.errors.error("Failed to get access token for transcription: \(error)")
+        let deviceId = DeviceIDManager.shared.deviceID
+        guard let token = KeychainManager.shared.getAccessToken(for: deviceId) else {
+            Logger.errors.error("Failed to get access token for transcription")
             throw TranscriptionError.authenticationFailed
         }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         // Create multipart body
         let boundary = UUID().uuidString

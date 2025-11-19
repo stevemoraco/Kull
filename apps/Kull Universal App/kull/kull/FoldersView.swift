@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import SwiftUI
+import OSLog
 
 struct FolderItem: Identifiable, Decodable { let id: String; let name: String }
 struct FolderCatalog: Decodable { let folders: [FolderItem]; let updatedAt: String }
@@ -11,7 +12,7 @@ struct FoldersView: View {
     @State private var selected: FolderItem? = nil
     @State private var showingRun = false
     @State private var selectedLocalFolder: URL? = nil
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
 
     var body: some View {
         if horizontalSizeClass == .regular {

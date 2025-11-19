@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import OSLog
 
 #if os(macOS)
 import AppKit

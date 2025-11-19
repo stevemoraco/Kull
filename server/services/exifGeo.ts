@@ -134,7 +134,7 @@ export class ExifGeoContextService {
         gps: {
           ...metadata.gps,
           resolvedAddress: geo.address ?? undefined,
-          nearbyVenues: geo.pois.length ? geo.pois : [],
+          nearbyVenues: geo.pois.length ? geo.pois : undefined,
         },
       };
     }
@@ -204,7 +204,7 @@ export class ExifGeoContextService {
       return {
         latitude,
         longitude,
-        nearbyVenues: [],
+        nearbyVenues: undefined,
         altitude: typeof parsed.altitude === "number" ? parsed.altitude : undefined,
       };
     }

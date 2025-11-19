@@ -1266,7 +1266,10 @@ describe('GroqAdapter', () => {
       expect(options.headers['Content-Type']).toBe('application/json');
       expect(options.headers['Authorization']).toContain('Bearer');
       expect(body.model).toBe('moonshotai/kimi-k2-instruct-0905');
-      expect(body.response_format.type).toBe('json_object');
+      expect(body.response_format.type).toBe('json_schema');
+      expect(body.response_format.json_schema.name).toBe('photo_rating');
+      expect(body.response_format.json_schema.strict).toBe(true);
+      expect(body.response_format.json_schema.schema).toBeDefined();
       expect(body.max_tokens).toBe(2000);
       expect(body.temperature).toBe(0.7);
       expect(body.messages).toHaveLength(2);

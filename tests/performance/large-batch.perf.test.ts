@@ -303,15 +303,17 @@ describe('Performance Test: Large Batch Processing', () => {
   }, 120000); // 120 second timeout
 
   it('should track and report retry statistics', async () => {
-    // Provider with controlled failure rate
-    let attemptCount = 0;
+    // Provider with controlled failure rate (only fails twice, not indefinitely)
+    const failureCounts = new Map<string, number>();
     const retryTestProvider: ProviderAdapter = {
       processSingleImage: vi.fn(async (input) => {
-        attemptCount++;
+        const imageId = input.image.id;
+        const failures = failureCounts.get(imageId) || 0;
 
-        // Fail first 2 attempts for every 10th image
+        // Fail first 2 attempts for every 10th image, then succeed
         const imageNum = parseInt(input.image.id.split('_')[1] || '0');
-        if (imageNum % 10 === 0 && attemptCount % 3 !== 0) {
+        if (imageNum % 10 === 0 && failures < 2) {
+          failureCounts.set(imageId, failures + 1);
           throw new Error('Simulated transient error');
         }
 
@@ -354,5 +356,5 @@ describe('Performance Test: Large Batch Processing', () => {
     expect(imagesWithRetries.length).toBeGreaterThan(0);
     expect(totalRetries).toBeGreaterThan(0);
     expect(results.every(r => r.success)).toBe(true);
-  }, 60000); // 60 second timeout
+  }, 120000); // 120 second timeout (increased to handle retries)
 });

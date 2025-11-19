@@ -6,18 +6,33 @@
 //
 
 import SwiftUI
+import UIKit
 
 #if os(iOS)
+import OSLog
+
+/// UIHostingController subclass that handles keyboard shortcuts
+/// This is the proper way to integrate UIKeyCommands into SwiftUI on iPad
+class KeyboardHostingController<Content: View>: UIHostingController<Content> {
+    private var customKeyCommands: [UIKeyCommand] = []
+
+    override var keyCommands: [UIKeyCommand]? {
+        return customKeyCommands
+    }
+
+    func setKeyCommands(_ commands: [UIKeyCommand]) {
+        self.customKeyCommands = commands
+    }
+}
+
 /// Keyboard shortcuts for iPad
 /// Cmd+N: New shoot
 /// Cmd+,: Settings
-/// Cmd+W: Close current view
 /// Cmd+R: Refresh
 struct KeyboardShortcutsModifier: ViewModifier {
     @Binding var showingNewShoot: Bool
     @Binding var showingSettings: Bool
     var onRefresh: () -> Void
-    @Environment(\.dismiss) private var dismiss
 
     func body(content: Content) -> some View {
         content
@@ -27,12 +42,37 @@ struct KeyboardShortcutsModifier: ViewModifier {
     }
 
     private func setupKeyCommands() {
-        // Note: UIKeyCommand setup would go here
-        // This is a placeholder for the keyboard command infrastructure
+        // Register handlers with the global manager
+        KeyboardCommandManager.shared.registerHandler(for: KeyboardCommandManager.Commands.newShoot) { [self] in
+            Logger.ui.info("Keyboard shortcut: Cmd+N (New Shoot)")
+            showingNewShoot = true
+        }
+
+        KeyboardCommandManager.shared.registerHandler(for: KeyboardCommandManager.Commands.settings) { [self] in
+            Logger.ui.info("Keyboard shortcut: Cmd+, (Settings)")
+            showingSettings = true
+        }
+
+        KeyboardCommandManager.shared.registerHandler(for: KeyboardCommandManager.Commands.refresh) {
+            Logger.ui.info("Keyboard shortcut: Cmd+R (Refresh)")
+            onRefresh()
+        }
+
+        // Register commands with the responder chain
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController as? KeyboardHostingController<AnyView> {
+            rootVC.setKeyCommands(KeyboardCommandManager.shared.buildKeyCommands())
+        }
     }
 }
 
 extension View {
+    /// Adds keyboard shortcuts to a view
+    /// - Parameters:
+    ///   - showingNewShoot: Binding to control "New Shoot" sheet (Cmd+N)
+    ///   - showingSettings: Binding to control Settings sheet (Cmd+,)
+    ///   - onRefresh: Callback for refresh action (Cmd+R)
     func keyboardShortcuts(
         showingNewShoot: Binding<Bool>,
         showingSettings: Binding<Bool>,
@@ -47,6 +87,7 @@ extension View {
 }
 
 /// Keyboard command definitions for iOS/iPadOS
+/// Manages global keyboard shortcuts for the app
 class KeyboardCommandManager {
     static let shared = KeyboardCommandManager()
 
@@ -54,67 +95,75 @@ class KeyboardCommandManager {
     struct Commands {
         static let newShoot = "newShoot"
         static let settings = "settings"
-        static let close = "close"
         static let refresh = "refresh"
     }
 
     private var commandHandlers: [String: () -> Void] = [:]
 
+    private init() {}
+
+    /// Register a handler for a specific command
     func registerHandler(for command: String, handler: @escaping () -> Void) {
         commandHandlers[command] = handler
+        Logger.ui.debug("Registered keyboard handler for command: \(command)")
     }
 
+    /// Remove a handler for a specific command
+    func unregisterHandler(for command: String) {
+        commandHandlers.removeValue(forKey: command)
+        Logger.ui.debug("Unregistered keyboard handler for command: \(command)")
+    }
+
+    /// Execute a command if a handler is registered
     func executeCommand(_ command: String) {
-        commandHandlers[command]?()
+        if let handler = commandHandlers[command] {
+            Logger.ui.info("Executing keyboard command: \(command)")
+            handler()
+        } else {
+            Logger.ui.warning("No handler registered for keyboard command: \(command)")
+        }
     }
 
+    /// Build the array of UIKeyCommands for the app
     func buildKeyCommands() -> [UIKeyCommand] {
         return [
             UIKeyCommand(
                 title: "New Shoot",
-                action: #selector(handleNewShoot),
+                action: #selector(KeyboardResponder.handleNewShoot),
                 input: "n",
                 modifierFlags: .command,
                 discoverabilityTitle: "Start a new photo culling session"
             ),
             UIKeyCommand(
                 title: "Settings",
-                action: #selector(handleSettings),
+                action: #selector(KeyboardResponder.handleSettings),
                 input: ",",
                 modifierFlags: .command,
                 discoverabilityTitle: "Open settings"
             ),
             UIKeyCommand(
-                title: "Close",
-                action: #selector(handleClose),
-                input: "w",
-                modifierFlags: .command,
-                discoverabilityTitle: "Close current view"
-            ),
-            UIKeyCommand(
                 title: "Refresh",
-                action: #selector(handleRefresh),
+                action: #selector(KeyboardResponder.handleRefresh),
                 input: "r",
                 modifierFlags: .command,
                 discoverabilityTitle: "Refresh current view"
             )
         ]
     }
+}
 
-    @objc private func handleNewShoot() {
-        executeCommand(Commands.newShoot)
+/// Helper class to make keyboard commands work with Objective-C selectors
+@objc class KeyboardResponder: NSObject {
+    @objc static func handleNewShoot() {
+        KeyboardCommandManager.shared.executeCommand(KeyboardCommandManager.Commands.newShoot)
     }
 
-    @objc private func handleSettings() {
-        executeCommand(Commands.settings)
+    @objc static func handleSettings() {
+        KeyboardCommandManager.shared.executeCommand(KeyboardCommandManager.Commands.settings)
     }
 
-    @objc private func handleClose() {
-        executeCommand(Commands.close)
-    }
-
-    @objc private func handleRefresh() {
-        executeCommand(Commands.refresh)
+    @objc static func handleRefresh() {
+        KeyboardCommandManager.shared.executeCommand(KeyboardCommandManager.Commands.refresh)
     }
 }
 #endif

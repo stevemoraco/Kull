@@ -17,7 +17,7 @@ struct MarketplaceView: View {
     @State private var search: String = ""
     @State private var prompts: [PromptCard] = []
     @State private var loading = false
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
 
     var body: some View {
         VStack(spacing: 0) {

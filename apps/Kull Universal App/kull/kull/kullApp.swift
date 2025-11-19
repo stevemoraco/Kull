@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 
 #if os(macOS)
 import AppKit
@@ -347,6 +348,13 @@ struct KullApp: App {
     }
 }
 
+// Helper to ensure AuthViewModel is available throughout the app
+extension View {
+    func withAuthEnvironment(_ auth: AuthViewModel) -> some View {
+        self.environmentObject(auth)
+    }
+}
+
 final class MobileCredits: ObservableObject {
     @Published var balance: Int = 0
     @Published var plan: String = "—"
@@ -401,17 +409,42 @@ struct HomeView: View {
     @State private var showingPrompts = false
     @State private var showingFolders = false
     @State private var showingSettings = false
+    @State private var showingNewShoot = false
     @State private var selectedTab: NavigationItem? = .home
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
 
     var body: some View {
-        if horizontalSizeClass == .regular {
-            // iPad: Use NavigationSplitView for 3-column layout
-            iPadLayout
-        } else {
-            // iPhone: Use traditional NavigationView
-            iPhoneLayout
+        Group {
+            if horizontalSizeClass == .regular {
+                // iPad: Use NavigationSplitView for 3-column layout
+                iPadLayout
+            } else {
+                // iPhone: Use traditional NavigationView
+                iPhoneLayout
+            }
         }
+        #if os(iOS)
+        .keyboardShortcuts(
+            showingNewShoot: $showingNewShoot,
+            showingSettings: $showingSettings,
+            onRefresh: { credits.refresh() }
+        )
+        .sheet(isPresented: $showingNewShoot) {
+            // New shoot sheet - navigate to Folders view
+            NavigationView {
+                FoldersView()
+                    .navigationTitle("New Shoot")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Cancel") {
+                                showingNewShoot = false
+                            }
+                        }
+                    }
+            }
+        }
+        #endif
     }
 
     // MARK: - iPad Layout (Split View)
@@ -458,6 +491,12 @@ struct HomeView: View {
                 SettingsView()
             case .none:
                 homeMainView
+            }
+        }
+        .onChange(of: showingSettings) { _, newValue in
+            if newValue {
+                selectedTab = .settings
+                showingSettings = false
             }
         }
     }
@@ -690,7 +729,7 @@ enum NavigationItem: Hashable {
 // iOS AppDelegate for lifecycle management and push notifications
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        Logger.app.info("Kull iOS app launched")
+        Logger.general.info("Kull iOS app launched")
 
         // Set notification delegate
         UNUserNotificationCenter.current().delegate = self
@@ -709,7 +748,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
         // Handle deep links for authentication callback
-        Logger.app.info("Received deep link: \(url.absoluteString)")
+        Logger.general.info("Received deep link: \(url.absoluteString)")
         return true
     }
 
@@ -737,7 +776,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        Logger.app.info("Received notification while app in foreground")
+        Logger.general.info("Received notification while app in foreground")
         NotificationService.shared.handleNotification(notification.request.content.userInfo)
 
         // Show banner, sound, and badge even when app is in foreground
@@ -750,7 +789,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        Logger.app.info("User tapped notification")
+        Logger.general.info("User tapped notification")
         NotificationService.shared.handleNotification(response.notification.request.content.userInfo)
         completionHandler()
     }
