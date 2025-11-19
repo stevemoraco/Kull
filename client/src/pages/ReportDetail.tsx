@@ -7,6 +7,7 @@ import { TopSelectsGallery } from '@/components/reports/TopSelectsGallery';
 import { NarrativeSummary } from '@/components/reports/NarrativeSummary';
 import { ExportDownloads } from '@/components/reports/ExportDownloads';
 import { ShareModal } from '@/components/reports/ShareModal';
+import { XMPExportDialog } from '@/components/XMPExportDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ export default function ReportDetail() {
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [xmpExportDialogOpen, setXmpExportDialogOpen] = useState(false);
 
   const handleDelete = async () => {
     try {
@@ -85,6 +87,7 @@ export default function ReportDetail() {
         report={report}
         onShare={() => setShareModalOpen(true)}
         onDelete={() => setDeleteDialogOpen(true)}
+        onExportXmp={() => setXmpExportDialogOpen(true)}
       />
 
       {/* Main Content */}
@@ -128,6 +131,15 @@ export default function ReportDetail() {
         reportName={report.shootName}
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
+      />
+
+      {/* XMP Export Dialog */}
+      <XMPExportDialog
+        reportId={report.id}
+        reportName={report.shootName}
+        totalImages={report.totalImages}
+        isOpen={xmpExportDialogOpen}
+        onClose={() => setXmpExportDialogOpen(false)}
       />
 
       {/* Delete Confirmation Dialog */}

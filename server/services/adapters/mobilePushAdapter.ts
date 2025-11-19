@@ -128,7 +128,7 @@ export class MobilePushAdapter implements PushAdapter {
             imageCount: payload?.imageCount,
             activeCount: payload?.activeCount || 0
           },
-          badge: payload?.activeCount || 0
+          badge: (payload?.activeCount as number) || 0
         };
 
       case 'device_connected':

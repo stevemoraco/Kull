@@ -129,7 +129,7 @@ export default function PromptDetail() {
   }
 
   const isAuthor = user?.id === prompt.authorId;
-  const qualityScore = parseFloat(prompt.qualityScore);
+  const qualityScore = prompt.qualityScore;
   const stars = Math.round(qualityScore * 5);
 
   return (

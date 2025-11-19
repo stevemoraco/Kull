@@ -39,7 +39,7 @@ export default function MyPrompts() {
   const totalUses = prompts.reduce((sum, p) => sum + p.usageCount, 0);
   const totalVotes = prompts.reduce((sum, p) => sum + p.voteCount, 0);
   const avgScore = prompts.length > 0
-    ? prompts.reduce((sum, p) => sum + parseFloat(p.qualityScore), 0) / prompts.length
+    ? prompts.reduce((sum, p) => sum + p.qualityScore, 0) / prompts.length
     : 0;
 
   return (

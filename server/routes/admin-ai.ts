@@ -7,20 +7,11 @@
 
 import { Router, Request, Response } from 'express';
 import { rateLimitLog, errorLog, activeJobs } from './ai-passthrough';
+import { requireAdmin } from '../middleware/adminAuth';
 
 const router = Router();
 
-/**
- * Simple admin auth middleware
- * In production, this should check for actual admin JWT or session
- */
-function requireAdmin(req: Request, res: Response, next: Function) {
-  // TODO: Implement proper admin auth check
-  // For now, just check if user is authenticated
-  // In production, check user role === 'admin' or user.email === 'steve@lander.media'
-  next();
-}
-
+// Apply admin authentication to all routes in this router
 router.use(requireAdmin);
 
 /**

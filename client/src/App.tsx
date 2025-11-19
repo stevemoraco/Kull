@@ -32,6 +32,7 @@ import DeviceSessions from "@/pages/DeviceSessions";
 import Reports from "@/pages/Reports";
 import ReportDetail from "@/pages/ReportDetail";
 import SharedReport from "@/pages/SharedReport";
+import BatchJobs from "@/pages/BatchJobs";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -354,6 +355,36 @@ function Router() {
             </div>;
           }
           return <Credits />;
+        }}
+      </Route>
+
+      {/* Batch Jobs page - require paid access */}
+      <Route path="/batch-jobs">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+          if (!isAuthenticated) {
+            window.location.href = '/landing';
+            return null;
+          }
+          if (!hasAccess) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center max-w-md mx-auto p-8">
+                <h1 className="text-2xl font-bold mb-4">Paid Feature</h1>
+                <p className="text-muted-foreground mb-6">{getAccessDenialReason(typedUser)}</p>
+                <a href="/dashboard" className="inline-block px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+                  View Plans
+                </a>
+              </div>
+            </div>;
+          }
+          return <BatchJobs />;
         }}
       </Route>
 

@@ -33,6 +33,9 @@ export interface EnvironmentConfig {
   jwtAccessExpiry: string;
   jwtRefreshExpiry: string;
 
+  // Admin access
+  adminUserId: string; // User ID of admin user (steve@lander.media)
+
   // Rate limiting
   rateLimitWindow: number;      // milliseconds
   rateLimitMaxRequests: number; // max requests per window
@@ -78,6 +81,8 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     jwtSecret: process.env.JWT_SECRET || process.env.SESSION_SECRET!,
     jwtAccessExpiry: '1h',
     jwtRefreshExpiry: '30d',
+
+    adminUserId: process.env.ADMIN_USER_ID || '13472548', // steve@lander.media
 
     rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW || '60000'),
     rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '30000')

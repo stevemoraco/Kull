@@ -543,20 +543,9 @@ describe('GoogleAdapter', () => {
     });
 
     it('should skip error responses in JSONL', async () => {
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/job-123',
-            state: 'JOB_STATE_SUCCEEDED',
-            createTime: new Date().toISOString(),
-            metadata: { outputFileUri: 'files/results' }
-          })
-        });
-
-      const jsonlResults = [
+      const inlinedResponses = [
         {
-          key: 'image-0-success.jpg',
+          metadata: { key: 'image-0-success.jpg' },
           response: {
             candidates: [{
               content: {
@@ -575,11 +564,11 @@ describe('GoogleAdapter', () => {
           }
         },
         {
-          key: 'image-1-error.jpg',
+          metadata: { key: 'image-1-error.jpg' },
           error: { message: 'Image too large' }
         },
         {
-          key: 'image-2-another-success.jpg',
+          metadata: { key: 'image-2-another-success.jpg' },
           response: {
             candidates: [{
               content: {
@@ -597,11 +586,25 @@ describe('GoogleAdapter', () => {
             }]
           }
         }
-      ].map(r => JSON.stringify(r)).join('\n');
+      ];
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        text: async () => jsonlResults
+        json: async () => ({
+          name: 'projects/test/jobs/job-123',
+          state: 'JOB_STATE_SUCCEEDED',
+          createTime: new Date().toISOString(),
+          batchStats: {
+            requestCount: '3',
+            successfulRequestCount: '2',
+            failedRequestCount: '1'
+          },
+          dest: {
+            inlinedResponses: {
+              inlinedResponses
+            }
+          }
+        })
       });
 
       const results = await adapter.retrieveBatchResults('projects/test/jobs/job-123');
@@ -612,40 +615,45 @@ describe('GoogleAdapter', () => {
     });
 
     it('should handle filenames with hyphens correctly', async () => {
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/job-123',
-            state: 'JOB_STATE_SUCCEEDED',
-            createTime: new Date().toISOString(),
-            metadata: { outputFileUri: 'files/results' }
-          })
-        });
-
-      const jsonlResults = JSON.stringify({
-        key: 'image-0-wedding-2025-01-15-ceremony-shot-123.jpg',
-        response: {
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
-                  starRating: 5,
-                  colorLabel: 'green',
-                  keepReject: 'keep',
-                  description: 'Perfect moment',
-                  technicalQuality: { sharpness: 0.95, exposure: 0.90, composition: 0.92, overallScore: 0.92 },
-                  subjectAnalysis: { primarySubject: 'Couple', eyesOpen: true, smiling: true, inFocus: true }
-                })
-              }]
-            }
-          }]
+      const inlinedResponses = [
+        {
+          metadata: { key: 'image-0-wedding-2025-01-15-ceremony-shot-123.jpg' },
+          response: {
+            candidates: [{
+              content: {
+                parts: [{
+                  text: JSON.stringify({
+                    starRating: 5,
+                    colorLabel: 'green',
+                    keepReject: 'keep',
+                    description: 'Perfect moment',
+                    technicalQuality: { sharpness: 0.95, exposure: 0.90, composition: 0.92, overallScore: 0.92 },
+                    subjectAnalysis: { primarySubject: 'Couple', eyesOpen: true, smiling: true, inFocus: true }
+                  })
+                }]
+              }
+            }]
+          }
         }
-      });
+      ];
 
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
-        text: async () => jsonlResults
+        json: async () => ({
+          name: 'projects/test/jobs/job-123',
+          state: 'JOB_STATE_SUCCEEDED',
+          createTime: new Date().toISOString(),
+          batchStats: {
+            requestCount: '1',
+            successfulRequestCount: '1',
+            failedRequestCount: '0'
+          },
+          dest: {
+            inlinedResponses: {
+              inlinedResponses
+            }
+          }
+        })
       });
 
       const results = await adapter.retrieveBatchResults('projects/test/jobs/job-123');
@@ -655,6 +663,7 @@ describe('GoogleAdapter', () => {
     });
 
     it('should handle download errors', async () => {
+      // Mock checkBatchStatus to return job with file-based responses
       (global.fetch as any)
         .mockResolvedValueOnce({
           ok: true,
@@ -662,9 +671,17 @@ describe('GoogleAdapter', () => {
             name: 'projects/test/jobs/job-123',
             state: 'JOB_STATE_SUCCEEDED',
             createTime: new Date().toISOString(),
-            metadata: { outputFileUri: 'files/results' }
+            batchStats: {
+              requestCount: '1',
+              successfulRequestCount: '1',
+              failedRequestCount: '0'
+            },
+            dest: {
+              responsesFile: 'files/test-results'
+            }
           })
         })
+        // Mock file download to return 403 error
         .mockResolvedValueOnce({
           ok: false,
           status: 403,
@@ -692,36 +709,32 @@ describe('GoogleAdapter', () => {
         userPrompt: 'Rate'
       };
 
-      (global.fetch as any)
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers({ 'X-Goog-Upload-URL': 'https://upload.url' })
+      // Mock the single batch submission call
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'projects/test/jobs/job-123',
+          state: 'JOB_STATE_PENDING',
+          createTime: new Date().toISOString(),
+          batchStats: {
+            requestCount: '4'
+          }
         })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ file: { uri: 'files/test' } })
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            name: 'projects/test/jobs/job',
-            state: 'JOB_STATE_PENDING',
-            createTime: new Date().toISOString()
-          })
-        });
+      });
 
       const result = await adapter.submitBatch(request);
       expect(result.totalImages).toBe(4);
+      expect(result.status).toBe('queued');
+      expect(result.jobId).toBe('projects/test/jobs/job-123');
 
-      // Verify correct MIME types were used
-      const uploadCall = (global.fetch as any).mock.calls[1];
-      const uploadedContent = uploadCall[1].body.toString();
-      const lines = uploadedContent.split('\n');
+      // Verify correct MIME types were used in the batch request body
+      const batchCall = (global.fetch as any).mock.calls[0];
+      const requestBody = JSON.parse(batchCall[1].body);
 
-      expect(lines[0]).toContain('image/jpeg');
-      expect(lines[1]).toContain('image/png');
-      expect(lines[2]).toContain('image/webp');
-      expect(lines[3]).toContain('image/heic');
+      expect(requestBody.batch.requests[0].request.contents[0].parts[0].inline_data.mime_type).toBe('image/jpeg');
+      expect(requestBody.batch.requests[1].request.contents[0].parts[0].inline_data.mime_type).toBe('image/png');
+      expect(requestBody.batch.requests[2].request.contents[0].parts[0].inline_data.mime_type).toBe('image/webp');
+      expect(requestBody.batch.requests[3].request.contents[0].parts[0].inline_data.mime_type).toBe('image/heic');
     });
   });
 });

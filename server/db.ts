@@ -20,13 +20,27 @@ let pool: any;
 let db: any;
 
 if (isLocalDb) {
+  // PERFORMANCE FIX: Increased connection pool size for concurrent load
   // Local PostgreSQL connection
-  pool = new PgPool({ connectionString: process.env.DATABASE_URL });
+  pool = new PgPool({
+    connectionString: process.env.DATABASE_URL,
+    min: 10,
+    max: 50, // Increased from default 10 to handle concurrent requests
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
   db = drizzlePg(pool, { schema });
 } else {
+  // PERFORMANCE FIX: Increased connection pool size for Neon serverless
   // Neon serverless connection
   neonConfig.webSocketConstructor = ws;
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    min: 10,
+    max: 50, // Increased from default to handle concurrent requests
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
   db = drizzle({ client: pool, schema });
 }
 

@@ -64,6 +64,7 @@ export default function SharedReport() {
         report={report}
         onShare={() => {}}
         onDelete={() => {}}
+        onExportXmp={() => {}}
         isShared={true}
       />
 

@@ -12,6 +12,7 @@ import { createSyncRouter } from "./routes/sync";
 import { bootstrapNotificationAdapters } from "./services/bootstrapNotifications";
 import transcribeRouter from "./routes/transcribe";
 import notificationsRouter from "./routes/notifications";
+import xmpExportRouter from "./routes/xmp-export";
 
 const app = express();
 
@@ -105,6 +106,10 @@ app.use((req, res, next) => {
   // Register notifications routes
   app.use('/api', notificationsRouter);
   log('[Notifications] Notification routes registered at /api/notifications');
+
+  // Register XMP export routes
+  app.use('/api/xmp-export', xmpExportRouter);
+  log('[XMP Export] XMP export routes registered at /api/xmp-export');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

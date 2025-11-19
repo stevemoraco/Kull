@@ -68,6 +68,8 @@ export class BatchProcessor extends EventEmitter {
   /**
    * Process all images concurrently with retry logic
    * Fires ALL images at once, no batching, no queuing
+   *
+   * PERFORMANCE FIX: Process in chunks to reduce memory pressure
    */
   async processConcurrent(
     userId: string,
@@ -83,49 +85,72 @@ export class BatchProcessor extends EventEmitter {
 
     console.log(`[BatchProcessor] Starting concurrent processing of ${images.length} images for user ${userId}`);
 
-    // Fire ALL images at once - no batching, no limits
-    const promises = images.map((image, index) =>
-      this.processWithRetry(
-        userId,
-        shootId,
-        image,
-        provider,
-        prompt,
-        systemPrompt,
-        index,
-        images.length
-      )
-    );
+    // PERFORMANCE FIX: Process in chunks to prevent memory exhaustion
+    const CHUNK_SIZE = 1000; // Process 1000 images at a time
+    const allResults: ProcessingResult[] = [];
 
-    // Wait for all to complete
-    const results = await Promise.allSettled(promises);
+    for (let i = 0; i < images.length; i += CHUNK_SIZE) {
+      const chunk = images.slice(i, i + CHUNK_SIZE);
+      const chunkStart = i;
 
-    // Extract successful results and log failures
-    const processingResults: ProcessingResult[] = results.map((result, index) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        // Log failure for admin, but don't expose to user
-        console.error(
-          `[BatchProcessor] Image ${index} (${images[index].id}) failed after all retries:`,
-          result.reason
-        );
-        return {
-          imageId: images[index].id,
-          success: false,
-          error: result.reason?.message || 'Unknown error',
-          attempts: 0,
-          totalRetryTime: 0,
-        };
+      console.log(`[BatchProcessor] Processing chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(images.length / CHUNK_SIZE)} (${chunk.length} images)`);
+
+      // Fire all images in this chunk at once
+      const promises = chunk.map((image, chunkIndex) =>
+        this.processWithRetry(
+          userId,
+          shootId,
+          image,
+          provider,
+          prompt,
+          systemPrompt,
+          chunkStart + chunkIndex,
+          images.length
+        )
+      );
+
+      // Wait for chunk to complete
+      const results = await Promise.allSettled(promises);
+
+      // Extract results and clear references
+      const chunkResults: ProcessingResult[] = results.map((result, chunkIndex) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          // Log failure for admin, but don't expose to user
+          const imageIndex = chunkStart + chunkIndex;
+          console.error(
+            `[BatchProcessor] Image ${imageIndex} (${images[imageIndex].id}) failed after all retries:`,
+            result.reason
+          );
+          return {
+            imageId: images[imageIndex].id,
+            success: false,
+            error: result.reason?.message || 'Unknown error',
+            attempts: 0,
+            totalRetryTime: 0,
+          };
+        }
+      });
+
+      allResults.push(...chunkResults);
+
+      // PERFORMANCE FIX: Clear chunk references and hint garbage collection
+      promises.length = 0;
+      results.length = 0;
+
+      // Force garbage collection if available (only in test/dev with --expose-gc)
+      if (global.gc && images.length > 5000) {
+        global.gc();
       }
-    });
+    }
 
-    const successCount = processingResults.filter(r => r.success).length;
+    const successCount = allResults.filter(r => r.success).length;
     console.log(
       `[BatchProcessor] Completed: ${successCount}/${images.length} successful (${((successCount / images.length) * 100).toFixed(1)}%)`
     );
 
-    return processingResults;
+    return allResults;
   }
 
   /**

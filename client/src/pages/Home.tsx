@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Smartphone, LogOut, Gift, Clock, DollarSign } from "lucide-react";
 import { Footer } from "@/components/Footer";
+import { OfflineQueueIndicator } from "@/components/OfflineQueueIndicator";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { useCredits } from "@/hooks/useCredits";
 import { hasPaidAccess } from "@/lib/accessControl";
@@ -49,6 +50,7 @@ export default function Home() {
             <span className="text-xl font-black text-foreground">Kull</span>
           </button>
           <div className="flex items-center gap-4">
+            <OfflineQueueIndicator />
             {hasAccess && (
               <Button
                 variant="ghost"

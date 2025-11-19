@@ -62,7 +62,7 @@ export function NarrativeSummary({ narrative, provider }: NarrativeSummaryProps)
 
         {isLong && (
           <Button
-            variant="link"
+            variant="ghost"
             onClick={() => setExpanded(!expanded)}
             className="mt-4 px-0"
           >

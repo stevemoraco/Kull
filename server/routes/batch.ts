@@ -9,9 +9,41 @@ import { getProvider } from '@shared/culling/providers';
 import type { ProviderId } from '@shared/culling/schemas';
 import { db } from '../db';
 import { batchJobs } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
+import { getGlobalWsService } from '../websocket.js';
 
 export const batchRouter = Router();
+
+/**
+ * GET /api/batch/jobs
+ *
+ * Get all batch jobs for the current user
+ */
+batchRouter.get('/jobs', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get all jobs for this user, ordered by creation date (newest first)
+    const jobs = await db
+      .select()
+      .from(batchJobs)
+      .where(eq(batchJobs.userId, userId))
+      .orderBy(desc(batchJobs.createdAt));
+
+    return res.json(jobs);
+
+  } catch (error: any) {
+    console.error('[BatchAPI] Error getting user jobs:', error);
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+});
 
 /**
  * Request schemas

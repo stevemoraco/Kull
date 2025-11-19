@@ -79,6 +79,10 @@ async function upsertUser(
       // Don't await - let it run in background
       import("./emailService").then(({ sendEmail, scheduleNonCheckoutDripCampaign }) => {
         import("./emailTemplates").then(({ emailTemplates }) => {
+          if (!user.email) {
+            console.warn("[Auth] Cannot send welcome email: user has no email");
+            return;
+          }
           const welcomeEmail = emailTemplates.firstLoginWelcome(user);
           sendEmail({
             to: user.email,

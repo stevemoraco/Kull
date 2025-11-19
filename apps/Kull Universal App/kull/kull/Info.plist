@@ -2,15 +2,187 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- App Metadata -->
+	<key>CFBundleDisplayName</key>
+	<string>Kull</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+
+	<!-- Privacy Descriptions (Required for App Store) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kull needs access to your photo library to analyze and rate your images. Photos are processed by AI to generate quality scores and Lightroom-compatible XMP files. Your photos are never stored on our servers.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Kull needs permission to save XMP sidecar files alongside your photos for Adobe Lightroom compatibility.</string>
+
+	<!-- File Access Descriptions (macOS) -->
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Kull needs access to your Documents folder to read RAW photo files and write XMP sidecar files for Lightroom.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Kull may need access to your Downloads folder if your photos are stored there.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Kull may need access to external drives (SD cards, USB drives) where your photo shoots are stored.</string>
+
+	<!-- Network Usage (Both Platforms) -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<!-- Allow secure connections to our backend -->
+			<key>lander.media</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSTemporaryExceptionMinimumTLSVersion</key>
+				<string>TLSv1.3</string>
+			</dict>
+		</dict>
+	</dict>
+
+	<!-- Background Processing -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>fetch</string>
+		<string>processing</string>
 	</array>
+
+	<!-- Document Support (iOS) -->
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>RAW Image</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.camera-raw-image</string>
+				<string>com.adobe.raw-image</string>
+				<string>com.canon.cr2-raw-image</string>
+				<string>com.canon.cr3-raw-image</string>
+				<string>com.nikon.nrw-raw-image</string>
+				<string>com.sony.arw-raw-image</string>
+				<string>com.fuji.raw-image</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Exported UTIs (for XMP files) -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.xml</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>XMP Sidecar File</string>
+			<key>UTTypeIdentifier</key>
+			<string>media.lander.kull.xmp</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>xmp</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+
+	<!-- App Capabilities -->
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+
+	<!-- Launch Requirements -->
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>MinimumOSVersion</key>
+	<string>17.0</string>
+
+	<!-- URL Schemes (for deep linking) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>media.lander.kull</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kull</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Scene Configuration (iOS) -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+
+	<!-- iPad Multitasking -->
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- iPhone Interface Orientations -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- Status Bar Style -->
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleDefault</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+
+	<!-- Launch Screen -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIImageName</key>
+		<string>LaunchImage</string>
+		<key>UIColorName</key>
+		<string>AccentColor</string>
+	</dict>
 </dict>
 </plist>

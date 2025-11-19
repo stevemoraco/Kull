@@ -17,6 +17,7 @@ export default defineConfig({
       "shared/__tests__/**/*.test.ts",
       "tests/unit/**/*.test.ts",
       "tests/integration/**/*.test.ts",
+      "tests/performance/**/*.perf.test.ts",
       "server/**/*.test.ts",
      ],
     coverage: {
@@ -26,6 +27,7 @@ export default defineConfig({
         "client/src/vite-env.d.ts",
         "client/src/setupTests.ts",
         "client/src/**/__tests__/**",
+        "tests/performance/**",
       ],
     },
   },

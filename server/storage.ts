@@ -217,6 +217,7 @@ export interface IStorage {
   getUserDeviceSessions(userId: string): Promise<DeviceSession[]>;
   updateDeviceLastSeen(deviceId: string): Promise<void>;
   updateDevicePushToken(deviceId: string, pushToken: string): Promise<void>;
+  updateDeviceName(deviceId: string, deviceName: string): Promise<void>;
   revokeDeviceSession(deviceId: string): Promise<void>;
   revokeAllUserDevices(userId: string): Promise<void>;
 
@@ -492,7 +493,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(promptPresetSaves.userId, userId))
       .orderBy(desc(promptPresetSaves.createdAt));
 
-    return rows.map((row) => row.preset);
+    return rows.map((row: any) => row.preset);
   }
 
   async getPromptPresetBySlug(slug: string): Promise<PromptPreset | undefined> {
@@ -846,7 +847,7 @@ export class DatabaseStorage implements IStorage {
     // Create a map of userId/email -> session stats
     const sessionStatsByIdentifier = new Map<string, { conversationCount: number; totalMessages: number; device?: string; browser?: string; city?: string; state?: string; country?: string }>();
     
-    allSessions.forEach(session => {
+    allSessions.forEach((session: any) => {
       const identifier = session.userId || 'Anonymous';
       const messages = JSON.parse(session.messages);
       const existing = sessionStatsByIdentifier.get(identifier) || { conversationCount: 0, totalMessages: 0 };
@@ -866,7 +867,7 @@ export class DatabaseStorage implements IStorage {
     const allUsers = await db.select().from(users);
     const userIdToEmail = new Map<string, string>();
     const emailToUserId = new Map<string, string>();
-    allUsers.forEach(user => {
+    allUsers.forEach((user: any) => {
       if (user.email) {
         userIdToEmail.set(user.id, user.email);
         emailToUserId.set(user.email, user.id);
@@ -876,7 +877,7 @@ export class DatabaseStorage implements IStorage {
     return {
       totalQueries: totals[0]?.totalQueries || 0,
       totalCost: Number(totals[0]?.totalCost || 0),
-      queriesByEmail: byEmail.map(row => {
+      queriesByEmail: byEmail.map((row: any) => {
         const email = row.email || 'Anonymous';
         
         // Try to find session stats by userId (if email is in users table)
@@ -919,7 +920,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`DATE(${supportQueries.createdAt})`)
       .orderBy(sql`DATE(${supportQueries.createdAt})`);
 
-    return results.map(row => ({
+    return results.map((row: any) => ({
       date: row.date,
       count: row.count,
       avgCost: Number(row.avgCost),
@@ -1069,7 +1070,7 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoUpdate({
         target: [promptVotes.userId, promptVotes.promptId],
         set: {
-          vote: voteData.vote,
+          value: voteData.value,
           updatedAt: new Date(),
         },
       })
@@ -1103,7 +1104,7 @@ export class DatabaseStorage implements IStorage {
     // Calculate average vote score and total vote count
     const result = await db
       .select({
-        avgScore: sql<number>`COALESCE(AVG(${promptVotes.vote}::numeric), 0)::numeric`,
+        avgScore: sql<number>`COALESCE(AVG(${promptVotes.value}::numeric), 0)::numeric`,
         voteCount: sql<number>`count(*)::int`,
       })
       .from(promptVotes)
@@ -1309,6 +1310,15 @@ export class DatabaseStorage implements IStorage {
       .update(deviceSessions)
       .set({
         pushToken,
+      })
+      .where(eq(deviceSessions.deviceId, deviceId));
+  }
+
+  async updateDeviceName(deviceId: string, deviceName: string): Promise<void> {
+    await db
+      .update(deviceSessions)
+      .set({
+        deviceName,
       })
       .where(eq(deviceSessions.deviceId, deviceId));
   }

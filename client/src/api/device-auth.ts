@@ -80,6 +80,30 @@ export async function getUserDevices(accessToken: string): Promise<DeviceSession
 }
 
 /**
+ * Get all active device sessions for the authenticated user (web-based, uses session cookies)
+ * This is for web browsers where users are logged in via OAuth
+ */
+export async function getUserDevicesWeb(): Promise<DeviceSessionInfo[]> {
+  const response = await fetch(`${API_BASE}/sessions/web`, {
+    credentials: 'include', // Include session cookies
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch device sessions');
+  }
+
+  const sessions = await response.json();
+
+  // Convert date strings to Date objects
+  return sessions.map((session: any) => ({
+    ...session,
+    lastSeen: new Date(session.lastSeen),
+    createdAt: new Date(session.createdAt),
+  }));
+}
+
+/**
  * Revoke a specific device session
  * Requires device token authentication
  */
@@ -109,6 +133,57 @@ export async function revokeAllDevices(accessToken: string): Promise<{ revokedCo
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to revoke devices');
+  }
+
+  return response.json();
+}
+
+/**
+ * Revoke a specific device session (web-based, uses session cookies)
+ */
+export async function revokeDeviceWeb(deviceId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sessions/web/${deviceId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to revoke device');
+  }
+}
+
+/**
+ * Rename a device session (web-based, uses session cookies)
+ */
+export async function renameDeviceWeb(deviceId: string, deviceName: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sessions/web/${deviceId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ deviceName }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to rename device');
+  }
+}
+
+/**
+ * Revoke all device sessions (web-based, uses session cookies)
+ */
+export async function revokeAllDevicesWeb(): Promise<{ revokedCount: number }> {
+  const response = await fetch(`${API_BASE}/sessions/web/revoke-all`, {
+    method: 'DELETE',
+    credentials: 'include',
   });
 
   if (!response.ok) {

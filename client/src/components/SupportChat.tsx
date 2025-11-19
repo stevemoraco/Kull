@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback, flushSync } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, X, Send, Loader2, RotateCcw, History, Plus, ChevronDown, ChevronUp, Maximize2, Minimize2, Play, Pause } from 'lucide-react';
 import {

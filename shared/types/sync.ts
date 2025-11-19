@@ -7,6 +7,7 @@ export type SyncMessageType =
   | 'DEVICE_CONNECTED'
   | 'DEVICE_DISCONNECTED'
   | 'ADMIN_SESSION_UPDATE'
+  | 'PROVIDER_HEALTH'
   | 'PING'
   | 'PONG';
 
@@ -58,6 +59,31 @@ export interface AdminSessionUpdateData {
   messageCount?: number;
 }
 
+export interface ProviderHealthData {
+  providers: Array<{
+    provider: string;
+    healthScore: number;
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    activeRequests: number;
+    requestsToday: number;
+    costToday: number;
+    avgLatency: number;
+    successRate: number;
+    errorRate: number;
+    rateLimitHits: number;
+    rateLimitProximity: number;
+    recentErrors: number;
+    lastError: string | null;
+    lastErrorTime: Date | null;
+    requestHistory: Array<{ timestamp: Date; value: number }>;
+    costHistory: Array<{ timestamp: Date; value: number }>;
+    errorHistory: Array<{ timestamp: Date; value: number }>;
+    uptimePercentage: number;
+    lastDowntime: Date | null;
+  }>;
+  timestamp: Date;
+}
+
 export interface WebSocketClientMessage {
   type: 'SUBSCRIBE' | 'UNSUBSCRIBE' | 'UPDATE_PROGRESS' | 'PING';
   payload?: any;
@@ -79,4 +105,5 @@ export interface SyncHandlers {
   onDeviceConnected?: SyncHandler<DeviceConnectionData>;
   onDeviceDisconnected?: SyncHandler<DeviceConnectionData>;
   onAdminSessionUpdate?: SyncHandler<AdminSessionUpdateData>;
+  onProviderHealth?: SyncHandler<ProviderHealthData>;
 }

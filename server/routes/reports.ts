@@ -60,7 +60,7 @@ router.get('/', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: 
     const reports = await query;
 
     // Transform to list item format
-    const reportList = reports.map((report) => ({
+    const reportList = reports.map((report: any) => ({
       id: report.id,
       shootId: report.shootId,
       shootName: report.shootName,

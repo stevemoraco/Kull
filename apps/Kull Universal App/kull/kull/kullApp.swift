@@ -146,6 +146,9 @@ struct MainWindow: View {
 
                 // Network and sync status
                 HStack(spacing: 12) {
+                    // Offline queue indicator with interactive badge
+                    OfflineQueueIndicator()
+
                     // Network status
                     HStack(spacing: 4) {
                         Image(systemName: networkMonitor.isConnected ? "wifi" : "wifi.slash")
@@ -165,18 +168,6 @@ struct MainWindow: View {
                             .foregroundColor(.secondary)
                     }
                     .help(webSocket.isConnected ? "Real-time sync active" : "Sync unavailable - check connection")
-
-                    // Pending operations indicator
-                    if operationQueue.pendingOperationsCount > 0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .foregroundColor(.blue)
-                            Text("\(operationQueue.pendingOperationsCount) pending")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .help("Operations queued for sync")
-                    }
                 }
 
                 Button("Refresh Credits") { credits.refresh() }
@@ -409,103 +400,267 @@ struct HomeView: View {
     @StateObject private var operationQueue = OfflineOperationQueue.shared
     @State private var showingPrompts = false
     @State private var showingFolders = false
+    @State private var showingSettings = false
+    @State private var selectedTab: NavigationItem? = .home
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Network status banner
-                HStack {
-                    Image(systemName: networkMonitor.isConnected ? "wifi" : "wifi.slash")
-                        .foregroundColor(networkMonitor.isConnected ? .green : .orange)
-                    Text(networkMonitor.connectionDescription)
-                        .font(.caption)
-                    Spacer()
-                    if operationQueue.pendingOperationsCount > 0 {
-                        Text("\(operationQueue.pendingOperationsCount) pending")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
+        if horizontalSizeClass == .regular {
+            // iPad: Use NavigationSplitView for 3-column layout
+            iPadLayout
+        } else {
+            // iPhone: Use traditional NavigationView
+            iPhoneLayout
+        }
+    }
+
+    // MARK: - iPad Layout (Split View)
+
+    private var iPadLayout: some View {
+        NavigationSplitView(
+            columnVisibility: .constant(.all),
+            sidebar: { sidebarContent },
+            content: { mainContent },
+            detail: { detailContent }
+        )
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    private var sidebarContent: some View {
+        List(selection: $selectedTab) {
+            NavigationLink(value: NavigationItem.home) {
+                Label("Home", systemImage: "house.fill")
+            }
+            NavigationLink(value: NavigationItem.folders) {
+                Label("Folders", systemImage: "folder.fill")
+            }
+            NavigationLink(value: NavigationItem.marketplace) {
+                Label("Marketplace", systemImage: "app.badge")
+            }
+            NavigationLink(value: NavigationItem.settings) {
+                Label("Settings", systemImage: "gear")
+            }
+        }
+        .navigationTitle("Kull")
+        .listStyle(.sidebar)
+    }
+
+    private var mainContent: some View {
+        Group {
+            switch selectedTab {
+            case .home:
+                homeMainView
+            case .folders:
+                FoldersView()
+            case .marketplace:
+                MarketplaceView()
+            case .settings:
+                SettingsView()
+            case .none:
+                homeMainView
+            }
+        }
+    }
+
+    private var detailContent: some View {
+        VStack {
+            if syncCoordinator.isAnyShooting {
+                activeShootsDetailView
+            } else {
+                Text("Select an item to view details")
+                    .foregroundColor(.secondary)
+                    .font(.title3)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var homeMainView: some View {
+        VStack(spacing: 0) {
+            statusBanners
+            mainContentList
+        }
+        .navigationTitle("Dashboard")
+    }
+
+    private var activeShootsDetailView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Active Shoots")
+                .font(.title2)
+                .bold()
                 .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(networkMonitor.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+                .padding(.top)
 
-                // Syncing indicator
-                if operationQueue.isSyncing {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                        Text("Syncing operations...")
-                            .font(.caption)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.blue.opacity(0.1))
-                }
-
-                // WebSocket connection status
-                HStack {
-                    Image(systemName: webSocket.isConnected ? "bolt.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(webSocket.isConnected ? .green : .orange)
-                    Text(webSocket.isConnected ? "Real-time sync active" : connectionStateText)
-                        .font(.caption)
-                    Spacer()
-                    if let lastSync = webSocket.lastSyncTime {
-                        Text("Last sync: \(timeAgo(lastSync))")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(webSocket.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
-
-                List {
-                    Section(header: Text("Credits")) {
-                        HStack {
-                            Text("Available")
-                            Spacer()
-                            Text("\(syncCoordinator.creditBalance > 0 ? syncCoordinator.creditBalance : credits.balance)")
-                                .font(.headline)
-                        }
-                        HStack { Text("Plan"); Spacer(); Text(credits.plan) }
-                        HStack { Text("Est. Shoots Left"); Spacer(); Text(String(format: "%.0f", credits.shootsLeft)) }
-                        Button("Buy Credits") { /* open web */ }
-                    }
-
-                    // Active shoot progress
-                    if syncCoordinator.isAnyShooting {
-                        Section(header: Text("Active Shoots")) {
-                            ForEach(Array(syncCoordinator.activeShootProgress.values), id: \.shootId) { progress in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Text("Shoot: \(progress.shootId.prefix(8))")
-                                            .font(.caption)
-                                        Spacer()
-                                        Text("\(progress.processedCount)/\(progress.totalCount)")
-                                            .font(.caption)
-                                    }
-                                    ProgressView(value: progress.progress)
-                                    if let eta = progress.eta {
-                                        Text("ETA: \(Int(eta))s")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(Array(syncCoordinator.activeShootProgress.values), id: \.shootId) { progress in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Shoot: \(progress.shootId.prefix(8))")
+                                    .font(.headline)
+                                Spacer()
+                                Text("\(progress.processedCount)/\(progress.totalCount)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            ProgressView(value: progress.progress)
+                                .tint(.blue)
+                            if let eta = progress.eta {
+                                Text("ETA: \(Int(eta))s")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                         }
-                    }
-
-                    Section {
-                        NavigationLink(isActive: $showingFolders) { FoldersView() } label: { Button("Folders") { showingFolders = true } }
-                        NavigationLink(isActive: $showingPrompts) { MarketplaceView() } label: { Button("Prompt Marketplace") { showingPrompts = true } }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
                     }
                 }
+                .padding()
+            }
+        }
+    }
+
+    // MARK: - iPhone Layout (NavigationView)
+
+    private var iPhoneLayout: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                statusBanners
+                mainContentList
             }
             .navigationTitle("Kull")
             .onAppear { credits.refresh() }
         }
+    }
+
+    // MARK: - Shared Components
+
+    private var statusBanners: some View {
+        VStack(spacing: 0) {
+            // Network status banner with offline queue indicator
+            HStack {
+                Image(systemName: networkMonitor.isConnected ? "wifi" : "wifi.slash")
+                    .foregroundColor(networkMonitor.isConnected ? .green : .orange)
+                Text(networkMonitor.connectionDescription)
+                    .font(.caption)
+                Spacer()
+
+                // Offline queue indicator badge
+                OfflineQueueIndicator()
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(networkMonitor.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+
+            // Syncing indicator
+            if operationQueue.isSyncing {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("Syncing operations...")
+                        .font(.caption)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.1))
+            }
+
+            // WebSocket connection status
+            HStack {
+                Image(systemName: webSocket.isConnected ? "bolt.fill" : "exclamationmark.triangle.fill")
+                    .foregroundColor(webSocket.isConnected ? .green : .orange)
+                Text(webSocket.isConnected ? "Real-time sync active" : connectionStateText)
+                    .font(.caption)
+                Spacer()
+                if let lastSync = webSocket.lastSyncTime {
+                    Text("Last sync: \(timeAgo(lastSync))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(webSocket.isConnected ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+        }
+    }
+
+    private var mainContentList: some View {
+        List {
+            Section(header: Text("Credits")) {
+                HStack {
+                    Text("Available")
+                    Spacer()
+                    Text("\(syncCoordinator.creditBalance > 0 ? syncCoordinator.creditBalance : credits.balance)")
+                        .font(.headline)
+                }
+                .frame(minHeight: 44)  // iPad: Minimum touch target
+                HStack {
+                    Text("Plan")
+                    Spacer()
+                    Text(credits.plan)
+                }
+                .frame(minHeight: 44)
+                HStack {
+                    Text("Est. Shoots Left")
+                    Spacer()
+                    Text(String(format: "%.0f", credits.shootsLeft))
+                }
+                .frame(minHeight: 44)
+                Button("Buy Credits") { /* open web */ }
+                    .frame(minHeight: 44)
+            }
+
+            // Active shoot progress
+            if syncCoordinator.isAnyShooting {
+                Section(header: Text("Active Shoots")) {
+                    ForEach(Array(syncCoordinator.activeShootProgress.values), id: \.shootId) { progress in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Shoot: \(progress.shootId.prefix(8))")
+                                    .font(.caption)
+                                Spacer()
+                                Text("\(progress.processedCount)/\(progress.totalCount)")
+                                    .font(.caption)
+                            }
+                            ProgressView(value: progress.progress)
+                            if let eta = progress.eta {
+                                Text("ETA: \(Int(eta))s")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+
+            Section {
+                NavigationLink(isActive: $showingFolders) {
+                    FoldersView()
+                } label: {
+                    Label("Folders", systemImage: "folder.fill")
+                        .frame(minHeight: 44)
+                }
+                NavigationLink(isActive: $showingPrompts) {
+                    MarketplaceView()
+                } label: {
+                    Label("Prompt Marketplace", systemImage: "app.badge")
+                        .frame(minHeight: 44)
+                }
+            }
+        }
+    }
+
+    private func timeAgo(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "\(seconds)s ago" }
+        let minutes = seconds / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        return "\(hours)h ago"
     }
 
     private var connectionStateText: String {
@@ -522,15 +677,14 @@ struct HomeView: View {
             return "Failed"
         }
     }
+}
 
-    private func timeAgo(_ date: Date) -> String {
-        let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60 { return "\(seconds)s ago" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes)m ago" }
-        let hours = minutes / 60
-        return "\(hours)h ago"
-    }
+// Navigation items for iPad split view
+enum NavigationItem: Hashable {
+    case home
+    case folders
+    case marketplace
+    case settings
 }
 
 // iOS AppDelegate for lifecycle management and push notifications

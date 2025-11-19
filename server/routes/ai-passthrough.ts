@@ -12,6 +12,12 @@ import { GoogleAdapter } from '../ai/providers/GoogleAdapter';
 import { GrokAdapter } from '../ai/providers/GrokAdapter';
 import { GroqAdapter } from '../ai/providers/GroqAdapter';
 import { BaseProviderAdapter, ImageInput, ProcessImageRequest } from '../ai/BaseProviderAdapter';
+import {
+  logRequest,
+  logRateLimitHit as logHealthRateLimit,
+  incrementActiveRequests,
+  decrementActiveRequests
+} from '../services/providerHealthMonitor';
 
 const router = Router();
 
@@ -62,6 +68,8 @@ function logRateLimit(provider: string, retryAfter: number) {
   if (rateLimitLog.length > MAX_LOG_SIZE) {
     rateLimitLog.shift();
   }
+  // Also log to health monitor
+  logHealthRateLimit(provider, retryAfter);
 }
 
 function logError(provider: string, error: string, imageId?: string) {
@@ -107,8 +115,11 @@ router.get('/providers', (req: Request, res: Response) => {
  * - userPrompt: string
  */
 router.post('/process-single', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const { provider } = req.body;
+
   try {
-    const { provider, image, systemPrompt, userPrompt } = req.body;
+    const { image, systemPrompt, userPrompt } = req.body;
 
     if (!provider || !providers[provider]) {
       return res.status(400).json({
@@ -130,6 +141,9 @@ router.post('/process-single', async (req: Request, res: Response) => {
 
     const adapter = providers[provider];
 
+    // Track active request
+    incrementActiveRequests(provider);
+
     // Convert base64 string to Buffer
     const imageBuffer = Buffer.from(image.data, 'base64');
 
@@ -149,6 +163,15 @@ router.post('/process-single', async (req: Request, res: Response) => {
     // Process with automatic retry
     const result = await adapter.processSingleImage(request);
 
+    // Calculate latency
+    const latency = Date.now() - startTime;
+
+    // Log successful request
+    logRequest(provider, latency, true, result.cost.totalCostUSD);
+
+    // Decrement active requests
+    decrementActiveRequests(provider);
+
     res.json({
       rating: result.rating,
       cost: result.cost,
@@ -157,13 +180,20 @@ router.post('/process-single', async (req: Request, res: Response) => {
     });
 
   } catch (error: any) {
-    const provider = req.body.provider || 'unknown';
+    const providerName = provider || 'unknown';
+    const latency = Date.now() - startTime;
 
     if (error.status === 429) {
-      logRateLimit(provider, error.retryAfter || 0);
+      logRateLimit(providerName, error.retryAfter || 0);
     }
 
-    logError(provider, error.message || String(error), req.body.image?.filename);
+    logError(providerName, error.message || String(error), req.body.image?.filename);
+
+    // Log failed request
+    logRequest(providerName, latency, false, 0, error.message);
+
+    // Decrement active requests
+    decrementActiveRequests(providerName);
 
     res.status(500).json({
       error: 'Failed to process image',

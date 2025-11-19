@@ -8,7 +8,7 @@ import { FAQSection } from "@/components/FAQSection";
 import { FinalCTA } from "@/components/FinalCTA";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
+import { Download } from "lucide-react";
 
 export default function Landing() {
   const handleLogin = () => {
@@ -58,24 +58,29 @@ export default function Landing() {
               Download
             </button>
             <Button
-              variant="outline"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-5"
               onClick={handleLogin}
               data-testid="button-login-nav"
             >
-              <LogIn className="w-4 h-4 mr-2" />
-              Sign In
+              <Download className="w-5 h-5 mr-2 flex-shrink-0" />
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-xs">Start Free Trial</span>
+                <span className="text-xs">Download Now</span>
+              </div>
             </Button>
           </div>
           
           {/* Mobile Sign In */}
           <Button
-            variant="outline"
+            className="md:hidden bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-4"
             onClick={handleLogin}
-            className="md:hidden"
             data-testid="button-login-nav-mobile"
           >
-            <LogIn className="w-4 h-4 mr-2" />
-            Sign In
+            <Download className="w-4 h-4 mr-2 flex-shrink-0" />
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-[10px]">Start Free Trial</span>
+              <span className="text-[10px]">Download Now</span>
+            </div>
           </Button>
         </div>
       </nav>

@@ -86,7 +86,7 @@ class GeoClient {
           category: f?.properties?.category,
           distanceMeters: typeof f?.properties?.distance === "number" ? f.properties.distance : undefined,
         }))
-        .filter((poi) => poi.name);
+        .filter((poi: any) => poi.name);
 
       const result: GeoLookupResult = { address, pois };
       this.cache.set(cacheKey, result);
@@ -134,7 +134,7 @@ export class ExifGeoContextService {
         gps: {
           ...metadata.gps,
           resolvedAddress: geo.address ?? undefined,
-          nearbyVenues: geo.pois.length ? geo.pois : undefined,
+          nearbyVenues: geo.pois.length ? geo.pois : [],
         },
       };
     }
@@ -204,6 +204,7 @@ export class ExifGeoContextService {
       return {
         latitude,
         longitude,
+        nearbyVenues: [],
         altitude: typeof parsed.altitude === "number" ? parsed.altitude : undefined,
       };
     }

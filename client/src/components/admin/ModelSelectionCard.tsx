@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -51,10 +51,14 @@ export default function ModelSelectionCard() {
       const data = await res.json();
       return data.value || 'gpt-5-nano';
     },
-    onSuccess: (value) => {
-      setSelectedModel(value);
-    },
   });
+
+  // React Query v5: use useEffect instead of onSuccess
+  useEffect(() => {
+    if (currentSetting) {
+      setSelectedModel(currentSetting);
+    }
+  }, [currentSetting]);
 
   // Mutation to save model setting
   const saveMutation = useMutation({

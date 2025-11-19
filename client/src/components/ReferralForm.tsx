@@ -50,7 +50,7 @@ export function ReferralForm() {
           referredUserId: null,
           status: 'pending' as const,
           bonusUnlocked: null,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date(),
         }));
         return [...(old || []), ...newReferrals];
       });

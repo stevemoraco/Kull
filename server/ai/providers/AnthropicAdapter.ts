@@ -399,6 +399,15 @@ Return ONLY the JSON object, no other text.`;
     return inputCost + outputCost;
   }
 
+  getBatchCostPerImage(): number {
+    // Batch API has 50% discount
+    const inputTokens = 2000;
+    const outputTokens = 500;
+    const inputCost = (inputTokens / 1_000_000) * this.BATCH_INPUT_COST_PER_1M;
+    const outputCost = (outputTokens / 1_000_000) * this.BATCH_OUTPUT_COST_PER_1M;
+    return inputCost + outputCost;
+  }
+
   getProviderName(): string {
     return 'Anthropic';
   }

@@ -472,4 +472,127 @@ router.post('/update-push-token', verifyDeviceToken, hasPaidAccessDevice, async 
   }
 });
 
+/**
+ * GET /api/device-auth/sessions/web
+ * Get all active device sessions for the authenticated user (web-based, uses session auth)
+ * This is for web browsers where users are logged in via OAuth
+ */
+router.get('/sessions/web', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+
+    const sessions = await storage.getUserDeviceSessions(userId);
+
+    const response = sessions.map(session => ({
+      id: session.id,
+      deviceId: session.deviceId,
+      platform: session.platform,
+      deviceName: session.deviceName,
+      lastSeen: session.lastSeen,
+      isCurrentDevice: false, // Web session doesn't have a device ID
+      createdAt: session.createdAt,
+    }));
+
+    res.json(response);
+  } catch (error) {
+    console.error('[Device Auth] Error fetching sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch device sessions' });
+  }
+});
+
+/**
+ * DELETE /api/device-auth/sessions/web/:deviceId
+ * Revoke a specific device session (web-based, uses session auth)
+ */
+router.delete('/sessions/web/:deviceId', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { deviceId } = req.params;
+
+    if (!deviceId) {
+      return res.status(400).json({ error: 'Device ID is required' });
+    }
+
+    // Verify user owns this device
+    const session = await storage.getDeviceSession(deviceId);
+    if (!session || session.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await storage.revokeDeviceSession(deviceId);
+
+    console.log(`[Device Auth] Device ${deviceId} revoked for user ${userId} via web`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Device Auth] Error revoking device:', error);
+    res.status(500).json({ error: 'Failed to revoke device' });
+  }
+});
+
+/**
+ * PATCH /api/device-auth/sessions/web/:deviceId
+ * Rename a device session (web-based, uses session auth)
+ */
+router.patch('/sessions/web/:deviceId', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+    const { deviceId } = req.params;
+    const { deviceName } = req.body;
+
+    if (!deviceId) {
+      return res.status(400).json({ error: 'Device ID is required' });
+    }
+
+    if (!deviceName || deviceName.trim().length === 0) {
+      return res.status(400).json({ error: 'Device name is required' });
+    }
+
+    // Verify user owns this device
+    const session = await storage.getDeviceSession(deviceId);
+    if (!session || session.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await storage.updateDeviceName(deviceId, deviceName.trim());
+
+    console.log(`[Device Auth] Device ${deviceId} renamed to "${deviceName}" for user ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Device Auth] Error renaming device:', error);
+    res.status(500).json({ error: 'Failed to rename device' });
+  }
+});
+
+/**
+ * DELETE /api/device-auth/sessions/web/revoke-all
+ * Revoke all device sessions (web-based, uses session auth)
+ */
+router.delete('/sessions/web/revoke-all', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.claims.sub;
+
+    // Get all user devices
+    const sessions = await storage.getUserDeviceSessions(userId);
+
+    // Revoke all devices
+    let revokedCount = 0;
+    for (const session of sessions) {
+      await storage.revokeDeviceSession(session.deviceId);
+      revokedCount++;
+    }
+
+    console.log(`[Device Auth] Revoked all ${revokedCount} devices for user ${userId} via web`);
+
+    res.json({
+      success: true,
+      revokedCount,
+    });
+  } catch (error) {
+    console.error('[Device Auth] Error revoking all devices:', error);
+    res.status(500).json({ error: 'Failed to revoke devices' });
+  }
+});
+
 export default router;

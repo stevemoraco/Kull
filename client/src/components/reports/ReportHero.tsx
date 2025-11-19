@@ -1,16 +1,17 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Share2, Trash2, Calendar, Zap } from 'lucide-react';
+import { Share2, Trash2, Calendar, Zap, FileDown } from 'lucide-react';
 import type { ShootReport } from '@/lib/reports';
 
 interface ReportHeroProps {
   report: ShootReport;
   onShare: () => void;
   onDelete: () => void;
+  onExportXmp: () => void;
   isShared?: boolean;
 }
 
-export function ReportHero({ report, onShare, onDelete, isShared }: ReportHeroProps) {
+export function ReportHero({ report, onShare, onDelete, onExportXmp, isShared }: ReportHeroProps) {
   const formattedDate = new Date(report.generatedAt).toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -40,8 +41,12 @@ export function ReportHero({ report, onShare, onDelete, isShared }: ReportHeroPr
 
           {/* Actions */}
           {!isShared && (
-            <div className="flex gap-3">
-              <Button onClick={onShare} variant="default" className="gap-2">
+            <div className="flex gap-3 flex-wrap">
+              <Button onClick={onExportXmp} variant="default" className="gap-2">
+                <FileDown className="w-4 h-4" />
+                Export to Lightroom
+              </Button>
+              <Button onClick={onShare} variant="outline" className="gap-2">
                 <Share2 className="w-4 h-4" />
                 Share Report
               </Button>

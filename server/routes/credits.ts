@@ -84,21 +84,21 @@ router.get('/usage-summary', async (req: Request, res: Response) => {
 
     // Calculate totals
     const totalPurchased = transactions
-      .filter(t => t.type === 'purchase' || t.type === 'bonus')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .filter((t: any) => t.type === 'purchase' || t.type === 'bonus')
+      .reduce((sum: number, t: any) => sum + t.amount, 0);
 
     const totalSpent = Math.abs(
       transactions
-        .filter(t => t.type === 'usage')
-        .reduce((sum, t) => sum + t.amount, 0)
+        .filter((t: any) => t.type === 'usage')
+        .reduce((sum: number, t: any) => sum + t.amount, 0)
     );
 
     // Group by provider
     const byProvider: Record<string, { total: number; count: number; lastUsed: Date | null }> = {};
 
     transactions
-      .filter(t => t.type === 'usage' && t.provider)
-      .forEach(t => {
+      .filter((t: any) => t.type === 'usage' && t.provider)
+      .forEach((t: any) => {
         if (!byProvider[t.provider!]) {
           byProvider[t.provider!] = { total: 0, count: 0, lastUsed: null };
         }
@@ -110,7 +110,7 @@ router.get('/usage-summary', async (req: Request, res: Response) => {
       });
 
     const currentBalance = transactions.length > 0
-      ? transactions.sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())[0].balance
+      ? transactions.sort((a: any, b: any) => b.createdAt!.getTime() - a.createdAt!.getTime())[0].balance
       : 0;
 
     res.json({

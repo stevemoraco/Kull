@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Laptop, Smartphone, Tablet, MoreVertical, Trash2, AlertTriangle } from 'lucide-react';
+import { Laptop, Smartphone, Tablet, MoreVertical, Trash2, Edit2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,13 +16,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { getUserDevices, revokeDevice, revokeAllDevices } from '@/api/device-auth';
+import { getUserDevicesWeb, revokeDeviceWeb, revokeAllDevicesWeb, renameDeviceWeb } from '@/api/device-auth';
 import type { DeviceSessionInfo } from '@/api/device-auth';
 import type { DevicePlatform } from '@shared/types/device';
 
@@ -32,34 +40,26 @@ import type { DevicePlatform } from '@shared/types/device';
  * Allows users to:
  * - View all active device sessions
  * - Revoke individual devices
- * - Revoke all devices except current
+ * - Rename devices
+ * - Revoke all devices
  */
 export default function DeviceSessions() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
   const [revokeAllDialogOpen, setRevokeAllDialogOpen] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<DeviceSessionInfo | null>(null);
+  const [newDeviceName, setNewDeviceName] = useState('');
 
-  // Note: This page is designed for web access, so we don't have a device token
-  // In a real implementation, you'd need to handle authentication differently
-  // For demo purposes, we'll show a message that this requires native app access
   const { data: devices, isLoading, error } = useQuery({
     queryKey: ['device-sessions'],
-    queryFn: async () => {
-      // This would need to be called with a valid access token
-      // For web-based management, you might want to create a separate endpoint
-      // that uses session authentication instead of device tokens
-      throw new Error('Device management requires authentication from a native app');
-    },
-    retry: false,
+    queryFn: getUserDevicesWeb,
+    retry: 1,
   });
 
   const revokeMutation = useMutation({
-    mutationFn: async (deviceId: string) => {
-      // Would need access token
-      throw new Error('Not implemented - requires device token');
-    },
+    mutationFn: (deviceId: string) => revokeDeviceWeb(deviceId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['device-sessions'] });
       toast({
@@ -79,11 +79,8 @@ export default function DeviceSessions() {
   });
 
   const revokeAllMutation = useMutation({
-    mutationFn: async () => {
-      // Would need access token
-      throw new Error('Not implemented - requires device token');
-    },
-    onSuccess: (data: any) => {
+    mutationFn: revokeAllDevicesWeb,
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['device-sessions'] });
       toast({
         title: 'Devices Revoked',
@@ -100,14 +97,51 @@ export default function DeviceSessions() {
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: ({ deviceId, deviceName }: { deviceId: string; deviceName: string }) =>
+      renameDeviceWeb(deviceId, deviceName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['device-sessions'] });
+      toast({
+        title: 'Device Renamed',
+        description: 'The device name has been successfully updated.',
+      });
+      setRenameDialogOpen(false);
+      setSelectedDevice(null);
+      setNewDeviceName('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleRevoke = (device: DeviceSessionInfo) => {
     setSelectedDevice(device);
     setRevokeDialogOpen(true);
   };
 
+  const handleRename = (device: DeviceSessionInfo) => {
+    setSelectedDevice(device);
+    setNewDeviceName(device.deviceName);
+    setRenameDialogOpen(true);
+  };
+
   const confirmRevoke = () => {
     if (selectedDevice) {
       revokeMutation.mutate(selectedDevice.deviceId);
+    }
+  };
+
+  const confirmRename = () => {
+    if (selectedDevice && newDeviceName.trim()) {
+      renameMutation.mutate({
+        deviceId: selectedDevice.deviceId,
+        deviceName: newDeviceName.trim(),
+      });
     }
   };
 
@@ -140,16 +174,7 @@ export default function DeviceSessions() {
           </p>
         </div>
 
-        {/* Info Alert - Explaining this is a demo/placeholder */}
-        <Alert className="mb-6">
-          <AlertDescription>
-            <strong>Note:</strong> Device session management is designed to be accessed from native Kull AI apps.
-            This page demonstrates the UI for managing connected devices. In production, users would access this
-            through the app's settings menu with proper authentication.
-          </AlertDescription>
-        </Alert>
-
-        {/* Demo Content - Shows what the interface would look like */}
+        {/* Content */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -159,67 +184,51 @@ export default function DeviceSessions() {
                   Devices currently connected to your account
                 </CardDescription>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setRevokeAllDialogOpen(true)}
-                disabled={true}
-              >
-                Revoke All Others
-              </Button>
+              {devices && devices.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setRevokeAllDialogOpen(true)}
+                  disabled={revokeAllMutation.isPending}
+                >
+                  Revoke All
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
-            {/* Demo Devices */}
-            <div className="space-y-4">
-              {/* Example Current Device */}
-              <DeviceSessionCard
-                device={{
-                  id: '1',
-                  deviceId: 'demo-mac',
-                  platform: 'macos' as const,
-                  deviceName: "Steve's MacBook Pro",
-                  lastSeen: new Date(),
-                  isCurrentDevice: true,
-                  createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                }}
-                onRevoke={handleRevoke}
-                formatLastSeen={formatLastSeen}
-              />
-
-              {/* Example Other Device */}
-              <DeviceSessionCard
-                device={{
-                  id: '2',
-                  deviceId: 'demo-iphone',
-                  platform: 'ios' as const,
-                  deviceName: "Steve's iPhone",
-                  lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000),
-                  isCurrentDevice: false,
-                  createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
-                }}
-                onRevoke={handleRevoke}
-                formatLastSeen={formatLastSeen}
-              />
-
-              {/* Example iPad */}
-              <DeviceSessionCard
-                device={{
-                  id: '3',
-                  deviceId: 'demo-ipad',
-                  platform: 'ipados' as const,
-                  deviceName: "Steve's iPad Pro",
-                  lastSeen: new Date(Date.now() - 24 * 60 * 60 * 1000),
-                  isCurrentDevice: false,
-                  createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-                }}
-                onRevoke={handleRevoke}
-                formatLastSeen={formatLastSeen}
-              />
-            </div>
-
-            {!devices && (
+            {isLoading && (
               <div className="text-center py-12 text-muted-foreground">
-                <p>Demo: Active device sessions would appear here</p>
+                <p>Loading device sessions...</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-center py-12 text-destructive">
+                <p>Failed to load device sessions. Please try again later.</p>
+                <p className="text-sm mt-2">{(error as Error).message}</p>
+              </div>
+            )}
+
+            {devices && devices.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No active device sessions found.</p>
+                <p className="text-sm mt-2">
+                  Download the Kull AI app on macOS or iOS to get started.
+                </p>
+              </div>
+            )}
+
+            {devices && devices.length > 0 && (
+              <div className="space-y-4">
+                {devices.map((device) => (
+                  <DeviceSessionCard
+                    key={device.deviceId}
+                    device={device}
+                    onRevoke={handleRevoke}
+                    onRename={handleRename}
+                    formatLastSeen={formatLastSeen}
+                  />
+                ))}
               </div>
             )}
           </CardContent>
@@ -240,8 +249,9 @@ export default function DeviceSessions() {
               <AlertDialogAction
                 onClick={confirmRevoke}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={revokeMutation.isPending}
               >
-                Revoke Access
+                {revokeMutation.isPending ? 'Revoking...' : 'Revoke Access'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -251,9 +261,9 @@ export default function DeviceSessions() {
         <AlertDialog open={revokeAllDialogOpen} onOpenChange={setRevokeAllDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Revoke All Other Devices?</AlertDialogTitle>
+              <AlertDialogTitle>Revoke All Devices?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will disconnect all devices except your current one. This action cannot be undone,
+                This will disconnect all devices from your account. This action cannot be undone,
                 and you'll need to approve each device again to use Kull AI on them.
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -262,12 +272,54 @@ export default function DeviceSessions() {
               <AlertDialogAction
                 onClick={confirmRevokeAll}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={revokeAllMutation.isPending}
               >
-                Revoke All Others
+                {revokeAllMutation.isPending ? 'Revoking...' : 'Revoke All'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Rename Device Dialog */}
+        <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename Device</DialogTitle>
+              <DialogDescription>
+                Enter a new name for "{selectedDevice?.deviceName}"
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                value={newDeviceName}
+                onChange={(e) => setNewDeviceName(e.target.value)}
+                placeholder="Enter device name"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newDeviceName.trim()) {
+                    confirmRename();
+                  }
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRenameDialogOpen(false);
+                  setNewDeviceName('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmRename}
+                disabled={!newDeviceName.trim() || renameMutation.isPending}
+              >
+                {renameMutation.isPending ? 'Renaming...' : 'Rename'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -276,11 +328,12 @@ export default function DeviceSessions() {
 interface DeviceSessionCardProps {
   device: DeviceSessionInfo;
   onRevoke: (device: DeviceSessionInfo) => void;
+  onRename: (device: DeviceSessionInfo) => void;
   formatLastSeen: (date: Date) => string;
 }
 
-function DeviceSessionCard({ device, onRevoke, formatLastSeen }: DeviceSessionCardProps) {
-  const icon = getPlatformIcon(device.platform);
+function DeviceSessionCard({ device, onRevoke, onRename, formatLastSeen }: DeviceSessionCardProps) {
+  const icon = getPlatformIcon(device.platform as DevicePlatform);
 
   return (
     <div className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -300,29 +353,31 @@ function DeviceSessionCard({ device, onRevoke, formatLastSeen }: DeviceSessionCa
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          {getPlatformLabel(device.platform)} • Last seen {formatLastSeen(device.lastSeen)}
+          {getPlatformLabel(device.platform as DevicePlatform)} • Last seen {formatLastSeen(device.lastSeen)}
         </p>
       </div>
 
       {/* Actions */}
-      {!device.isCurrentDevice && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => onRevoke(device)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Revoke Access
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onRename(device)}>
+            <Edit2 className="w-4 h-4 mr-2" />
+            Rename
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => onRevoke(device)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Revoke Access
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

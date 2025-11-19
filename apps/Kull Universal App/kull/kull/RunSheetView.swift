@@ -14,8 +14,65 @@ struct RunSheetView: View {
     @State private var estimatedImageCount: Int = 0
     @StateObject private var runner = RunController()
     @StateObject private var cloudService = CloudAIService.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
+        if horizontalSizeClass == .regular {
+            // iPad: Optimized landscape layout
+            iPadLayout
+        } else {
+            // iPhone: Compact layout
+            iPhoneLayout
+        }
+    }
+
+    // MARK: - iPad Layout
+
+    private var iPadLayout: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Run Settings")
+                    .font(.largeTitle)
+                    .bold()
+                    .padding(.horizontal)
+
+                // Processing Mode and Provider in horizontal layout for iPad
+                HStack(alignment: .top, spacing: 24) {
+                    processingModeSection
+                        .frame(maxWidth: .infinity)
+                    providerSection
+                        .frame(maxWidth: .infinity)
+                    presetSection
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal)
+
+                // Cost estimate (more prominent on iPad)
+                if selectedMode != .local && estimatedImageCount > 0 {
+                    costEstimateCard
+                        .padding(.horizontal)
+                }
+
+                // Prompt editor (larger on iPad)
+                promptEditorSection
+                    .padding(.horizontal)
+
+                // Progress and action buttons
+                actionSection
+                    .padding(.horizontal)
+            }
+            .padding(.vertical)
+        }
+        .background(Color(.systemGroupedBackground))
+        .task {
+            await loadProviders()
+            updateCostEstimate()
+        }
+    }
+
+    // MARK: - iPhone Layout
+
+    private var iPhoneLayout: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Run Settings").font(.title2).bold()
 
@@ -181,6 +238,224 @@ struct RunSheetView: View {
         .task {
             await loadProviders()
             updateCostEstimate()
+        }
+    }
+
+    // MARK: - Reusable Components
+
+    private var processingModeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Processing Mode")
+                .font(.headline)
+            Picker("Mode", selection: $selectedMode) {
+                ForEach(ProcessingMode.allCases) { mode in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(mode.displayName)
+                        Text(mode.description).font(.caption2).foregroundStyle(.secondary)
+                    }.tag(mode)
+                }
+            }
+            #if os(macOS)
+            .pickerStyle(.radioGroup)
+            #else
+            .pickerStyle(.menu)
+            #endif
+            .frame(minHeight: 44)  // iPad: Touch target
+            .onChange(of: selectedMode) { _, _ in
+                updateCostEstimate()
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    private var providerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("AI Provider")
+                .font(.headline)
+            if selectedMode == .local {
+                Text("Apple Intelligence (Local)")
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .frame(minHeight: 44)
+            } else if providers.isEmpty {
+                Picker("Provider", selection: $selectedProvider) {
+                    ForEach(AIProvider.allCases.filter { $0 != .appleIntelligence }) { provider in
+                        Text(provider.displayName).tag(provider)
+                    }
+                }
+                #if os(macOS)
+                .pickerStyle(.radioGroup)
+                #else
+                .pickerStyle(.menu)
+                #endif
+                .disabled(selectedMode == .local)
+                .frame(minHeight: 44)
+                .onChange(of: selectedProvider) { _, _ in
+                    updateCostEstimate()
+                }
+            } else {
+                Picker("Provider", selection: $selectedProvider) {
+                    ForEach(providers) { provider in
+                        HStack {
+                            Text(provider.name)
+                            Spacer()
+                            Text(provider.displayCost).font(.caption).foregroundStyle(.secondary)
+                        }.tag(AIProvider(rawValue: provider.id) ?? .openaiGPT5Nano)
+                    }
+                }
+                #if os(macOS)
+                .pickerStyle(.radioGroup)
+                #else
+                .pickerStyle(.menu)
+                #endif
+                .disabled(selectedMode == .local)
+                .frame(minHeight: 44)
+                .onChange(of: selectedProvider) { _, _ in
+                    updateCostEstimate()
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    private var presetSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preset & Options")
+                .font(.headline)
+            Picker("Preset", selection: $preset) {
+                Text("Standard").tag("standard")
+                Text("Wedding Storytelling").tag("wedding-storytelling")
+                Text("Corporate Event").tag("corporate-event")
+            }
+            .pickerStyle(.menu)
+            .frame(minHeight: 44)
+
+            Toggle("Title", isOn: $includeTitle)
+                .frame(minHeight: 44)
+            Toggle("Description", isOn: $includeDescription)
+                .frame(minHeight: 44)
+            Toggle("Tags", isOn: $includeTags)
+                .frame(minHeight: 44)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    private var costEstimateCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(.blue)
+                Text("Cost Estimate")
+                    .font(.headline)
+                Spacer()
+                Text(formatCost(estimatedCost))
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.blue)
+            }
+            HStack {
+                Text("\(estimatedImageCount) images")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if selectedMode == .economy {
+                    Text("50% savings with batch processing")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+
+    private var promptEditorSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Custom Prompt (optional)")
+                    .font(.headline)
+                Spacer()
+                #if os(macOS)
+                Button("🎙 Transcribe…") {
+                    TranscriptionHelper().transcribe(currentText: { self.promptText }) { self.promptText = $0 }
+                }
+                .frame(minHeight: 44)
+                #endif
+            }
+            TextEditor(text: $promptText)
+                .font(.system(.body, design: .monospaced))
+                .frame(height: horizontalSizeClass == .regular ? 180 : 120)
+                .border(.quaternary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+
+    private var actionSection: some View {
+        VStack(spacing: 16) {
+            if runner.isRunning {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        ProgressView(value: Double(runner.processed), total: Double(max(runner.total, 1)))
+                        Text("\(runner.processed)/\(runner.total)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    if runner.currentCost > 0 {
+                        Text("Cost so far: \(formatCost(runner.currentCost))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+            } else if runner.processed > 0 && runner.processed == runner.total {
+                VStack(alignment: .leading, spacing: 8) {
+                    #if os(macOS)
+                    Label("Complete! XMP files written next to your photos.", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(.green)
+                    Text("Open Lightroom to import with ratings.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    #else
+                    Label("Complete! XMP files ready to save.", systemImage: "checkmark.circle.fill")
+                        .font(.headline)
+                        .foregroundStyle(.green)
+                    Text("Use the share sheet to save XMP files back to your photo library.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    #endif
+                }
+                .padding()
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(12)
+            }
+
+            Button(action: { Task { await startRun() } }) {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text("Run")
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)  // iPad: Larger button
+                .background(selectedFolder == nil || runner.isRunning ? Color.gray : Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .disabled(selectedFolder == nil || runner.isRunning)
         }
     }
 

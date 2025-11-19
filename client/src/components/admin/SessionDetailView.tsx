@@ -16,6 +16,9 @@ interface Message {
   timestamp: string;
   tokensIn?: number;
   tokensOut?: number;
+  cachedTokensIn?: number;
+  newTokensIn?: number;
+  cacheHitRate?: number;
   cost?: string;
   model?: string;
   fullPrompt?: string;

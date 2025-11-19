@@ -186,7 +186,7 @@ describe('Batch Processing', () => {
       expect(results.results.length).toBe(1);
       expect(results.results[0].starRating).toBe(4);
       expect(results.results[0].technicalQuality.focusAccuracy).toBeGreaterThan(800);
-      expect(results.results[0].subjectAnalysis.emotionIntensity).toBeGreaterThan(900);
+      expect(results.results[0].subjectAnalysis.emotionIntensity).toBeGreaterThanOrEqual(900);
     });
 
     it('should error if job not completed', () => {

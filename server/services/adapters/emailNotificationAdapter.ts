@@ -17,7 +17,7 @@ export class EmailNotificationAdapter implements PushAdapter {
 
   async send(event: NotificationEvent): Promise<void> {
     const payload = this.parsePayload(event);
-    if (!payload) return;
+    if (!payload || !payload.report || !payload.recipientEmail) return;
 
     const template = emailTemplatesReport.shootReport(payload.report);
     const deliver = await this.ensureDeliver();

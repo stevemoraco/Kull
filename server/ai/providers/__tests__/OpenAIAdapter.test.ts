@@ -1173,7 +1173,7 @@ describe('OpenAIAdapter', () => {
       expect(results).toHaveLength(2);
       expect(results[0].starRating).toBe(5);
       expect(results[1].starRating).toBe(4);
-      expect(results[0].technicalQuality.momentTiming).toBe(1000);
+      expect(results[0].subjectAnalysis.momentTiming).toBe(1000);
     });
   });
 });

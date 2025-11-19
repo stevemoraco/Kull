@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { SyncMessage, SyncMessageType } from '@shared/types/sync';
 import type { Server } from 'http';
+import { config } from './config/environment';
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
@@ -30,6 +31,11 @@ export function setupWebSocketServer(server: Server): WebSocketService {
 
   // Map of userId -> Set of WebSocket connections
   const userConnections = new Map<string, Set<AuthenticatedWebSocket>>();
+
+  // PERFORMANCE FIX: Message batching for high-throughput scenarios
+  const messageQueue = new Map<string, SyncMessage[]>();
+  const BATCH_INTERVAL = 50; // ms - batch messages every 50ms
+  let batchingEnabled = false; // Enable batching under high load
 
   console.log('[WebSocket] Server initialized on path /ws');
 
@@ -130,6 +136,12 @@ export function setupWebSocketServer(server: Server): WebSocketService {
           };
           broadcastToUser(ws.userId, disconnectedMsg);
         }
+
+        // PERFORMANCE FIX: Clean up event listeners to prevent memory leaks
+        ws.removeAllListeners('message');
+        ws.removeAllListeners('error');
+        ws.removeAllListeners('pong');
+        ws.removeAllListeners('close');
       });
 
       // Handle errors
@@ -148,8 +160,43 @@ export function setupWebSocketServer(server: Server): WebSocketService {
     }
   });
 
+  // PERFORMANCE FIX: Message batching interval
+  const batchInterval = setInterval(() => {
+    if (messageQueue.size === 0) return;
+
+    for (const [userId, messages] of Array.from(messageQueue.entries())) {
+      if (messages.length === 0) continue;
+
+      const connections = userConnections.get(userId);
+      if (!connections) {
+        messageQueue.delete(userId);
+        continue;
+      }
+
+      // Send batched messages
+      connections.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          // Send as a batch if batching is enabled and we have multiple messages
+          if (batchingEnabled && messages.length > 1) {
+            ws.send(JSON.stringify({
+              type: 'BATCH',
+              messages,
+              timestamp: Date.now()
+            }));
+          } else {
+            // Send individually if batching is disabled or single message
+            messages.forEach(msg => ws.send(JSON.stringify(msg)));
+          }
+        }
+      });
+
+      // Clear queue for this user
+      messageQueue.set(userId, []);
+    }
+  }, BATCH_INTERVAL);
+
   // Keepalive ping interval (30 seconds)
-  const interval = setInterval(() => {
+  const pingInterval = setInterval(() => {
     wss.clients.forEach((ws: any) => {
       if (ws.isAlive === false) {
         console.log('[WS] Terminating inactive connection');
@@ -161,7 +208,9 @@ export function setupWebSocketServer(server: Server): WebSocketService {
   }, 30000);
 
   wss.on('close', () => {
-    clearInterval(interval);
+    clearInterval(pingInterval);
+    clearInterval(batchInterval);
+    messageQueue.clear();
     console.log('[WebSocket] Server closed');
   });
 
@@ -173,6 +222,7 @@ export function setupWebSocketServer(server: Server): WebSocketService {
       return;
     }
 
+    // Send immediately (batching disabled by default for now - can be enabled for high-load scenarios)
     const msgStr = JSON.stringify(message);
     let sentCount = 0;
 
@@ -237,9 +287,8 @@ export function setupWebSocketServer(server: Server): WebSocketService {
   }
 
   function broadcastToAdmins(message: SyncMessage) {
-    // Broadcast to all admin users (steve@lander.media = userId 13472548)
-    const adminUserId = '13472548'; // TODO: make this configurable
-    broadcastToUser(adminUserId, message);
+    // Broadcast to all admin users
+    broadcastToUser(config.adminUserId, message);
   }
 
   const service = {

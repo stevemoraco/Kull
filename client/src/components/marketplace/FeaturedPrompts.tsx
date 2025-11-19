@@ -27,7 +27,7 @@ export function FeaturedPrompts({ prompts }: FeaturedPromptsProps) {
   if (prompts.length === 0) return null;
 
   const currentPrompt = prompts[currentIndex];
-  const qualityScore = parseFloat(currentPrompt.qualityScore);
+  const qualityScore = currentPrompt.qualityScore;
   const stars = Math.round(qualityScore * 5);
 
   const goToNext = () => {
@@ -84,7 +84,7 @@ export function FeaturedPrompts({ prompts }: FeaturedPromptsProps) {
 
               <Button
                 size="lg"
-                onClick={() => setLocation(`/marketplace/${currentPrompt.id}`)}
+                onClick={() => setLocation(`/marketplace/${String(currentPrompt.id)}`)}
               >
                 View Details
               </Button>

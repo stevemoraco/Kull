@@ -26,7 +26,7 @@ const linksByCode = new Map<string, DeviceLinkRecord>();
 
 const cleanupExpired = () => {
   const now = Date.now();
-  for (const [pollToken, record] of linksByPollToken.entries()) {
+  for (const [pollToken, record] of Array.from(linksByPollToken.entries())) {
     if (record.expiresAt <= now || record.status === "claimed") {
       linksByPollToken.delete(pollToken);
       linksByCode.delete(record.code);

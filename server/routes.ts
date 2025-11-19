@@ -10,7 +10,7 @@ import {
   cancelDripCampaign,
   processPendingEmails,
 } from "./emailService";
-import { insertRefundSurveySchema, supportQueries, users } from "@shared/schema";
+import { insertRefundSurveySchema, supportQueries, users, type User } from "@shared/schema";
 import { db } from "./db";
 import { desc } from "drizzle-orm";
 import Stripe from "stripe";
@@ -21,6 +21,7 @@ import exportsRouter from "./routes/exports";
 import { batchRouter } from "./routes/batch";
 import aiPassthroughRouter from "./routes/ai-passthrough";
 import adminAIRouter from "./routes/admin-ai";
+import adminHealthRouter from "./routes/admin-health";
 import { PromptStyleSchema, ProviderIdSchema } from "@shared/culling/schemas";
 import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
@@ -230,7 +231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           profile: snapshot,
         };
 
-        return req.login(deviceUser as any, (err) => {
+        return req.login(deviceUser as any, (err: Error | null) => {
           if (err) {
             console.error("device link login failed", err);
             return res.status(500).json({ message: "Failed to issue session" });
@@ -1864,7 +1865,7 @@ ${contextMarkdown}`;
         .select()
         .from(users);
 
-      const userMap = new Map(allUsers.map(u => [u.id, u]));
+      const userMap: Map<string, User> = new Map(allUsers.map((u: User) => [u.id, u]));
 
       // Get all support queries for cost tracking
       const allQueries = await db
@@ -1885,7 +1886,7 @@ ${contextMarkdown}`;
         // Generate display name
         let displayName: string;
         if (session.userId) {
-          const userDetails = userMap.get(session.userId);
+          const userDetails: User | undefined = userMap.get(session.userId);
           displayName = userDetails?.email || `User ${session.userId}`;
         } else {
           // For anonymous users, create display name from metadata + session length
@@ -1970,7 +1971,7 @@ ${contextMarkdown}`;
       let matchedByEmail = 0;
       let matchedByComposite = 0;
       let unmatchedQueries = 0;
-      allQueries.forEach(query => {
+      allQueries.forEach((query: any) => {
         // Priority matching order:
         // 1. Direct sessionId match (most accurate)
         // 2. Temporal match for logged-in users (userId + ±5min window)
@@ -2104,7 +2105,7 @@ ${contextMarkdown}`;
         const durationMinutes = Math.round((lastTimestamp.getTime() - firstTimestamp.getTime()) / 60000);
 
         // Calculate cost and token stats for this session by matching queries within time range
-        const matchingQueries = allQueries.filter(q => {
+        const matchingQueries = allQueries.filter((q: any) => {
           const queryTime = new Date(q.createdAt);
           const matchesUser = q.userId === session.userId ||
                              (session.userEmail && q.userEmail === session.userEmail);
@@ -2113,9 +2114,9 @@ ${contextMarkdown}`;
           return matchesUser && withinTimeRange;
         });
 
-        const sessionCost = matchingQueries.reduce((sum, q) => sum + (parseFloat(q.cost as any) || 0), 0);
-        const sessionTokensIn = matchingQueries.reduce((sum, q) => sum + (q.tokensIn || 0), 0);
-        const sessionCachedTokensIn = matchingQueries.reduce((sum, q) => sum + (q.cachedTokensIn || 0), 0);
+        const sessionCost = matchingQueries.reduce((sum: number, q: any) => sum + (parseFloat(q.cost as any) || 0), 0);
+        const sessionTokensIn = matchingQueries.reduce((sum: number, q: any) => sum + (q.tokensIn || 0), 0);
+        const sessionCachedTokensIn = matchingQueries.reduce((sum: number, q: any) => sum + (q.cachedTokensIn || 0), 0);
         const sessionNewTokensIn = sessionTokensIn - sessionCachedTokensIn;
         const sessionCacheHitRate = sessionTokensIn > 0
           ? Math.round((sessionCachedTokensIn / sessionTokensIn) * 100)
@@ -2220,7 +2221,7 @@ ${contextMarkdown}`;
 
           // Find query that matches this assistant response
           // Match by: user, time proximity (within 30 seconds), and response content
-          const matchingQuery = allQueries.find(q => {
+          const matchingQuery = allQueries.find((q: any) => {
             const queryTime = new Date(q.createdAt);
             const timeDiff = Math.abs(queryTime.getTime() - msgTime.getTime());
             const matchesUser = q.userId === session.userId ||
@@ -2330,12 +2331,12 @@ ${contextMarkdown}`;
         
         const emailTemplate = emailTemplates.referralInvitation(referrerName, referrerEmail, referredEmail);
         
-        await sendEmail(
-          referredEmail,
-          emailTemplate.subject,
-          emailTemplate.html,
-          emailTemplate.text
-        );
+        await sendEmail({
+          to: referredEmail,
+          subject: emailTemplate.subject,
+          html: emailTemplate.html,
+          text: emailTemplate.text
+        });
       } catch (emailError) {
         console.error("Failed to send referral email:", emailError);
         // Don't fail the referral creation if email fails
@@ -2633,6 +2634,8 @@ ${contextMarkdown}`;
         subscriptionStatus: 'trial' as const,
         appInstalledAt: null,
         referralRewardsEarned: [],
+        folderCatalog: null,
+        preferredChatModel: null,
       };
 
       let emailTemplate: any;
@@ -2805,7 +2808,7 @@ ${contextMarkdown}`;
         limit: 1,
       });
 
-      const invoice = invoices.data[0];
+      const invoice = invoices.data[0] as any;
       if (!invoice || !invoice.charge) {
         return res.status(400).json({ message: "No payment found to refund" });
       }
@@ -3250,6 +3253,7 @@ ${contextMarkdown}`;
 
   // Admin AI Monitoring
   app.use('/api/admin/ai', adminAIRouter);
+  app.use('/api/admin/ai', adminHealthRouter);
 
   const httpServer = createServer(app);
 

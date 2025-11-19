@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { verifyDeviceToken } from '../middleware/auth';
-import storage from '../storage';
+import { verifyDeviceToken } from './device-auth';
+import { storage } from '../storage';
 import mobilePushAdapter from '../services/adapters/mobilePushAdapter';
 
 const router = Router();
@@ -11,6 +11,11 @@ const router = Router();
  */
 router.post('/notifications/register', verifyDeviceToken, async (req, res) => {
   try {
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
     const { deviceToken, deviceId, platform } = req.body;
 
     if (!deviceToken || !deviceId) {
@@ -29,14 +34,14 @@ router.post('/notifications/register', verifyDeviceToken, async (req, res) => {
 
     // Store device token in database
     const tokenId = await storage.upsertDeviceToken({
-      userId: req.user.id,
+      userId,
       deviceId,
       deviceToken,
       platform: platform.toLowerCase() as 'ios' | 'android',
       updatedAt: new Date()
     });
 
-    console.log(`[notifications] Registered device token for user=${req.user.id} device=${deviceId} platform=${platform}`);
+    console.log(`[notifications] Registered device token for user=${userId} device=${deviceId} platform=${platform}`);
 
     res.json({
       success: true,
@@ -58,6 +63,11 @@ router.post('/notifications/register', verifyDeviceToken, async (req, res) => {
  */
 router.delete('/notifications/unregister', verifyDeviceToken, async (req, res) => {
   try {
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
     const { deviceId } = req.body;
 
     if (!deviceId) {
@@ -67,9 +77,9 @@ router.delete('/notifications/unregister', verifyDeviceToken, async (req, res) =
       });
     }
 
-    await storage.deleteDeviceToken(req.user.id, deviceId);
+    await storage.deleteDeviceToken(userId, deviceId);
 
-    console.log(`[notifications] Unregistered device token for user=${req.user.id} device=${deviceId}`);
+    console.log(`[notifications] Unregistered device token for user=${userId} device=${deviceId}`);
 
     res.json({
       success: true,
@@ -90,7 +100,12 @@ router.delete('/notifications/unregister', verifyDeviceToken, async (req, res) =
  */
 router.get('/notifications/devices', verifyDeviceToken, async (req, res) => {
   try {
-    const devices = await storage.getDeviceTokens(req.user.id);
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
+    const devices = await storage.getDeviceTokens(userId);
 
     res.json({
       success: true,
@@ -115,6 +130,11 @@ router.get('/notifications/devices', verifyDeviceToken, async (req, res) => {
  */
 router.post('/notifications/test', verifyDeviceToken, async (req, res) => {
   try {
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
     const { deviceId, type = 'shoot_complete' } = req.body;
 
     if (!deviceId) {
@@ -124,7 +144,7 @@ router.post('/notifications/test', verifyDeviceToken, async (req, res) => {
       });
     }
 
-    const devices = await storage.getDeviceTokens(req.user.id);
+    const devices = await storage.getDeviceTokens(userId);
     const device = devices.find(d => d.deviceId === deviceId);
 
     if (!device) {
@@ -178,6 +198,11 @@ router.post('/notifications/test', verifyDeviceToken, async (req, res) => {
  */
 router.put('/notifications/preferences', verifyDeviceToken, async (req, res) => {
   try {
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
     const preferences = req.body;
 
     // Validate preferences
@@ -191,7 +216,7 @@ router.put('/notifications/preferences', verifyDeviceToken, async (req, res) => 
       });
     }
 
-    await storage.updateNotificationPreferences(req.user.id, preferences);
+    await storage.updateNotificationPreferences(userId, preferences);
 
     res.json({
       success: true,
@@ -212,7 +237,12 @@ router.put('/notifications/preferences', verifyDeviceToken, async (req, res) => 
  */
 router.get('/notifications/preferences', verifyDeviceToken, async (req, res) => {
   try {
-    const preferences = await storage.getNotificationPreferences(req.user.id);
+    if (!req.user || !('id' in req.user)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const userId = req.user.id as string;
+
+    const preferences = await storage.getNotificationPreferences(userId);
 
     res.json({
       success: true,

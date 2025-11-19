@@ -22,13 +22,13 @@ const profileColors: Record<string, string> = {
 export function PromptCard({ prompt }: PromptCardProps) {
   const [, setLocation] = useLocation();
 
-  const qualityScore = parseFloat(prompt.qualityScore);
+  const qualityScore = prompt.qualityScore;
   const stars = Math.round(qualityScore * 5); // Convert 0-1 to 0-5 stars
 
   return (
     <Card
       className="p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-card-border"
-      onClick={() => setLocation(`/marketplace/${prompt.id}`)}
+      onClick={() => setLocation(`/marketplace/${String(prompt.id)}`)}
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">

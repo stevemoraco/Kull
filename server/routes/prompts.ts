@@ -60,11 +60,11 @@ router.get("/", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, r
 
     // Sort
     if (sortBy === 'recent') {
-      prompts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      prompts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     } else if (sortBy === 'popular') {
-      prompts.sort((a, b) => b.voteCount - a.voteCount);
+      prompts.sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
     } else if (sortBy === 'usage') {
-      prompts.sort((a, b) => b.usageCount - a.usageCount);
+      prompts.sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
     }
     // Default is already quality score (from storage)
 
@@ -87,7 +87,7 @@ router.get("/", isAuthenticated, hasPaidAccessMiddleware, async (req: Request, r
           const vote = await storage.getUserPromptVote(userId, prompt.id);
           return {
             ...prompt,
-            userVote: vote ? vote.vote : 0,
+            userVote: vote ? vote.value : 0,
           };
         })
       );
@@ -124,7 +124,7 @@ router.get("/:id", isAuthenticated, hasPaidAccessMiddleware, async (req: Request
       const vote = await storage.getUserPromptVote(userId, prompt.id);
       return res.json({
         ...promptWithAuthor,
-        userVote: vote ? vote.vote : 0,
+        userVote: vote ? vote.value : 0,
       });
     }
 
@@ -247,7 +247,7 @@ router.post("/:id/vote", isAuthenticated, hasPaidAccessMiddleware, async (req: a
     await storage.votePrompt({
       userId,
       promptId: id,
-      vote: value,
+      value: value,
     });
 
     // Get updated prompt with new scores
@@ -270,8 +270,8 @@ router.get("/:id/votes", isAuthenticated, hasPaidAccessMiddleware, async (req: R
 
     const votes = await storage.getPromptVotes(id);
 
-    const upvotes = votes.filter(v => v.vote === 1).length;
-    const downvotes = votes.filter(v => v.vote === -1).length;
+    const upvotes = votes.filter(v => v.value === 1).length;
+    const downvotes = votes.filter(v => v.value === -1).length;
     const total = votes.length;
 
     res.json({
