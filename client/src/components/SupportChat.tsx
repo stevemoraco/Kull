@@ -1593,7 +1593,6 @@ export function SupportChat() {
                     const lastMsg = updated[updated.length - 1];
                     if (lastMsg && lastMsg.role === 'assistant') {
                       lastMsg.content = data.message;
-                      lastMsg.isStreaming = true;
                     }
                     return updated;
                   });

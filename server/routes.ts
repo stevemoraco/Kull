@@ -1539,6 +1539,10 @@ ${contextMarkdown}`;
         res.socket.setNoDelay(true);
       }
 
+      // Status updates for welcome message
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '👋 generating personalized greeting...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
       // Track the full response for analytics
       let fullResponse = '';
       let tokensIn = 0;
