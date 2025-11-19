@@ -177,16 +177,20 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-border/40">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p data-testid="text-copyright">
-              © 2025 Lander Media, 31 N Tejon St Colorado Springs CO 80903
-            </p>
-            <p data-testid="text-powered-by">
-              Built and powered by <a href="https://heydata.org" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">heydata.org</a>
-            </p>
-          </div>
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            <p>Adobe, Lightroom, and the Lightroom logo are either registered trademarks or trademarks of Adobe Inc. in the United States and/or other countries.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-muted-foreground">
+            <div className="text-center md:text-left px-4 md:px-0">
+              <p data-testid="text-copyright">
+                © 2025 Lander Media, 31 N Tejon St Colorado Springs CO 80903
+              </p>
+            </div>
+            <div className="text-center px-4 md:px-0">
+              <p data-testid="text-powered-by">
+                Built and powered by <a href="https://heydata.org" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">heydata.org</a>
+              </p>
+            </div>
+            <div className="text-center md:text-right px-4 md:px-0">
+              <p className="text-xs">Adobe, Lightroom, and the Lightroom logo are either registered trademarks or trademarks of Adobe Inc. in the United States and/or other countries.</p>
+            </div>
           </div>
         </div>
       </div>

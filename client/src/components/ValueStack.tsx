@@ -1,4 +1,5 @@
 import { Check, Gift, Shield } from "lucide-react";
+import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 export function ValueStack() {
   const coreFeatures = [
@@ -84,10 +85,12 @@ export function ValueStack() {
             <h4 className="font-bold text-lg text-foreground">Zero Risk Guarantee</h4>
           </div>
           <p className="text-muted-foreground leading-relaxed">
-            Start with a <strong className="text-foreground">1-day unlimited free trial</strong>. 
+            Start with a <strong className="text-foreground">1-day unlimited free trial</strong>.
             Cancel anytime—no questions asked.
           </p>
         </div>
+
+        <CompactSavingsSummary />
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 import { Zap, Target, Gauge, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 export function SolutionSection() {
   const features = [
@@ -36,8 +37,7 @@ export function SolutionSection() {
           Introducing <span className="text-primary">Kull</span>
         </h2>
         <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-3xl mx-auto">
-          The first AI-powered photo rating and organization system for Mac, iPhone, and iPad, 
-          combining 5 advanced AI models to rate and organize your photos with professional-level accuracy.
+          The fastest automatic image culling service on planet Earth. Others take up to 30 minutes for even just 2,000 photos, and can be even slower depending on how new your computer is. Ours happens in seconds, on any device of any age, saving you hours. Learn how.
         </p>
 
         {/* Demo mockup placeholder */}
@@ -77,6 +77,8 @@ export function SolutionSection() {
           <Zap className="w-5 h-5 mr-2" />
           Try It Free for 1 Day
         </Button>
+
+        <CompactSavingsSummary />
       </div>
     </section>
   );

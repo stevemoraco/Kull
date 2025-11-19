@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Zap, Sparkles, Star } from "lucide-react";
+import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 function getRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -27,7 +28,7 @@ export function Hero() {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden" data-testid="section-hero">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
 
@@ -43,7 +44,7 @@ export function Hero() {
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-hero-headline">
-          Find all your <span className="inline-flex gap-1">⭐⭐⭐⭐⭐</span> images in seconds{" "}
+          Find All Your 5-Star <span className="inline-flex gap-1">⭐⭐⭐⭐⭐</span> Images In Seconds{" "}
           <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">even if you have</span>{" "}
           <span className="text-primary">10,000+ photos</span>{" "}
           <span className="text-muted-foreground text-2xl md:text-3xl lg:text-4xl">across multiple photoshoots</span>
@@ -309,6 +310,8 @@ export function Hero() {
             </div>
           </div>
         </div>
+
+        <CompactSavingsSummary />
       </div>
     </section>
   );

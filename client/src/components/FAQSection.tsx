@@ -16,10 +16,6 @@ export function FAQSection() {
       answer: "When you sign up, you'll have 24 hours to subscribe and receive 3 extra months free on any annual plan. That's a total of 15 months for the price of 12—saving you hundreds of dollars."
     },
     {
-      question: "Which plan is right for me?",
-      answer: "The Professional plan ($99/mo) is perfect for individual photographers rating their own work. The Studio plan ($499/mo) is ideal for teams, studios, or high-volume photographers who need priority processing, team collaboration, and advanced features."
-    },
-    {
       question: "How does the app work?",
       answer: "Kull is a universal Mac/iPhone/iPad app that works with any folder on your Mac. Download the Mac app, point it to your photo folders, and the AI instantly rates, organizes, titles, describes, tags, and color-codes your images. Continue organizing on your iPhone or iPad with automatic sync across all devices."
     },

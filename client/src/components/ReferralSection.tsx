@@ -1,4 +1,5 @@
 import { Users, Gift, Star, Crown } from "lucide-react";
+import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 export function ReferralSection() {
   const bonusTiers = [
@@ -86,6 +87,8 @@ export function ReferralSection() {
         <p className="text-center text-sm text-muted-foreground mt-8">
           Your referrals get the same amazing free trial, and you get rewarded for spreading the word
         </p>
+
+        <CompactSavingsSummary />
       </div>
     </section>
   );
