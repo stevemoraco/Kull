@@ -1059,18 +1059,14 @@ export function SupportChat() {
         console.log('[Chat] Starting stream read...');
 
         while (true) {
-          console.log('[Chat] Waiting for chunk...');
           const { done, value } = await reader.read();
-          console.log('[Chat] Received chunk:', { done, valueLength: value?.length });
 
           if (done) {
-            console.log('[Chat] Stream done, breaking loop');
             break;
           }
 
           const chunk = decoder.decode(value, { stream: true });
           chunkCount++;
-          console.log(`[Chat] Chunk #${chunkCount}:`, chunk.substring(0, 100));
 
           // Add to buffer and split by lines
           buffer += chunk;
@@ -1083,11 +1079,9 @@ export function SupportChat() {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
-                console.log('[Chat] Parsed SSE data:', data);
 
                 if (data.type === 'delta' && data.content) {
                   fullContent += data.content;
-                  console.log('[Chat] Added delta, total length now:', fullContent.length);
 
                   // STREAM TO UI - update greeting in real-time with immediate flush
                   flushSync(() => {
@@ -1096,29 +1090,22 @@ export function SupportChat() {
                 } else if (data.type === 'done') {
                   // Track when AI last responded (welcome message)
                   lastAiMessageTimeRef.current = Date.now();
-                  console.log('[Chat] Received done event');
                 } else if (data.type === 'error') {
-                  console.error('[Chat] Received error event:', data.message);
+                  console.error('[Chat] Stream error:', data.message);
                 }
               } catch (e) {
-                console.error('[Chat] Failed to parse JSON:', line, e);
+                console.error('[Chat] Failed to parse SSE:', e);
               }
             }
           }
         }
 
-        console.log('[Chat] ===== GREETING STREAM COMPLETE =====');
-        console.log('[Chat] Full content length:', fullContent.length);
-        console.log('[Chat] Full content:', fullContent);
-        console.log('[Chat] Is active?', isActive);
+        // Stream complete - minimal logging
 
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
           const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?QUICK_REPLIES:\s*([^\n]+)/i);
-
-          console.log('[Chat] NEXT_MESSAGE match:', nextMessageMatch);
-          console.log('[Chat] QUICK_REPLIES match:', followUpMatch);
 
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
@@ -1127,23 +1114,15 @@ export function SupportChat() {
           const cutoffIndex = fullContent.indexOf('␞');
           const followUpIndex = fullContent.search(/\n\n?QUICK_REPLIES:/);
 
-          console.log('[Chat] Cutoff index:', cutoffIndex);
-          console.log('[Chat] FollowUp index:', followUpIndex);
-
           if (cutoffIndex !== -1) {
             cleanContent = fullContent.substring(0, cutoffIndex).trim();
           } else if (followUpIndex !== -1) {
             cleanContent = fullContent.substring(0, followUpIndex).trim();
           }
 
-          console.log('[Chat] Clean content:', cleanContent);
-
           // Parse timing
           if (nextMessageMatch) {
             nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-            console.log('[Chat] ✅ Parsed next message time:', nextMsgSeconds, 'seconds');
-          } else {
-            console.log('[Chat] ❌ No NEXT_MESSAGE found, using default 30s');
           }
 
           // Parse and display follow-up questions
@@ -1154,30 +1133,17 @@ export function SupportChat() {
               .map((q: string) => q.trim())
               .filter((q: string) => q.length > 5 && q.length < 200);
 
-            console.log('[Chat] Welcome greeting follow-up questions:', newQuestions);
-
             if (newQuestions.length > 0) {
               setQuickQuestions(newQuestions);
               setShowSuggestions(true);
             }
-          } else {
-            console.log('[Chat] No follow-up questions in welcome message');
           }
-
-          console.log('[Chat] ===== SETTING STATE =====');
-          console.log('[Chat] Generated greeting:', cleanContent.substring(0, 100));
-          console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
-          console.log('[Chat] Greeting generated?', currentGreetingGenerated);
-          console.log('[Chat] Chat open?', currentIsOpen);
 
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
-            console.log('[Chat] 🎉 First greeting - setting countdown to:', nextMsgSeconds);
             setLatestGreeting(cleanContent);
             setGreetingGenerated(true);
             setNextMessageIn(nextMsgSeconds);
-
-            console.log('[Chat] First greeting - storing and showing countdown');
 
             // 🔊 PLAY CYBERPUNK DING FOR NEW GREETING (only if tab is visible)
             if (isTabVisibleRef.current) {
@@ -1203,8 +1169,6 @@ export function SupportChat() {
               };
               setMessages(prev => [...prev, newMessage]);
               lastAiMessageTimeRef.current = Date.now();
-            } else {
-              console.log('[Chat] First greeting ready but proactive messages are paused - not adding to conversation');
             }
           } else {
             // Subsequent generations
@@ -1212,7 +1176,6 @@ export function SupportChat() {
 
             // Double-check pause state before adding message (in case pause was activated during generation)
             if (isProactiveMessagesPausedRef.current) {
-              console.log('[Chat] Greeting ready but proactive messages are paused - not adding to conversation');
               return;
             }
 
@@ -1225,10 +1188,7 @@ export function SupportChat() {
                 timestamp: new Date(),
               };
 
-              setMessages(prev => {
-                console.log('[Chat] Adding greeting to messages, current count:', prev.length);
-                return [...prev, newMessage];
-              });
+              setMessages(prev => [...prev, newMessage]);
               setNextMessageIn(nextMsgSeconds);
 
               // Update last AI message time
@@ -1450,7 +1410,7 @@ export function SupportChat() {
   // Reset timer when messages change or chat opens
   useEffect(() => {
     resetInactivityTimer();
-    
+
     // Cleanup on unmount
     return () => {
       if (inactivityTimerRef.current) {
@@ -1486,6 +1446,10 @@ export function SupportChat() {
 
     // Track when user last sent a message
     lastUserMessageTimeRef.current = Date.now();
+
+    // CRITICAL FIX: Clear proactive message countdown when user sends a message
+    // This prevents automated messages from interrupting active conversations
+    setNextMessageIn(null);
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -1605,13 +1569,11 @@ export function SupportChat() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              console.log('[Chat] Received event type:', data.type);
 
               if (data.type === 'delta' && data.content) {
                 // Mark that we've received the first token
                 if (!firstTokenReceived) {
                   firstTokenReceived = true;
-                  console.log('[Chat] 🎉 First token received! Starting to stream...');
                 }
 
                 // If we already detected cutoff, ignore all further deltas
@@ -1620,7 +1582,6 @@ export function SupportChat() {
                 }
 
                 fullContent += data.content;
-                console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
 
                 // Look for cutoff markers - check multiple patterns to ensure we catch metadata
                 let cutoffIndex = -1;
@@ -1653,10 +1614,6 @@ export function SupportChat() {
                   const cleanContent = fullContent.substring(0, cutoffIndex).trim();
                   const questionsSection = fullContent.substring(cutoffIndex);
 
-                  console.log('[Chat] CUTOFF DETECTED at index:', cutoffIndex);
-                  console.log('[Chat] Clean content length:', cleanContent.length);
-                  console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
-
                   // Extract follow-up questions - look for the line after cutoff
                   const followUpMatch = questionsSection.match(/QUICK_REPLIES:\s*([^\n]+)/i);
 
@@ -1667,14 +1624,10 @@ export function SupportChat() {
                       .map((q: string) => q.trim())
                       .filter((q: string) => q.length > 5 && q.length < 200);
 
-                    console.log('[Chat] Extracted follow-up questions:', newQuestions);
-
                     if (newQuestions.length > 0) {
                       setQuickQuestions(newQuestions);
                       setShowSuggestions(true); // Show them by default when new questions arrive
                     }
-                  } else {
-                    console.log('[Chat] No follow-up questions found in:', questionsSection);
                   }
 
                   // Extract next message timing - ALWAYS set a countdown
@@ -1682,9 +1635,6 @@ export function SupportChat() {
                   let nextMsgSeconds = 45; // Default countdown
                   if (nextMessageMatch) {
                     nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
-                    console.log('[Chat] Next message in:', nextMsgSeconds, 'seconds');
-                  } else {
-                    console.log('[Chat] No NEXT_MESSAGE found, using default:', nextMsgSeconds, 'seconds');
                   }
                   // ALWAYS set the countdown
                   setNextMessageIn(nextMsgSeconds);
@@ -1719,7 +1669,6 @@ export function SupportChat() {
                 }
 
                 // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
-                console.log('[Chat] Updating message', assistantMessageId, 'with content length:', fullContent.length);
                 flushSync(() => {
                   setMessages(prev =>
                     prev.map(msg =>
@@ -1756,8 +1705,6 @@ export function SupportChat() {
                     const cutoffIndex = Math.min(...indices);
                     const cleanContent = fullContent.substring(0, cutoffIndex).trim();
 
-                    console.log('[Chat] Final cleanup - cutoff detected at:', cutoffIndex);
-
                     setMessages(prev =>
                       prev.map(msg =>
                         msg.id === assistantMessageId
@@ -1769,8 +1716,10 @@ export function SupportChat() {
                 }
               }
             } catch (e) {
-              // Skip invalid JSON lines
-              console.log('[Chat] Skipped invalid JSON line:', line.substring(0, 100));
+              // Skip invalid JSON lines - only log if it's actually an error
+              if (e instanceof Error) {
+                console.error('[Chat] Parse error:', e.message);
+              }
             }
           }
         }
@@ -2220,7 +2169,13 @@ export function SupportChat() {
               <input
                 type="text"
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  // CRITICAL FIX: Pause automated messages when user is typing
+                  // Update last activity time so proactive messages don't interrupt
+                  lastActivityTimeRef.current = Date.now();
+                  lastUserMessageTimeRef.current = Date.now();
+                }}
                 placeholder="Type your message..."
                 className="flex-1 bg-background border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 data-testid="input-chat-message"

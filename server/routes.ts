@@ -804,8 +804,12 @@ ${userActivity.map((event: any, idx: number) => {
 
       // Set up Server-Sent Events headers
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if present
+      // Send initial newline to establish connection
+      res.write('\n');
+      res.flushHeaders(); // Ensure headers are sent immediately
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
 
@@ -1457,10 +1461,18 @@ ${repoContent}
 
 ${contextMarkdown}`;
 
-      // Pass empty history array since we've already included it in the prompt
+      // CRITICAL FIX: Pass the actual history array so AI can track conversation properly
+      // Convert history to ChatMessage format expected by getChatResponseStream
+      const formattedHistory = history && Array.isArray(history)
+        ? history.map((msg: any) => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: msg.content
+          }))
+        : [];
+
       const stream = await getChatResponseStream(
         fullContextMarkdown,
-        [],
+        formattedHistory, // FIXED: Pass actual history, not empty array
         preferredModel,
         undefined, // userActivityMarkdown
         undefined, // pageVisits
@@ -1470,8 +1482,12 @@ ${contextMarkdown}`;
       );
 
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering if present
+      // Send initial newline to establish connection
+      res.write('\n');
+      res.flushHeaders(); // Ensure headers are sent immediately
 
       // Track the full response for analytics
       let fullResponse = '';
