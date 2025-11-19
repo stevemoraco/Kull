@@ -285,7 +285,7 @@ export function ProblemSection() {
                 size="lg"
                 onMouseEnter={() => setIsTopButtonHovered(true)}
                 onMouseLeave={() => setIsTopButtonHovered(false)}
-                className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
+                className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-3 md:py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
                   isTopButtonHovered
                     ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-dance-tilt'
                     : 'bg-gradient-to-r from-cyan-600 via-teal-500 to-emerald-600 text-white border-cyan-400 shadow-cyan-500/30 hover:scale-105'
@@ -296,7 +296,7 @@ export function ProblemSection() {
                 } : {}}
                 onClick={() => window.location.href = "/api/login"}
               >
-                <span className="break-words leading-snug text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                <span className="block break-words whitespace-normal leading-tight text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
                 {isTopButtonHovered && (
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine" />
                 )}
@@ -525,7 +525,7 @@ export function ProblemSection() {
                     size="lg"
                     onMouseEnter={() => setIsBottomButtonHovered(true)}
                     onMouseLeave={() => setIsBottomButtonHovered(false)}
-                    className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
+                    className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-3 md:py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
                       isBottomButtonHovered
                         ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-dance-tilt'
                         : 'bg-gradient-to-r from-cyan-600 via-teal-500 to-emerald-600 text-white border-cyan-400 shadow-cyan-500/30 hover:scale-105'
@@ -536,7 +536,7 @@ export function ProblemSection() {
                     } : {}}
                     onClick={() => window.location.href = "/api/login"}
                   >
-                    <span className="break-words leading-snug text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                    <span className="block break-words whitespace-normal leading-tight text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
                     {isBottomButtonHovered && (
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine" />
                     )}
