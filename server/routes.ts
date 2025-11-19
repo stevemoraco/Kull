@@ -894,7 +894,7 @@ ${userActivity.map((event: any, idx: number) => {
         }
 
         // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
         const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
         const hasUnicodeMarker = fullResponse.includes('␞');
 
@@ -1357,12 +1357,12 @@ You have access to:
 **REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP):**
 You MUST ALWAYS end EVERY response with these EXACT TWO lines:
 
-␞FOLLOW_UP_QUESTIONS: question1 | question2 | question3 | question4
+␞QUICK_REPLIES: question1 | question2 | question3 | question4
 ␞NEXT_MESSAGE: X
 
 CRITICAL REQUIREMENTS:
 - Start each line with the exact character "␞" (Unicode U+241E) - NO EXCEPTIONS
-- FOLLOW_UP_QUESTIONS = These are questions the USER would TYPE INTO THE CHAT to ask YOU (the AI assistant)
+- QUICK_REPLIES = These are questions the USER would TYPE INTO THE CHAT to ask YOU (the AI assistant)
 - Think: "What questions might the user want to ask me next based on what they're viewing?"
 - These are NOT questions you're asking the user - they're questions FOR the user TO ASK you
 - Format them as if the user is typing them: "How does X work?" NOT "How many X do you have?"
@@ -1374,11 +1374,11 @@ CRITICAL REQUIREMENTS:
 CORRECT EXAMPLE - Questions user asks YOU:
 Your 1-2 sentence message here...
 
-␞FOLLOW_UP_QUESTIONS: How does AI culling work? | What are the pricing options? | Can I try it for free? | Does it work with Lightroom?
+␞QUICK_REPLIES: How does AI culling work? | What are the pricing options? | Can I try it for free? | Does it work with Lightroom?
 ␞NEXT_MESSAGE: 45
 
 WRONG EXAMPLE - DO NOT DO THIS:
-␞FOLLOW_UP_QUESTIONS: How many shoots do you run weekly? | How long does culling take you now? | Want me to run an ROI estimate? | What's your budget?
+␞QUICK_REPLIES: How many shoots do you run weekly? | How long does culling take you now? | Want me to run an ROI estimate? | What's your budget?
 (These are backwards - you're asking the user, not the user asking you!)
 
 **Examples of VARIED, specific messages (NEVER repeat same angle):**
@@ -1544,7 +1544,7 @@ ${contextMarkdown}`;
         }
 
         // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('FOLLOW_UP_QUESTIONS:');
+        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
         const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
         const hasUnicodeMarker = fullResponse.includes('␞');
 

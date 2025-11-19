@@ -363,5 +363,5 @@ function createErrorStream(errorMessage: string): ReadableStream {
 function getErrorResponse(): string {
   return `I'm sorry, the chat service is temporarily unavailable. Please try again in a moment.
 
-FOLLOW_UP_QUESTIONS: Refresh the page? | Try again later? | Contact support? | Visit homepage?`;
+QUICK_REPLIES: Refresh the page? | Try again later? | Contact support? | Visit homepage?`;
 }
