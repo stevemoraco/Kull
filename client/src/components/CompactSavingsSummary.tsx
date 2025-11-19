@@ -2,12 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Shield, Download } from "lucide-react";
 import { useCalculator } from "@/contexts/CalculatorContext";
 import { useState, useRef, MouseEvent } from "react";
-import { useAuth } from "@/hooks/useAuth";
 
 export function CompactSavingsSummary() {
   // Get real-time values from calculator context
   const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = useCalculator();
-  const { isAuthenticated } = useAuth();
   const teamSize = 1;
 
   // Simple hover effect
@@ -32,8 +30,8 @@ export function CompactSavingsSummary() {
   const percentageOfWorkYear = ((totalHoursPerYear / standardWorkingHoursPerYear) * 100).toFixed(1);
 
   const handleStartTrial = () => {
-    // If already logged in, go to dashboard/home, otherwise go to login
-    window.location.href = isAuthenticated ? "/" : "/api/login";
+    // Server-side /api/login already handles logged-in users by redirecting to /
+    window.location.href = "/api/login";
   };
 
   const scrollToCalculator = () => {
