@@ -72,12 +72,12 @@ export function CompactSavingsSummary() {
           {/* Kull Logo - Top on mobile, Left square section on desktop */}
           <div className="flex flex-col items-center md:items-start md:justify-center md:w-[30%] p-6 md:p-8 gap-3 md:min-h-full">
             <div className="flex flex-col items-center gap-3">
-              <div className={`relative w-32 h-32 md:w-full md:h-auto md:aspect-square md:max-w-[200px] rounded-3xl bg-gradient-to-br from-black to-[hsl(180,60%,20%)] border-2 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+              <div className={`relative w-32 h-32 md:w-full md:h-auto md:aspect-square md:max-w-[200px] rounded-3xl bg-white border-2 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                 isButtonHovered
                   ? 'border-white scale-105'
                   : 'border-primary/40 shadow-lg shadow-black/50'
               }`}>
-                <img src="/kull-logo.png" alt="Kull" className="w-4/5 h-4/5 rounded-2xl" />
+                <img src="/kull-logo.png" alt="Kull" className="w-11/12 h-11/12 rounded-2xl" />
               </div>
               <p className="text-white text-base font-semibold tracking-wide">Kull</p>
             </div>
@@ -108,11 +108,11 @@ export function CompactSavingsSummary() {
             </div>
           </div>
 
-          <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl p-4 mb-6 space-y-3">
+          <div className="bg-black/50 backdrop-blur-sm border border-white/40 rounded-xl p-4 mb-6 space-y-3">
             <p className="text-sm text-center text-white font-bold">
               <span className="text-white drop-shadow">Reclaim {workweeksSaved.toFixed(1)} weeks <span className="underline font-black italic">every year</span></span> for family or creative work you love
             </p>
-            <p className="text-xs text-center text-white/95 leading-relaxed border-t border-white/30 pt-3">
+            <p className="text-xs text-center text-white/95 leading-relaxed border-t border-white/40 pt-3">
               By end of {today.getFullYear()}: save <span className="font-bold">${savingsByEndOfYear.toLocaleString()}</span> and gain <span className="font-bold">{hoursByEndOfYear} hours</span> for editing your best shots.{" "}
               <button
                 onClick={scrollToCalculator}

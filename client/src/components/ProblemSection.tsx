@@ -200,21 +200,25 @@ export function ProblemSection() {
 
             {/* Results - Top */}
             <div className="mb-10">
-              <div className="bg-gradient-to-br from-destructive/20 to-destructive/10 border-2 border-destructive/40 rounded-2xl p-8 mb-6">
+              <div className="relative bg-gradient-to-br from-black via-[hsl(25,80%,20%)] to-[hsl(25,75%,35%)] border-4 border-[hsl(25,90%,55%)] rounded-xl p-8 mb-6 shadow-xl shadow-destructive/40">
+                {/* Inner gradient overlays */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-xl pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-destructive/10 to-transparent rounded-xl pointer-events-none" />
+                <div className="relative z-10">
                 <div className="text-center mb-6">
-                  <p className="text-sm uppercase tracking-wide text-muted-foreground font-bold mb-4">{headerText}</p>
+                  <p className="text-sm uppercase tracking-wide text-white/70 font-bold mb-4">{headerText}</p>
                   <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12">
                     <div className="text-center flex-1">
-                      <p className="text-5xl md:text-6xl font-black text-destructive mb-3">
+                      <p className="text-5xl md:text-6xl font-black text-white drop-shadow-lg mb-3">
                         ${totalCostPerYear.toLocaleString()}
                       </p>
-                      <p className="text-sm text-muted-foreground leading-snug">
-                        worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-foreground">${billableRate}/hr</span>{" "}
+                      <p className="text-sm text-white/80 leading-snug">
+                        worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
                         {!hasBillableRateChanged && (
                           <span className="inline-block">(
                           <button
                             onClick={() => document.getElementById('calculator-sliders')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                            className="font-bold text-foreground hover:text-foreground/80 underline cursor-pointer transition-colors"
+                            className="font-bold text-white hover:text-white/80 underline cursor-pointer transition-colors"
                           >
                             change the sliders
                           </button> if that's not accurate)</span>
@@ -222,27 +226,28 @@ export function ProblemSection() {
                       </p>
                     </div>
                     <div className="text-center flex-1">
-                      <p className="text-5xl md:text-6xl font-black text-destructive mb-3">
+                      <p className="text-5xl md:text-6xl font-black text-white drop-shadow-lg mb-3">
                         {Math.round(totalHoursPerYear).toLocaleString()} <span className="text-3xl md:text-4xl">hrs</span>
                       </p>
-                      <p className="text-sm text-muted-foreground leading-snug">
-                        working hours spent on manual culling per year, or about <span className="font-bold text-foreground">{percentageOfWorkYear}%</span> of your total working hours a year
+                      <p className="text-sm text-white/80 leading-snug">
+                        working hours spent on manual culling per year, or about <span className="font-bold text-white">{percentageOfWorkYear}%</span> of your total working hours a year
                       </p>
                     </div>
                   </div>
-                  <div className="mt-6 pt-6 border-t border-destructive/20">
-                    <p className="text-base md:text-lg text-foreground font-semibold text-center">
+                  <div className="mt-6 pt-6 border-t border-white/20">
+                    <p className="text-base md:text-lg text-white font-semibold text-center">
                       That means Kull can help you reclaim <span className="text-destructive font-bold">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
                     </p>
                   </div>
-                  <div className="mt-6 pt-6 border-t border-destructive/20">
-                    <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                      Today is <span className="font-semibold text-foreground">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
-                      By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-destructive">${savingsByEndOfYear.toLocaleString()}</span> and
-                      gained <span className="font-bold text-destructive">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
+                  <div className="mt-6 pt-6 border-t border-white/20">
+                    <p className="text-sm md:text-base text-white/80 leading-relaxed">
+                      Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
+                      By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
+                      gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
                       editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
                     </p>
                   </div>
+                </div>
                 </div>
               </div>
 
@@ -252,10 +257,10 @@ export function ProblemSection() {
 
               <Button
                 size="lg"
-                className="w-full h-auto min-h-[4rem] text-base md:text-lg font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-3"
+                className="w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black bg-gradient-to-r from-[hsl(25,80%,30%)] via-destructive to-white hover:from-[hsl(25,85%,35%)] hover:via-[hsl(25,85%,60%)] hover:to-white text-[hsl(25,80%,15%)] px-4 py-4 shadow-xl shadow-destructive/30 transition-all duration-300 border-2 border-[hsl(25,85%,60%)] hover:border-[hsl(25,90%,70%)] hover:scale-105"
                 onClick={() => window.location.href = "/api/login"}
               >
-                <span className="break-words leading-snug">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                <span className="break-words leading-snug text-center">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
               </Button>
               <p className="text-center mt-4 text-lg font-semibold text-muted-foreground">
                 Reclaim <span className="text-foreground font-bold">{weeksReclaimed} entire workweeks</span> × <span className="text-foreground font-bold">{Math.round(totalHoursPerYear).toLocaleString()} billable hours</span> this year!
@@ -419,22 +424,26 @@ export function ProblemSection() {
                 </div>
 
                 {/* Results */}
-                <div className="mt-10 pt-8 border-t-2 border-destructive/20">
-                  <div className="bg-gradient-to-br from-destructive/20 to-destructive/10 border-2 border-destructive/40 rounded-2xl p-8 mb-6">
+                <div className="mt-10 pt-8 border-t-2 border-white/10">
+                  <div className="relative bg-gradient-to-br from-black via-[hsl(25,80%,20%)] to-[hsl(25,75%,35%)] border-4 border-[hsl(25,90%,55%)] rounded-xl p-8 mb-6 shadow-xl shadow-destructive/40">
+                    {/* Inner gradient overlays */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-xl pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent via-destructive/10 to-transparent rounded-xl pointer-events-none" />
+                    <div className="relative z-10">
                     <div className="text-center mb-6">
-                      <p className="text-sm uppercase tracking-wide text-muted-foreground font-bold mb-4">{headerText}</p>
+                      <p className="text-sm uppercase tracking-wide text-white/70 font-bold mb-4">{headerText}</p>
                       <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12">
                         <div className="text-center flex-1">
-                          <p className="text-5xl md:text-6xl font-black text-destructive mb-3">
+                          <p className="text-5xl md:text-6xl font-black text-white drop-shadow-lg mb-3">
                             ${totalCostPerYear.toLocaleString()}
                           </p>
-                          <p className="text-sm text-muted-foreground leading-snug">
-                            worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-foreground">${billableRate}/hr</span>{" "}
+                          <p className="text-sm text-white/80 leading-snug">
+                            worth of billable, working hours out of 2,080 spent on manual culling every year. Valued at <span className="font-bold text-white">${billableRate}/hr</span>{" "}
                             {!hasBillableRateChanged && (
                               <span className="inline-block">(
                               <button
                                 onClick={() => document.getElementById('calculator-sliders')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                                className="font-bold text-foreground hover:text-foreground/80 underline cursor-pointer transition-colors"
+                                className="font-bold text-white hover:text-white/80 underline cursor-pointer transition-colors"
                               >
                                 change the sliders
                               </button> if that's not accurate)</span>
@@ -442,27 +451,28 @@ export function ProblemSection() {
                           </p>
                         </div>
                         <div className="text-center flex-1">
-                          <p className="text-5xl md:text-6xl font-black text-destructive mb-3">
+                          <p className="text-5xl md:text-6xl font-black text-white drop-shadow-lg mb-3">
                             {Math.round(totalHoursPerYear).toLocaleString()} <span className="text-3xl md:text-4xl">hrs</span>
                           </p>
-                          <p className="text-sm text-muted-foreground leading-snug">
-                            working hours spent on manual culling per year, or about <span className="font-bold text-foreground">{percentageOfWorkYear}%</span> of your total working hours a year
+                          <p className="text-sm text-white/80 leading-snug">
+                            working hours spent on manual culling per year, or about <span className="font-bold text-white">{percentageOfWorkYear}%</span> of your total working hours a year
                           </p>
                         </div>
                       </div>
-                      <div className="mt-6 pt-6 border-t border-destructive/20">
-                        <p className="text-base md:text-lg text-foreground font-semibold text-center">
+                      <div className="mt-6 pt-6 border-t border-white/20">
+                        <p className="text-base md:text-lg text-white font-semibold text-center">
                           That means Kull can help you reclaim <span className="text-destructive font-bold">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
                         </p>
                       </div>
-                      <div className="mt-6 pt-6 border-t border-destructive/20">
-                        <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-                          Today is <span className="font-semibold text-foreground">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
-                          By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-destructive">${savingsByEndOfYear.toLocaleString()}</span> and
-                          gained <span className="font-bold text-destructive">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
+                      <div className="mt-6 pt-6 border-t border-white/20">
+                        <p className="text-sm md:text-base text-white/80 leading-relaxed">
+                          Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
+                          By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
+                          gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
                           editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
                         </p>
                       </div>
+                    </div>
                     </div>
                   </div>
 
@@ -472,10 +482,10 @@ export function ProblemSection() {
 
                   <Button
                     size="lg"
-                    className="w-full h-auto min-h-[4rem] text-base md:text-lg font-bold bg-destructive hover:bg-destructive/90 text-destructive-foreground px-4 py-3"
+                    className="w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black bg-gradient-to-r from-[hsl(25,80%,30%)] via-destructive to-white hover:from-[hsl(25,85%,35%)] hover:via-[hsl(25,85%,60%)] hover:to-white text-[hsl(25,80%,15%)] px-4 py-4 shadow-xl shadow-destructive/30 transition-all duration-300 border-2 border-[hsl(25,85%,60%)] hover:border-[hsl(25,90%,70%)] hover:scale-105"
                     onClick={() => window.location.href = "/api/login"}
                   >
-                    <span className="break-words leading-snug">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                    <span className="break-words leading-snug text-center">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
                   </Button>
                   <p className="text-center mt-4 text-lg font-semibold text-muted-foreground">
                     Reclaim <span className="text-foreground font-bold">{weeksReclaimed} entire workweeks</span> × <span className="text-foreground font-bold">{Math.round(totalHoursPerYear).toLocaleString()} billable hours</span> this year!
