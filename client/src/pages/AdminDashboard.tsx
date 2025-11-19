@@ -19,10 +19,12 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { format } from 'date-fns';
+import AdminAnalytics from '../components/AdminAnalytics';
 
 export default function AdminDashboard() {
   const { data, loading, error } = useProviderHealth();
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'providers' | 'analytics'>('providers');
 
   if (loading && !data) {
     return (
@@ -61,13 +63,71 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">AI Provider Health Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
           <p className="mt-2 text-gray-600">
-            Real-time monitoring of all AI provider performance and health metrics
+            Monitor AI provider health and analyze user behavior
           </p>
           <p className="text-sm text-gray-500 mt-1">
             Last updated: {format(data.timestamp, 'PPpp')}
           </p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mb-8 border-b border-gray-200">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('providers')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'providers'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Provider Health
+            </button>
+            <button
+              onClick={() => setActiveTab('analytics')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'analytics'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              User Analytics
+            </button>
+          </nav>
+        </div>
+
+        {/* Conditional Content */}
+        {activeTab === 'analytics' ? (
+          <AdminAnalytics />
+        ) : (
+          <div>
+
+        {/* CSV Export Section */}
+        <div className="mb-8 bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Export Data</h2>
+          <p className="text-gray-600 mb-4">Download CSV exports for external analysis</p>
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => window.open('/api/admin/export/users-csv', '_blank')}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Export Users CSV
+            </button>
+            <button
+              onClick={() => window.open('/api/admin/export/sessions-csv', '_blank')}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
+              Export Sessions CSV
+            </button>
+            <button
+              onClick={() => window.open('/api/admin/export/support-queries-csv', '_blank')}
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              Export Support Queries CSV
+            </button>
+          </div>
         </div>
 
         {/* Overall Stats */}
@@ -116,6 +176,8 @@ export default function AdminDashboard() {
             provider={data.providers.find(p => p.provider === selectedProvider)!}
             onClose={() => setSelectedProvider(null)}
           />
+        )}
+          </div>
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useLogout } from "@/hooks/useLogout";
 import { useQuery } from "@tanstack/react-query";
 import { UrgencyBanner } from "@/components/UrgencyBanner";
 import { PricingSection } from "@/components/PricingSection";
@@ -16,13 +17,10 @@ import type { User } from "@shared/schema";
 export default function Home() {
   usePageTracking('home');
   const { user } = useAuth();
+  const { logout: handleLogout } = useLogout();
   const typedUser = user as User;
   const { balance } = useCredits();
   const hasAccess = hasPaidAccess(typedUser);
-
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
-  };
 
   const handleSelectPlan = (tier: 'professional' | 'studio') => {
     window.location.href = `/checkout?plan=${tier}`;

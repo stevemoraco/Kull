@@ -14,6 +14,7 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 import { ChatUsersView } from "@/components/admin/ChatUsersView";
 import { UserSessionsView } from "@/components/admin/UserSessionsView";
 import { SessionDetailView } from "@/components/admin/SessionDetailView";
+import { ScriptStepFunnelView } from "@/components/admin/ScriptStepFunnelView";
 import ModelSelectionCard from "@/components/admin/ModelSelectionCard";
 
 interface Analytics {
@@ -330,6 +331,11 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Sales Script Funnel Analysis */}
+        {chatView === 'users' && (
+          <ScriptStepFunnelView />
+        )}
 
         {/* Unified User Activity & Chat History View */}
         {chatView === 'users' && (

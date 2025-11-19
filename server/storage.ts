@@ -21,6 +21,8 @@ import {
   promptPresetVotes,
   promptPresetSaves,
   creditLedger,
+  calculatorInteractions,
+  conversationSteps,
   type User,
   type UpsertUser,
   type Referral,
@@ -61,6 +63,10 @@ import {
   type InsertPromptPresetSave,
   type CreditLedger,
   type InsertCreditLedger,
+  type CalculatorInteraction,
+  type InsertCalculatorInteraction,
+  type ConversationStep,
+  type InsertConversationStep,
 } from "@shared/schema";
 import { PLANS, DEFAULT_PLAN_ID } from "@shared/culling/plans";
 import { estimateCreditsForImages } from "@shared/utils/cost";
@@ -786,10 +792,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async trackSupportQuery(query: InsertSupportQuery): Promise<SupportQuery> {
+    // 🔐 LAYER 3: Database-level deduplication - add message hash
+    const { createContentHash } = await import("@shared/utils/messageFingerprint");
+    const messageHash = createContentHash(query.aiResponse);
+
     const [newQuery] = await db
       .insert(supportQueries)
       .values({
         ...query,
+        messageHash, // Add hash for deduplication
         cachedTokensIn: query.cachedTokensIn ?? 0, // Ensure default value for cached tokens
       })
       .returning();
@@ -937,14 +948,36 @@ export class DatabaseStorage implements IStorage {
 
   // Chat session operations
   async saveChatSession(session: InsertChatSession): Promise<ChatSession> {
+    // Detect script step from conversation messages
+    let scriptStep: number | null = null;
+
+    try {
+      const messages = typeof session.messages === 'string'
+        ? JSON.parse(session.messages)
+        : session.messages;
+
+      if (Array.isArray(messages)) {
+        const { detectCurrentScriptStep } = await import('./scriptStepDetector');
+        scriptStep = detectCurrentScriptStep(messages);
+      }
+    } catch (error) {
+      console.error('[Storage] Error detecting script step:', error);
+      // Continue without script step if detection fails
+    }
+
     const [savedSession] = await db
       .insert(chatSessions)
-      .values(session)
+      .values({
+        ...session,
+        scriptStep: scriptStep,
+      })
       .onConflictDoUpdate({
         target: chatSessions.id,
         set: {
           title: session.title,
           messages: session.messages,
+          calculatorData: session.calculatorData,
+          scriptStep: scriptStep,
           updatedAt: session.updatedAt,
         },
       })

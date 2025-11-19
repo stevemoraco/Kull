@@ -70,7 +70,14 @@ export const referrals = pgTable("referrals", {
   status: varchar("status").notNull().default('pending'), // 'pending', 'completed'
   bonusUnlocked: integer("bonus_unlocked"), // 1, 3, 5, or 10
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for referrer lookup - optimizes WHERE referrerId = ?
+  index("referrals_referrer_id_idx").on(table.referrerId),
+  // Index for referred user lookup - optimizes WHERE referredUserId = ?
+  index("referrals_referred_user_id_idx").on(table.referredUserId),
+  // Index for status filtering - optimizes WHERE status = ?
+  index("referrals_status_idx").on(table.status),
+]);
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -118,7 +125,16 @@ export const pageVisits = pgTable("page_visits", {
   referrer: varchar("referrer"),
   userAgent: varchar("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("page_visits_user_id_idx").on(table.userId),
+  // Index for session lookup - optimizes WHERE sessionId = ?
+  index("page_visits_session_id_idx").on(table.sessionId),
+  // Index for time-based queries - optimizes WHERE createdAt >= ? AND createdAt <= ?
+  index("page_visits_created_at_idx").on(table.createdAt.desc()),
+  // Composite index for user's recent visits - optimizes WHERE userId = ? ORDER BY createdAt DESC
+  index("page_visits_user_created_idx").on(table.userId, table.createdAt.desc()),
+]);
 
 export type PageVisit = typeof pageVisits.$inferSelect;
 export type InsertPageVisit = typeof pageVisits.$inferInsert;
@@ -137,6 +153,8 @@ export const supportQueries = pgTable("support_queries", {
   cachedTokensIn: integer("cached_tokens_in").notNull().default(0), // Cached prompt tokens (from OpenAI prompt caching)
   cost: numeric("cost", { precision: 10, scale: 6 }).notNull().default("0"), // Cost in USD
   model: varchar("model").notNull().default("gpt-4o-mini"),
+  // 🔐 LAYER 3: Database-level deduplication
+  messageHash: varchar("message_hash", { length: 16 }), // FNV-1a hash of aiResponse for deduplication
   // Anonymous user metadata for tracking
   device: varchar("device"), // Device type (e.g., "Desktop", "Mobile", "Tablet")
   browser: varchar("browser"), // Browser name (e.g., "Chrome", "Safari", "Firefox")
@@ -145,7 +163,21 @@ export const supportQueries = pgTable("support_queries", {
   country: varchar("country"), // User's country
   sessionLength: integer("session_length"), // Session length in seconds
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for session lookup - optimizes WHERE sessionId = ?
+  index("support_queries_session_id_idx").on(table.sessionId),
+  // Index for user email lookup - optimizes WHERE userEmail = ?
+  index("support_queries_user_email_idx").on(table.userEmail),
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("support_queries_user_id_idx").on(table.userId),
+  // Index for recent queries - optimizes ORDER BY createdAt DESC
+  index("support_queries_created_at_idx").on(table.createdAt.desc()),
+  // Composite index for user's recent queries - optimizes WHERE userEmail = ? ORDER BY createdAt DESC
+  index("support_queries_email_created_idx").on(table.userEmail, table.createdAt.desc()),
+  // 🔐 LAYER 3: Database deduplication index - prevents duplicate messages within time window
+  // Composite index: sessionId + messageHash + createdAt for fast duplicate detection
+  index("support_queries_dedup_idx").on(table.sessionId, table.messageHash, table.createdAt.desc()),
+]);
 
 export type SupportQuery = typeof supportQueries.$inferSelect;
 export type InsertSupportQuery = typeof supportQueries.$inferInsert;
@@ -172,6 +204,7 @@ export const chatSessions = pgTable("chat_sessions", {
   userEmail: varchar("user_email"), // Email for quick lookups
   title: varchar("title").notNull(),
   messages: text("messages").notNull(), // JSON string of messages
+  scriptStep: integer("script_step"), // Current step in 15-step sales script (1-15)
   // Anonymous user metadata for tracking (when userId is null)
   ipAddress: varchar("ip_address"), // For associating anonymous sessions with users on login
   device: varchar("device"),
@@ -179,9 +212,30 @@ export const chatSessions = pgTable("chat_sessions", {
   city: varchar("city"),
   state: varchar("state"),
   country: varchar("country"),
+  // Calculator data snapshot for tracking user's business metrics
+  calculatorData: jsonb("calculator_data").$type<{
+    shootsPerWeek: number;
+    hoursPerShoot: number;
+    billableRate: number;
+    hasManuallyAdjusted: boolean;
+    hasClickedPreset: boolean;
+  }>(),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes getChatSessions(userId)
+  index("chat_sessions_user_id_idx").on(table.userId),
+  // Index for recent sessions - optimizes ORDER BY updatedAt DESC
+  index("chat_sessions_updated_at_idx").on(table.updatedAt.desc()),
+  // Composite index for user's recent sessions - optimizes WHERE userId = ? ORDER BY updatedAt DESC
+  index("chat_sessions_user_updated_idx").on(table.userId, table.updatedAt.desc()),
+  // Index for funnel analysis - optimizes WHERE scriptStep = ?
+  index("chat_sessions_script_step_idx").on(table.scriptStep),
+  // Index for anonymous session association - optimizes WHERE ipAddress = ? AND userId IS NULL
+  index("chat_sessions_ip_address_idx").on(table.ipAddress),
+  // Index for email lookup - optimizes WHERE userEmail = ?
+  index("chat_sessions_user_email_idx").on(table.userEmail),
+]);
 
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
@@ -234,7 +288,18 @@ export const creditTransactions = pgTable("credit_transactions", {
   description: text("description").notNull(),
   metadata: jsonb("metadata"), // flexible field for extra data
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("credit_transactions_user_id_idx").on(table.userId),
+  // Index for recent transactions - optimizes ORDER BY createdAt DESC
+  index("credit_transactions_created_at_idx").on(table.createdAt.desc()),
+  // Composite index for user's recent transactions - optimizes WHERE userId = ? ORDER BY createdAt DESC
+  index("credit_transactions_user_created_idx").on(table.userId, table.createdAt.desc()),
+  // Index for transaction type filtering - optimizes WHERE type = ?
+  index("credit_transactions_type_idx").on(table.type),
+  // Index for provider analytics - optimizes WHERE provider = ?
+  index("credit_transactions_provider_idx").on(table.provider),
+]);
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
 export type InsertCreditTransaction = typeof creditTransactions.$inferInsert;
@@ -252,7 +317,14 @@ export const deviceSessions = pgTable("device_sessions", {
   lastSeen: timestamp("last_seen").defaultNow(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("device_sessions_user_id_idx").on(table.userId),
+  // Index for recent activity - optimizes ORDER BY lastSeen DESC
+  index("device_sessions_last_seen_idx").on(table.lastSeen.desc()),
+  // Composite index for user's active devices - optimizes WHERE userId = ? AND isActive = true ORDER BY lastSeen DESC
+  index("device_sessions_user_active_idx").on(table.userId, table.isActive, table.lastSeen.desc()),
+]);
 
 export type DeviceSession = typeof deviceSessions.$inferSelect;
 export type InsertDeviceSession = typeof deviceSessions.$inferInsert;
@@ -307,7 +379,14 @@ export const shootReports = pgTable("shoot_reports", {
   provider: varchar("provider").notNull(), // AI provider used
   creditCost: integer("credit_cost").notNull(),
   generatedAt: timestamp("generated_at").defaultNow(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("shoot_reports_user_id_idx").on(table.userId),
+  // Index for recent reports - optimizes ORDER BY generatedAt DESC
+  index("shoot_reports_generated_at_idx").on(table.generatedAt.desc()),
+  // Composite index for user's recent reports - optimizes WHERE userId = ? ORDER BY generatedAt DESC
+  index("shoot_reports_user_generated_idx").on(table.userId, table.generatedAt.desc()),
+]);
 
 export type ShootReport = typeof shootReports.$inferSelect;
 export type InsertShootReport = typeof shootReports.$inferInsert;
@@ -328,7 +407,16 @@ export const shootProgress = pgTable("shoot_progress", {
   completedAt: timestamp("completed_at"),
   updatedAt: timestamp("updated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  // Index for user lookup - optimizes WHERE userId = ?
+  index("shoot_progress_user_id_idx").on(table.userId),
+  // Index for status filtering - optimizes WHERE status = ?
+  index("shoot_progress_status_idx").on(table.status),
+  // Index for recent updates - optimizes ORDER BY updatedAt DESC
+  index("shoot_progress_updated_at_idx").on(table.updatedAt.desc()),
+  // Composite index for user's active shoots - optimizes WHERE userId = ? AND status IN ('queued', 'processing')
+  index("shoot_progress_user_status_idx").on(table.userId, table.status),
+]);
 
 export type ShootProgress = typeof shootProgress.$inferSelect;
 export type InsertShootProgress = typeof shootProgress.$inferInsert;
@@ -481,6 +569,57 @@ export const insertCreditLedgerSchema = createInsertSchema(creditLedger).omit({
   id: true,
   createdAt: true,
 });
+
+// Calculator interactions tracking table
+export const calculatorInteractions = pgTable("calculator_interactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(), // Session ID to group interactions
+  userId: varchar("user_id").references(() => users.id), // Optional, if logged in
+  userEmail: varchar("user_email"), // Optional, for logged-in users
+  // Calculator values at time of interaction
+  shootsPerWeek: doublePrecision("shoots_per_week").notNull(),
+  hoursPerShoot: doublePrecision("hours_per_shoot").notNull(),
+  billableRate: doublePrecision("billable_rate").notNull(),
+  hasManuallyAdjusted: boolean("has_manually_adjusted").notNull().default(false),
+  hasClickedPreset: boolean("has_clicked_preset").notNull().default(false),
+  presetClicked: varchar("preset_clicked"), // 'less', 'more', or null
+  // Metadata
+  ipAddress: varchar("ip_address"),
+  device: varchar("device"),
+  browser: varchar("browser"),
+  city: varchar("city"),
+  state: varchar("state"),
+  country: varchar("country"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("calculator_interactions_session_idx").on(table.sessionId),
+  index("calculator_interactions_user_idx").on(table.userId),
+  index("calculator_interactions_created_idx").on(table.createdAt),
+]);
+
+export type CalculatorInteraction = typeof calculatorInteractions.$inferSelect;
+export type InsertCalculatorInteraction = typeof calculatorInteractions.$inferInsert;
+
+// Conversation script steps tracking table
+export const conversationSteps = pgTable("conversation_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => chatSessions.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").references(() => users.id), // Optional
+  userEmail: varchar("user_email"), // Optional
+  stepNumber: integer("step_number").notNull(), // 1-15 from the sales script
+  stepName: varchar("step_name").notNull(), // E.g., "current_reality", "validate_ambition", etc.
+  userResponse: text("user_response"), // User's response to the step question
+  aiQuestion: text("ai_question"), // The question AI asked
+  completedAt: timestamp("completed_at").defaultNow(),
+}, (table) => [
+  index("conversation_steps_session_idx").on(table.sessionId),
+  index("conversation_steps_user_idx").on(table.userId),
+  index("conversation_steps_step_idx").on(table.stepNumber),
+  index("conversation_steps_completed_idx").on(table.completedAt),
+]);
+
+export type ConversationStep = typeof conversationSteps.$inferSelect;
+export type InsertConversationStep = typeof conversationSteps.$inferInsert;
 
 // Re-export email queue types
 export * from "./emailQueue";

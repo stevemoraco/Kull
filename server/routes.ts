@@ -22,6 +22,9 @@ import { batchRouter } from "./routes/batch";
 import aiPassthroughRouter from "./routes/ai-passthrough";
 import adminAIRouter from "./routes/admin-ai";
 import adminHealthRouter from "./routes/admin-health";
+import adminUserDetailRouter from "./routes/admin-user-detail";
+import adminExportRouter from "./routes/admin-export";
+import adminAnalyticsRouter from "./routes/admin-analytics";
 import { PromptStyleSchema, ProviderIdSchema } from "@shared/culling/schemas";
 import { estimateCreditsForImages } from "@shared/utils/cost";
 import { CREDIT_TOP_UP_PACKAGES, PLANS } from "@shared/culling/plans";
@@ -38,6 +41,70 @@ import { buildShootReport, type ShootReport } from "./services/reportBuilder";
 import { initiateDeviceLink, approveDeviceLink, claimDeviceLink } from "./services/deviceLink";
 import { telemetryStore } from "./services/batchTelemetry";
 import { emitShootCompletedNotification } from "./services/reportNotifications";
+import { createContentHash } from "@shared/utils/messageFingerprint";
+
+// 🔐 LAYER 2: Backend Deduplication - In-memory cache for recent message hashes
+const recentMessageCache = new Map<string, { timestamp: number; response: string }>();
+const DUPLICATE_WINDOW_MS = 60000; // 60 seconds
+const MAX_CACHE_SIZE = 200; // Keep last 200 messages
+
+// 🔐 LAYER 4: Monitoring - Track deduplication statistics
+interface DuplicationStats {
+  totalChecks: number;
+  duplicatesBlocked: number;
+  lastDuplicate: { timestamp: number; sessionId: string; hash: string } | null;
+}
+
+const deduplicationStats: DuplicationStats = {
+  totalChecks: 0,
+  duplicatesBlocked: 0,
+  lastDuplicate: null,
+};
+
+function isResponseDuplicate(sessionId: string, content: string): { isDuplicate: boolean; cachedResponse?: string } {
+  const hash = createContentHash(content);
+  const key = `${sessionId}:${hash}`;
+  const now = Date.now();
+
+  // 🔐 LAYER 4: Track this check
+  deduplicationStats.totalChecks++;
+
+  // Clean old entries
+  for (const [k, v] of recentMessageCache.entries()) {
+    if (now - v.timestamp > DUPLICATE_WINDOW_MS) {
+      recentMessageCache.delete(k);
+    }
+  }
+
+  // Check for duplicate
+  const cached = recentMessageCache.get(key);
+  if (cached && (now - cached.timestamp < DUPLICATE_WINDOW_MS)) {
+    // 🔐 LAYER 4: Track duplicate detection
+    deduplicationStats.duplicatesBlocked++;
+    deduplicationStats.lastDuplicate = { timestamp: now, sessionId, hash };
+
+    console.log(`[Dedup Layer 2] 🚫 Blocked duplicate backend response (hash: ${hash}, age: ${Math.round((now - cached.timestamp) / 1000)}s)`);
+
+    // 🔐 LAYER 4: Alert if duplicate rate exceeds threshold
+    if (deduplicationStats.duplicatesBlocked > 10 && deduplicationStats.duplicatesBlocked % 5 === 0) {
+      const duplicateRate = (deduplicationStats.duplicatesBlocked / deduplicationStats.totalChecks) * 100;
+      console.error(`[Dedup Alert] 🚨 High duplicate rate: ${duplicateRate.toFixed(1)}% (${deduplicationStats.duplicatesBlocked}/${deduplicationStats.totalChecks})`);
+    }
+
+    return { isDuplicate: true, cachedResponse: cached.response };
+  }
+
+  // Add to cache
+  recentMessageCache.set(key, { timestamp: now, response: content });
+
+  // Limit cache size
+  if (recentMessageCache.size > MAX_CACHE_SIZE) {
+    const oldestKey = Array.from(recentMessageCache.keys())[0];
+    recentMessageCache.delete(oldestKey);
+  }
+
+  return { isDuplicate: false };
+}
 
 // Initialize these lazily inside registerRoutes to ensure dotenv has loaded
 let stripe: Stripe;
@@ -681,13 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
 
-      // DEEP RESEARCH LOGGING: Verify history transmission
-      console.log('[DEEP RESEARCH] /api/chat/message received:');
-      console.log('  - message length:', message?.length || 0);
-      console.log('  - history:', history ? `${history.length} messages` : 'undefined/null');
-      console.log('  - history[0]:', history?.[0] ? JSON.stringify(history[0]).substring(0, 100) + '...' : 'N/A');
-      console.log('  - history[last]:', history?.length > 0 ? JSON.stringify(history[history.length - 1]).substring(0, 100) + '...' : 'N/A');
-      console.log('  - req.body size estimate:', JSON.stringify(req.body).length, 'chars');
+      // Request received - minimal logging
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
@@ -824,28 +885,51 @@ ${userActivity.map((event: any, idx: number) => {
         res.socket.setNoDelay(true);
       }
 
+      // TIMING: Start measuring
+      const timings = {
+        start: Date.now(),
+        contextCollected: 0,
+        promptBuilt: 0,
+        apiCalled: 0,
+        firstToken: 0,
+      };
+
       // Step 1: Collecting user context
       res.write(`data: ${JSON.stringify({ type: 'status', message: '📊 collecting your activity data...' })}\n\n`);
       if (res.socket) res.socket.uncork();
 
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
+      timings.contextCollected = Date.now() - timings.start;
+      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ context collected (${timings.contextCollected}ms)` })}\n\n`);
+      if (res.socket) res.socket.uncork();
 
       // Step 2: Building prompt
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '📝 appending to cached prompt...' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '📝 building prompt...' })}\n\n`);
       if (res.socket) res.socket.uncork();
 
+      const promptStart = Date.now();
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
-
-      // Step 3: Calling OpenAI
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '🤖 calling openai with cached context...' })}\n\n`);
+      const promptTime = Date.now() - promptStart;
+      timings.promptBuilt = Date.now() - timings.start;
+      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ prompt built (${promptTime}ms)` })}\n\n`);
       if (res.socket) res.socket.uncork();
 
-      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string) => {
-        // Callback for chatService to send status updates
-        res.write(`data: ${JSON.stringify({ type: 'status', message: status })}\n\n`);
+      // Step 3: Calling OpenAI
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '🤖 calling openai api...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
+      const apiStart = Date.now();
+      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string, timing?: number) => {
+        // Callback for chatService to send status updates with timing
+        const msg = timing ? `${status} (${timing}ms)` : status;
+        res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
         if (res.socket) res.socket.uncork();
       });
+      const apiTime = Date.now() - apiStart;
+      timings.apiCalled = Date.now() - timings.start;
+      res.write(`data: ${JSON.stringify({ type: 'status', message: `✅ api responded (${apiTime}ms)` })}\n\n`);
+      if (res.socket) res.socket.uncork();
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -891,9 +975,11 @@ ${userActivity.map((event: any, idx: number) => {
                   
                   // Extract content delta
                   if (choice.delta?.content) {
-                    // First token received!
+                    // First token received - measure total time
                     if (!firstTokenReceived) {
-                      res.write(`data: ${JSON.stringify({ type: 'status', message: '✨ streaming reply...' })}\n\n`);
+                      const totalTime = Date.now() - timings.start;
+                      timings.firstToken = totalTime;
+                      res.write(`data: ${JSON.stringify({ type: 'status', message: `✨ streaming (total: ${totalTime}ms)` })}\n\n`);
                       if (res.socket) res.socket.uncork();
                       firstTokenReceived = true;
                     }
@@ -918,10 +1004,7 @@ ${userActivity.map((event: any, idx: number) => {
                   const { calculateChatCost } = await import('./modelPricing');
                   cost = calculateChatCost(preferredModel, tokensIn, tokensOut);
 
-                  // Log with caching info
-                  const newTokensIn = tokensIn - cachedTokensIn;
-                  const cacheHitRate = tokensIn > 0 ? Math.round((cachedTokensIn / tokensIn) * 100) : 0;
-                  console.log(`[Chat] ✓ ${preferredModel} | 📦 ${cachedTokensIn.toLocaleString()} cached (${cacheHitRate}%) + ${newTokensIn.toLocaleString()} new ↓ | ${tokensOut.toLocaleString()} ↑ | $${cost.toFixed(4)}`);
+                  // Usage data received (logged after stream completes)
                 }
 
                 // Handle error
@@ -951,6 +1034,11 @@ ${userActivity.map((event: any, idx: number) => {
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         // Force immediate transmission
         if (res.socket) res.socket.uncork();
+
+        // LOG ALL TIMINGS
+        const totalTime = Date.now() - timings.start;
+        console.log(`[Chat Timings] Total: ${totalTime}ms | Context: ${timings.contextCollected}ms | Prompt: ${timings.promptBuilt - timings.contextCollected}ms | API: ${timings.apiCalled - timings.promptBuilt}ms | TTFT: ${timings.firstToken - timings.apiCalled}ms | FirstToken: ${timings.firstToken}ms`);
+        console.log(`[Chat Tokens] In: ${tokensIn} | Out: ${tokensOut} | Cached: ${cachedTokensIn} | Cost: $${cost.toFixed(4)}`);
 
         // Track support query in database
         const userEmail = req.user?.claims?.email;
@@ -1005,25 +1093,32 @@ ${userActivity.map((event: any, idx: number) => {
             ? Math.floor((Date.now() - req.body.sessionStartTime) / 1000)
             : 0;
 
-          await storage.trackSupportQuery({
-            sessionId,
-            userEmail,
-            userId,
-            userMessage: message,
-            aiResponse: fullResponse,
-            fullPrompt,
-            tokensIn,
-            tokensOut,
-            cachedTokensIn,
-            cost: cost.toString(),
-            model: preferredModel,
-            device,
-            browser,
-            city,
-            state,
-            country,
-            sessionLength,
-          });
+          // 🔐 LAYER 2: Backend Deduplication Check
+          const dedupCheck = isResponseDuplicate(sessionId, fullResponse);
+          if (dedupCheck.isDuplicate) {
+            console.log(`[Dedup Layer 2] Skipping duplicate response save for session ${sessionId}`);
+            // Don't save duplicate to database, but still broadcast admin update
+          } else {
+            await storage.trackSupportQuery({
+              sessionId,
+              userEmail,
+              userId,
+              userMessage: message,
+              aiResponse: fullResponse,
+              fullPrompt,
+              tokensIn,
+              tokensOut,
+              cachedTokensIn,
+              cost: cost.toString(),
+              model: preferredModel,
+              device,
+              browser,
+              city,
+              state,
+              country,
+              sessionLength,
+            });
+          }
 
           // Broadcast to admin panels for live updates
           const { getGlobalWsService } = await import('./websocket');
@@ -1047,14 +1142,37 @@ ${userActivity.map((event: any, idx: number) => {
         // End response after all tracking is complete
         res.end();
       } catch (streamError) {
-        console.error('[Chat] Error processing stream:', streamError);
+        const errorTime = Date.now() - timings.start;
+        console.error('[Chat] Error processing stream:', {
+          error: streamError,
+          message: streamError instanceof Error ? streamError.message : String(streamError),
+          stack: streamError instanceof Error ? streamError.stack : undefined,
+          timings: {
+            total: errorTime,
+            contextCollected: timings.contextCollected,
+            promptBuilt: timings.promptBuilt,
+            apiCalled: timings.apiCalled,
+            firstToken: timings.firstToken
+          }
+        });
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
         // Force immediate transmission
         if (res.socket) res.socket.uncork();
         res.end();
       }
     } catch (error: any) {
-      console.error("Error processing chat message:", error);
+      console.error("[Chat] Fatal error:", {
+        error,
+        message: error?.message,
+        stack: error?.stack,
+        headers_sent: res.headersSent,
+        request: {
+          message_length: message?.length,
+          history_length: history?.length,
+          model: preferredModel,
+          session_id: sessionId
+        }
+      });
       if (!res.headersSent) {
         res.status(500).json({ message: "Failed to process message" });
       }
@@ -1678,25 +1796,31 @@ ${contextMarkdown}`;
             }
           }
 
-          await storage.trackSupportQuery({
-            sessionId,
-            userEmail,
-            userId,
-            userMessage: '[Welcome Greeting - No User Message]',
-            aiResponse: fullResponse,
-            fullPrompt: fullContextMarkdown,
-            tokensIn,
-            tokensOut,
-            cachedTokensIn,
-            cost: cost.toString(),
-            model: preferredModel,
-            device,
-            browser,
-            city,
-            state,
-            country,
-            sessionLength: 0,
-          });
+          // 🔐 LAYER 2: Backend Deduplication Check
+          const dedupCheck = isResponseDuplicate(sessionId, fullResponse);
+          if (dedupCheck.isDuplicate) {
+            console.log(`[Dedup Layer 2] Skipping duplicate welcome greeting for session ${sessionId}`);
+          } else {
+            await storage.trackSupportQuery({
+              sessionId,
+              userEmail,
+              userId,
+              userMessage: '[Welcome Greeting - No User Message]',
+              aiResponse: fullResponse,
+              fullPrompt: fullContextMarkdown,
+              tokensIn,
+              tokensOut,
+              cachedTokensIn,
+              cost: cost.toString(),
+              model: preferredModel,
+              device,
+              browser,
+              city,
+              state,
+              country,
+              sessionLength: 0,
+            });
+          }
 
           // Broadcast to admin panels for live updates
           const { getGlobalWsService } = await import('./websocket');
@@ -1802,7 +1926,7 @@ ${contextMarkdown}`;
   // Chat session persistence endpoints
   app.post('/api/chat/sessions', async (req: any, res) => {
     try {
-      const { sessions, metadata } = req.body;
+      const { sessions, metadata, calculatorData } = req.body;
 
       if (!sessions || !Array.isArray(sessions)) {
         return res.status(400).json({ message: "Sessions array required" });
@@ -1834,6 +1958,7 @@ ${contextMarkdown}`;
           city: metadata?.city || null,
           state: metadata?.state || null,
           country: metadata?.country || null,
+          calculatorData: calculatorData || session.calculatorData || null,
           createdAt: new Date(session.createdAt),
           updatedAt: new Date(session.updatedAt),
         };
@@ -2258,6 +2383,7 @@ ${contextMarkdown}`;
           assistantMessageCount: assistantMessages.length,
           durationMinutes,
           totalCost: sessionCost.toFixed(4),
+          scriptStep: session.scriptStep,
           totalTokensIn: sessionTokensIn,
           totalCachedTokensIn: sessionCachedTokensIn,
           totalNewTokensIn: sessionNewTokensIn,
@@ -2721,6 +2847,91 @@ ${contextMarkdown}`;
     } catch (error: any) {
       console.error("Error fetching support queries by email:", error);
       res.status(500).json({ message: "Failed to fetch support queries: " + error.message });
+    }
+  });
+
+  // 🔐 LAYER 4: Admin endpoint to view deduplication statistics
+  app.get('/api/admin/deduplication-stats', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const duplicateRate = deduplicationStats.totalChecks > 0
+        ? ((deduplicationStats.duplicatesBlocked / deduplicationStats.totalChecks) * 100).toFixed(2)
+        : '0.00';
+
+      res.json({
+        totalChecks: deduplicationStats.totalChecks,
+        duplicatesBlocked: deduplicationStats.duplicatesBlocked,
+        duplicateRate: `${duplicateRate}%`,
+        cacheSize: recentMessageCache.size,
+        lastDuplicate: deduplicationStats.lastDuplicate
+          ? {
+              ...deduplicationStats.lastDuplicate,
+              age: `${Math.round((Date.now() - deduplicationStats.lastDuplicate.timestamp) / 1000)}s ago`,
+            }
+          : null,
+      });
+    } catch (error: any) {
+      console.error("Error fetching deduplication stats:", error);
+      res.status(500).json({ message: "Failed to fetch deduplication stats: " + error.message });
+    }
+  });
+
+  // Admin endpoint to view calculator data from chat sessions
+  app.get('/api/admin/calculator-data', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const allSessions = await storage.getChatSessions();
+
+      // Filter sessions that have calculator data and enrich with user info
+      const sessionsWithCalculator = allSessions
+        .filter(session => session.calculatorData)
+        .map(session => {
+          const calc = session.calculatorData as any;
+          const annualShoots = calc.shootsPerWeek * 52;
+          const annualHours = calc.shootsPerWeek * calc.hoursPerShoot * 52;
+          const annualCost = annualHours * calc.billableRate;
+          const weeksSaved = annualHours / 40;
+
+          return {
+            sessionId: session.id,
+            userId: session.userId,
+            userEmail: session.userEmail,
+            title: session.title,
+            device: session.device,
+            browser: session.browser,
+            location: `${session.city || ''}, ${session.state || ''} ${session.country || ''}`.trim(),
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            calculatorData: {
+              ...calc,
+              // Add calculated metrics
+              annualShoots,
+              annualHours: Math.round(annualHours),
+              annualCost: Math.round(annualCost),
+              weeksSaved: parseFloat(weeksSaved.toFixed(1)),
+            },
+          };
+        })
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+      res.json({
+        total: sessionsWithCalculator.length,
+        sessions: sessionsWithCalculator,
+        summary: {
+          averageShootsPerWeek: sessionsWithCalculator.length > 0
+            ? (sessionsWithCalculator.reduce((sum, s) => sum + s.calculatorData.shootsPerWeek, 0) / sessionsWithCalculator.length).toFixed(1)
+            : 0,
+          averageHoursPerShoot: sessionsWithCalculator.length > 0
+            ? (sessionsWithCalculator.reduce((sum, s) => sum + s.calculatorData.hoursPerShoot, 0) / sessionsWithCalculator.length).toFixed(1)
+            : 0,
+          averageBillableRate: sessionsWithCalculator.length > 0
+            ? Math.round(sessionsWithCalculator.reduce((sum, s) => sum + s.calculatorData.billableRate, 0) / sessionsWithCalculator.length)
+            : 0,
+          manuallyAdjustedCount: sessionsWithCalculator.filter(s => s.calculatorData.hasManuallyAdjusted).length,
+          clickedPresetCount: sessionsWithCalculator.filter(s => s.calculatorData.hasClickedPreset).length,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching calculator data:", error);
+      res.status(500).json({ message: "Failed to fetch calculator data: " + error.message });
     }
   });
 
@@ -3379,6 +3590,50 @@ ${contextMarkdown}`;
   // Admin AI Monitoring
   app.use('/api/admin/ai', adminAIRouter);
   app.use('/api/admin/ai', adminHealthRouter);
+
+  // Admin User Detail
+  app.use('/api/admin/user', adminUserDetailRouter);
+
+  // Admin CSV Export
+  // Admin Analytics
+  app.use('/api/admin/analytics', adminAnalyticsRouter);
+
+  app.use('/api/admin/export', adminExportRouter);
+
+  // Admin Script Funnel Analysis
+  app.get('/api/admin/script-funnel', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const allSessions = await storage.getChatSessions();
+      const { getScriptStepDescription } = await import('./scriptStepDetector');
+
+      // Count sessions by script step
+      const stepCounts = new Map<number, number>();
+
+      for (const session of allSessions) {
+        if (session.scriptStep && session.scriptStep >= 1 && session.scriptStep <= 15) {
+          stepCounts.set(session.scriptStep, (stepCounts.get(session.scriptStep) || 0) + 1);
+        }
+      }
+
+      // Build funnel data for all 15 steps
+      const stepStats = Array.from({ length: 15 }, (_, i) => {
+        const step = i + 1;
+        return {
+          step,
+          count: stepCounts.get(step) || 0,
+          description: getScriptStepDescription(step),
+        };
+      }).filter(stat => stat.count > 0); // Only include steps with data
+
+      res.json({
+        totalSessions: allSessions.length,
+        stepStats: stepStats.sort((a, b) => a.step - b.step),
+      });
+    } catch (error: any) {
+      console.error('[Admin] Error generating script funnel:', error);
+      res.status(500).json({ message: 'Failed to generate funnel data: ' + error.message });
+    }
+  });
 
   const httpServer = createServer(app);
 

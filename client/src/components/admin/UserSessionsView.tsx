@@ -15,6 +15,7 @@ interface ChatSession {
   assistantMessageCount: number;
   durationMinutes: number;
   totalCost: string;
+  scriptStep?: number;
   device?: string;
   browser?: string;
   city?: string;
@@ -112,7 +113,14 @@ export function UserSessionsView({ userKey, userEmail, onBack, onSessionClick }:
               className="flex items-start justify-between border-b pb-4 last:border-0"
             >
               <div className="space-y-2 flex-1">
-                <div className="font-medium">{session.title}</div>
+                <div className="flex items-center gap-3">
+                  <div className="font-medium">{session.title}</div>
+                  {session.scriptStep && (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                      Step {session.scriptStep}/15
+                    </div>
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground space-y-1">
                   {session.firstMessage && (
                     <div className="italic">"{session.firstMessage}..."</div>

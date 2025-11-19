@@ -1030,6 +1030,7 @@ export function SupportChat() {
         const response = await fetch('/api/chat/welcome', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include auth cookies
           body: JSON.stringify({
             context: sessionContext,
             history: fullChatHistory,

@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, MapPin, Monitor, Globe } from "lucide-react";
+import { Users, MapPin, Monitor, Globe, UserCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
 
 interface ChatUser {
   userKey: string;
@@ -40,6 +41,7 @@ interface ChatUsersViewProps {
 }
 
 export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
+  const [, setLocation] = useLocation();
   const { data: users, isLoading } = useQuery<ChatUser[]>({
     queryKey: ['/api/admin/chat-users'],
     staleTime: 0, // Always fetch fresh data
@@ -236,13 +238,25 @@ export function ChatUsersView({ onUserClick }: ChatUsersViewProps) {
                   </div>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onUserClick(user.userKey, user.userEmail)}
-              >
-                View All Sessions →
-              </Button>
+              <div className="flex gap-2">
+                {user.userId && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setLocation(`/admin/user/${user.userId}`)}
+                  >
+                    <UserCircle className="h-4 w-4 mr-1" />
+                    User Profile
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onUserClick(user.userKey, user.userEmail)}
+                >
+                  View Sessions →
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>

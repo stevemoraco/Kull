@@ -34,6 +34,8 @@ import Reports from "@/pages/Reports";
 import ReportDetail from "@/pages/ReportDetail";
 import SharedReport from "@/pages/SharedReport";
 import BatchJobs from "@/pages/BatchJobs";
+import AdminUserDetail from "@/components/AdminUserDetail";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -425,6 +427,48 @@ function Router() {
           }
           console.log('[Router] Admin access granted');
           return <Admin />;
+        }}
+      </Route>
+
+      {/* Admin User Detail - only for steve@lander.media */}
+      <Route path="/admin/user/:userId">
+        {(params) => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+
+          if (!isAuthenticated || !isAdmin) {
+            window.location.href = '/landing';
+            return null;
+          }
+
+          return <AdminUserDetail />;
+        }}
+      </Route>
+
+      {/* Admin Dashboard (Provider Health) - only for steve@lander.media */}
+      <Route path="/admin/dashboard">
+        {() => {
+          if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>;
+          }
+
+          if (!isAuthenticated || !isAdmin) {
+            window.location.href = '/landing';
+            return null;
+          }
+
+          return <AdminDashboard />;
         }}
       </Route>
 
