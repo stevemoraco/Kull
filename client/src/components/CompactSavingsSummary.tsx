@@ -59,8 +59,10 @@ export function CompactSavingsSummary() {
           background: 'linear-gradient(135deg, rgb(0, 0, 0) 0%, hsl(180, 95%, 15%) 30%, hsl(180, 85%, 35%) 60%, rgb(6, 182, 212) 60%, rgb(45, 212, 191) 80%, rgb(16, 185, 129) 100%)',
           backgroundSize: '400% 400%',
           backgroundPosition: isHovered ? '100% 100%' : '0% 0%',
-          animation: isHovered ? 'gradientPulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 'none',
-          transition: 'background-position 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), box-shadow 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), border-color 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)',
+          animation: isHovered ? 'gradientPulse 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 'none',
+          transition: isHovered
+            ? 'background-position 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), box-shadow 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), border-color 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)'
+            : 'background-position 0.8s ease-out, box-shadow 0.8s ease-out, border-color 0.8s ease-out, filter 0.8s ease-out, transform 0.8s ease-out',
           boxShadow: isHovered
             ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
             : '0 10px 30px -5px rgba(0, 0, 0, 0.4)',

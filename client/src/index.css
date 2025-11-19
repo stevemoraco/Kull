@@ -468,15 +468,25 @@
     animation: dance-tilt 1s ease-in-out infinite;
   }
 
-  /* Gradient pulse with white overshoot */
+  /* Gradient pulse with white overshoot and bounce settle */
   @keyframes gradientPulse {
     0% {
       filter: brightness(1);
       transform: scale(1);
     }
-    50% {
-      filter: brightness(1.5) saturate(0.6);
-      transform: scale(1.2);
+    40% {
+      filter: brightness(2) saturate(0.4);
+      transform: scale(1.4);
+    }
+    55% {
+      filter: brightness(1.1) saturate(1.05);
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(1.08);
+    }
+    85% {
+      transform: scale(1.06);
     }
     100% {
       filter: brightness(1.1) saturate(1.05);
