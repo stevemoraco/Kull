@@ -679,7 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chat support endpoint with streaming
   app.post('/api/chat/message', async (req: any, res) => {
     try {
-      const { message, history, userActivity, pageVisits, allSessions, sessionId } = req.body;
+      const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
 
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
@@ -741,6 +741,34 @@ ${recentActivity.slice(-5).map((a: any) => `  - ${a.action}: ${a.target}`).join(
 
       // Build rich markdown context for user activity (same as welcome endpoint)
       let userActivityMarkdown = userMetadataMarkdown;
+
+      // Add calculator data context
+      if (calculatorData) {
+        const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = calculatorData;
+        const annualShoots = shootsPerWeek * 52;
+        const annualHours = shootsPerWeek * hoursPerShoot * 52;
+        const annualCost = annualHours * billableRate;
+        const weeksSaved = annualHours / 40;
+
+        userActivityMarkdown += `\n\n## 💰 Calculator Data (Real-Time)
+
+User's current calculator inputs:
+- **Shoots per Week:** ${shootsPerWeek}
+- **Hours per Shoot (Culling):** ${hoursPerShoot}
+- **Billable Rate:** $${billableRate}/hour
+- **Has Manually Adjusted:** ${hasManuallyAdjusted ? 'Yes' : 'No'}
+- **Has Clicked Preset:** ${hasClickedPreset ? 'Yes' : 'No'}
+
+**Calculated Metrics:**
+- **Annual Shoots:** ${annualShoots} shoots/year
+- **Annual Hours Wasted on Culling:** ${Math.round(annualHours)} hours/year
+- **Annual Cost of Manual Culling:** $${Math.round(annualCost).toLocaleString()}/year
+- **Work Weeks Saved:** ${weeksSaved.toFixed(1)} weeks/year
+
+**IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
+`;
+      }
+
       if (userActivity && userActivity.length > 0) {
         userActivityMarkdown += `\n\n## 🖱️ User Activity History
 
@@ -987,7 +1015,7 @@ ${userActivity.map((event: any, idx: number) => {
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context, history, lastAiMessageTime, currentTime, sessionId } = req.body;
+      const { context, history, lastAiMessageTime, currentTime, sessionId, calculatorData } = req.body;
 
       // Silent mode - only log errors
 
@@ -1151,6 +1179,25 @@ ${context.webglRenderer !== 'unknown' ? `- **GPU:** ${context.webglRenderer}` : 
 ## 💾 Storage
 - **Local Storage:** ${context.localStorageAvailable ? 'Available' : 'Blocked'}
 - **Session Storage:** ${context.sessionStorageAvailable ? 'Available' : 'Blocked'}
+
+${calculatorData ? `
+## 💰 Calculator Data (Real-Time)
+
+User's current calculator inputs:
+- **Shoots per Week:** ${calculatorData.shootsPerWeek}
+- **Hours per Shoot (Culling):** ${calculatorData.hoursPerShoot}
+- **Billable Rate:** $${calculatorData.billableRate}/hour
+- **Has Manually Adjusted:** ${calculatorData.hasManuallyAdjusted ? 'Yes' : 'No'}
+- **Has Clicked Preset:** ${calculatorData.hasClickedPreset ? 'Yes' : 'No'}
+
+**Calculated Metrics:**
+- **Annual Shoots:** ${calculatorData.shootsPerWeek * 52} shoots/year
+- **Annual Hours Wasted on Culling:** ${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52)} hours/year
+- **Annual Cost of Manual Culling:** $${Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52 * calculatorData.billableRate).toLocaleString()}/year
+- **Work Weeks Saved:** ${((calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 52) / 40).toFixed(1)} weeks/year
+
+**IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
+` : ''}
 
 ## 🖱️ User Activity History
 ${context.userActivity && context.userActivity.length > 0 ? `

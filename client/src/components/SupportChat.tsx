@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
+import { useCalculator } from '@/contexts/CalculatorContext';
 
 // 🔊 CYBERPUNK NOTIFICATION SOUND - Web Audio API
 function playCyberpunkDing() {
@@ -346,6 +347,9 @@ const getUserMetadata = async () => {
 };
 
 export function SupportChat() {
+  // Get calculator context
+  const calculatorContext = useCalculator();
+
   // Persist chat open state
   const [isOpen, setIsOpen] = useState(() => {
     const stored = localStorage.getItem('kull-chat-open');
@@ -1032,6 +1036,13 @@ export function SupportChat() {
             lastAiMessageTime: lastAiMessageTime,
             currentTime: Date.now(),
             sessionId: currentSessionId,
+            calculatorData: {
+              shootsPerWeek: calculatorContext.shootsPerWeek,
+              hoursPerShoot: calculatorContext.hoursPerShoot,
+              billableRate: calculatorContext.billableRate,
+              hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+              hasClickedPreset: calculatorContext.hasClickedPreset,
+            },
           }),
         });
 
@@ -1104,17 +1115,17 @@ export function SupportChat() {
         if (fullContent && isActive) {
           // Parse next message timing and follow-up questions
           const nextMessageMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
-          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+          const followUpMatch = fullContent.match(/(?:␞\s*)?(?:\n\n?)?QUICK_REPLIES:\s*([^\n]+)/i);
 
           console.log('[Chat] NEXT_MESSAGE match:', nextMessageMatch);
-          console.log('[Chat] FOLLOW_UP_QUESTIONS match:', followUpMatch);
+          console.log('[Chat] QUICK_REPLIES match:', followUpMatch);
 
           let cleanContent = fullContent;
           let nextMsgSeconds = 30; // Default
 
-          // Remove ALL metadata from displayed content (cut at first ␞ or FOLLOW_UP_QUESTIONS)
+          // Remove ALL metadata from displayed content (cut at first ␞ or QUICK_REPLIES)
           const cutoffIndex = fullContent.indexOf('␞');
-          const followUpIndex = fullContent.search(/\n\n?FOLLOW_UP_QUESTIONS:/);
+          const followUpIndex = fullContent.search(/\n\n?QUICK_REPLIES:/);
 
           console.log('[Chat] Cutoff index:', cutoffIndex);
           console.log('[Chat] FollowUp index:', followUpIndex);
@@ -1519,6 +1530,13 @@ export function SupportChat() {
           allSessions: sessions, // Send ALL previous sessions for this user
           sessionId: currentSessionId,
           sessionStartTime, // For accurate session length calculation
+          calculatorData: {
+            shootsPerWeek: calculatorContext.shootsPerWeek,
+            hoursPerShoot: calculatorContext.hoursPerShoot,
+            billableRate: calculatorContext.billableRate,
+            hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+            hasClickedPreset: calculatorContext.hasClickedPreset,
+          },
         }),
         signal: controller.signal,
       });
@@ -1603,28 +1621,6 @@ export function SupportChat() {
 
                 fullContent += data.content;
                 console.log('[Chat] Delta received, fullContent now:', fullContent.length, 'chars');
-                
-                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
-                flushSync(() => {
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
-                });
-
-                // Check for first link and navigate immediately
-                if (!hasNavigated) {
-                  const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                  if (linkMatch) {
-                    const url = linkMatch[2];
-                    hasNavigated = true;
-                    // Navigate immediately!
-                    handleLinkClick(url);
-                  }
-                }
 
                 // Look for cutoff markers - check multiple patterns to ensure we catch metadata
                 let cutoffIndex = -1;
@@ -1633,12 +1629,12 @@ export function SupportChat() {
                 // 1. Unicode marker ␞ (U+241E)
                 const unicodeMarkerIdx = fullContent.indexOf('␞');
 
-                // 2. FOLLOW_UP_QUESTIONS with various formats (with or without newlines)
-                const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                // 2. QUICK_REPLIES with various formats (with or without newlines)
+                const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
                 const followUpMatch = fullContent.match(followUpPattern);
                 const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
 
-                // 3. NEXT_MESSAGE without FOLLOW_UP_QUESTIONS (in case AI skips that part)
+                // 3. NEXT_MESSAGE without QUICK_REPLIES (in case AI skips that part)
                 const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
                 const nextMsgMatch = fullContent.match(nextMsgPattern);
                 const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
@@ -1662,7 +1658,7 @@ export function SupportChat() {
                   console.log('[Chat] Questions section:', questionsSection.substring(0, 100));
 
                   // Extract follow-up questions - look for the line after cutoff
-                  const followUpMatch = questionsSection.match(/FOLLOW_UP_QUESTIONS:\s*([^\n]+)/i);
+                  const followUpMatch = questionsSection.match(/QUICK_REPLIES:\s*([^\n]+)/i);
 
                   if (followUpMatch) {
                     const questionsText = followUpMatch[1];
@@ -1694,13 +1690,15 @@ export function SupportChat() {
                   setNextMessageIn(nextMsgSeconds);
 
                   // Update message with clean content
-                  setMessages(prev =>
-                    prev.map(msg =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: cleanContent }
-                        : msg
-                    )
-                  );
+                  flushSync(() => {
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: cleanContent }
+                          : msg
+                      )
+                    );
+                  });
 
                   // Update fullContent so subsequent checks use clean version
                   fullContent = cleanContent;
@@ -1709,18 +1707,27 @@ export function SupportChat() {
                   continue;
                 }
 
-                // No cutoff yet, show all content - flush immediately for smooth streaming
+                // Check for first link and navigate immediately (before UI update to avoid race)
+                if (!hasNavigated) {
+                  const linkMatch = fullContent.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                  if (linkMatch) {
+                    const url = linkMatch[2];
+                    hasNavigated = true;
+                    // Navigate immediately!
+                    handleLinkClick(url);
+                  }
+                }
+
+                // 🔥 UPDATE UI INCREMENTALLY AS DELTAS ARRIVE - force immediate rendering
                 console.log('[Chat] Updating message', assistantMessageId, 'with content length:', fullContent.length);
                 flushSync(() => {
-                  setMessages(prev => {
-                    const updated = prev.map(msg =>
+                  setMessages(prev =>
+                    prev.map(msg =>
                       msg.id === assistantMessageId
                         ? { ...msg, content: fullContent }
                         : msg
-                    );
-                    console.log('[Chat] Messages after update:', updated.length, 'Updated msg found:', updated.some(m => m.id === assistantMessageId));
-                    return updated;
-                  });
+                    )
+                  );
                 });
               } else if (data.type === 'error') {
                 throw new Error(data.message || 'Stream error');
@@ -1737,7 +1744,7 @@ export function SupportChat() {
                 if (!cutoffDetected) {
                   // Use the same robust detection as in the stream loop
                   const unicodeMarkerIdx = fullContent.indexOf('␞');
-                  const followUpPattern = /(?:\n\s*|\s+)FOLLOW_UP_QUESTIONS:/i;
+                  const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
                   const followUpMatch = fullContent.match(followUpPattern);
                   const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
                   const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
@@ -1833,7 +1840,7 @@ export function SupportChat() {
 
     setCurrentSessionId(newSession.id);
 
-    // Reset quick questions to defaults
+    // Reset quick replies to defaults
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -1850,7 +1857,7 @@ export function SupportChat() {
   const handleSwitchSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
 
-    // Reset quick questions when switching
+    // Reset quick replies when switching
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -1880,7 +1887,7 @@ export function SupportChat() {
     // Switch to the new session
     setCurrentSessionId(newSessionId);
 
-    // Reset quick questions to defaults
+    // Reset quick replies to defaults
     setQuickQuestions([
       "How do I install Kull?",
       "Which AI model is best?",
@@ -2116,6 +2123,7 @@ export function SupportChat() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
             {messages
               .filter(m => !m.content.includes('[Continue conversation naturally based on context]'))
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
               .map((message) => (
               <div
                 key={message.id}
@@ -2171,7 +2179,7 @@ export function SupportChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Questions with toggle */}
+          {/* Quick Replies with toggle */}
           <div className="border-t border-border bg-muted/30">
             <button
               onClick={() => setShowSuggestions(!showSuggestions)}
@@ -2179,7 +2187,7 @@ export function SupportChat() {
               data-testid="button-toggle-suggestions"
             >
               <p className="text-xs font-semibold text-muted-foreground">
-                Suggested Questions ({quickQuestions.length})
+                Quick Replies ({quickQuestions.length})
               </p>
               {showSuggestions ? (
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />

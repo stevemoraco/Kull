@@ -8,7 +8,6 @@ import { Footer } from "@/components/Footer";
 import { SectionNav } from "@/components/SectionNav";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { CalculatorProvider } from "@/contexts/CalculatorContext";
 
 export default function Landing() {
   const handleLogin = () => {
@@ -30,8 +29,7 @@ export default function Landing() {
   };
 
   return (
-    <CalculatorProvider>
-      <div className="min-h-screen">
+    <div className="min-h-screen">
         {/* Section Navigation */}
         <SectionNav />
 
@@ -103,6 +101,5 @@ export default function Landing() {
         <Footer />
       </div>
     </div>
-    </CalculatorProvider>
   );
 }
