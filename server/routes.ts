@@ -798,9 +798,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { timezone, currentPath, visitedPages, recentActivity } = req.body;
 
+      // Get user authentication status
+      const userEmail = req.user?.claims?.email;
+      const userName = req.user?.claims?.name || req.user?.claims?.given_name;
+      const isLoggedIn = !!userId;
+
       // Build user metadata context
       const userMetadataMarkdown = `
 ## 👤 User Session Metadata
+${userName ? `- **Name:** ${userName}` : ''}
+${userEmail ? `- **Email:** ${userEmail}` : ''}
+- **Login Status:** ${isLoggedIn ? '🟢 Logged In' : '🔴 Not Logged In'}
 - **Device:** ${device}
 - **Browser:** ${browser}
 - **IP Address:** ${ip}
