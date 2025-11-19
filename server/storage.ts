@@ -432,42 +432,46 @@ export class DatabaseStorage implements IStorage {
 
   // Kull prompt presets (shared marketplace)
   async seedDefaultPrompts(prompts: PromptSeedDefinition[], authorEmail: string): Promise<void> {
-    const timestamp = new Date();
-    for (const preset of prompts) {
-      await db
-        .insert(promptPresets)
-        .values({
-          slug: preset.slug,
-          title: preset.title,
-          summary: preset.summary,
-          instructions: preset.instructions,
-          shootTypes: preset.shootTypes,
-          tags: preset.tags,
-          style: preset.style,
-          authorEmail,
-          isDefault: true,
-          sharedWithMarketplace: true,
-          aiScore: preset.aiScore ?? null,
-          aiSummary: preset.aiSummary ?? null,
-          updatedAt: timestamp,
-        })
-        .onConflictDoUpdate({
-          target: promptPresets.slug,
-          set: {
+    try {
+      const timestamp = new Date();
+      for (const preset of prompts) {
+        await db
+          .insert(promptPresets)
+          .values({
+            slug: preset.slug,
             title: preset.title,
             summary: preset.summary,
             instructions: preset.instructions,
             shootTypes: preset.shootTypes,
             tags: preset.tags,
             style: preset.style,
+            authorEmail,
             isDefault: true,
             sharedWithMarketplace: true,
             aiScore: preset.aiScore ?? null,
             aiSummary: preset.aiSummary ?? null,
-            authorEmail,
             updatedAt: timestamp,
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: promptPresets.slug,
+            set: {
+              title: preset.title,
+              summary: preset.summary,
+              instructions: preset.instructions,
+              shootTypes: preset.shootTypes,
+              tags: preset.tags,
+              style: preset.style,
+              isDefault: true,
+              sharedWithMarketplace: true,
+              aiScore: preset.aiScore ?? null,
+              aiSummary: preset.aiSummary ?? null,
+              authorEmail,
+              updatedAt: timestamp,
+            },
+          });
+      }
+    } catch (error: any) {
+      console.log('[Seed] ⚠️ Failed to seed default prompts (table may not exist yet):', error.message);
     }
   }
 
