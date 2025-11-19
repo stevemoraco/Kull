@@ -681,6 +681,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { message, history, userActivity, pageVisits, allSessions, sessionId, calculatorData } = req.body;
 
+      // DEEP RESEARCH LOGGING: Verify history transmission
+      console.log('[DEEP RESEARCH] /api/chat/message received:');
+      console.log('  - message length:', message?.length || 0);
+      console.log('  - history:', history ? `${history.length} messages` : 'undefined/null');
+      console.log('  - history[0]:', history?.[0] ? JSON.stringify(history[0]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history[last]:', history?.length > 0 ? JSON.stringify(history[history.length - 1]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - req.body size estimate:', JSON.stringify(req.body).length, 'chars');
+
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
       }
@@ -811,12 +819,33 @@ ${userActivity.map((event: any, idx: number) => {
       res.write('\n');
       res.flushHeaders(); // Ensure headers are sent immediately
 
+      // Disable TCP Nagle's algorithm for immediate transmission
+      if (res.socket) {
+        res.socket.setNoDelay(true);
+      }
+
+      // Step 1: Collecting user context
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '📊 collecting your activity data...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
       const { getChatResponseStream, buildFullPromptMarkdown } = await import('./chatService');
+
+      // Step 2: Building prompt
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '📝 appending to cached prompt...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
 
       // Build full prompt markdown for debugging
       const fullPrompt = await buildFullPromptMarkdown(message, history || []);
 
-      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId);
+      // Step 3: Calling OpenAI
+      res.write(`data: ${JSON.stringify({ type: 'status', message: '🤖 calling openai with cached context...' })}\n\n`);
+      if (res.socket) res.socket.uncork();
+
+      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string) => {
+        // Callback for chatService to send status updates
+        res.write(`data: ${JSON.stringify({ type: 'status', message: status })}\n\n`);
+        if (res.socket) res.socket.uncork();
+      });
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -826,6 +855,7 @@ ${userActivity.map((event: any, idx: number) => {
       let tokensOut = 0;
       let cachedTokensIn = 0;
       let cost = 0;
+      let firstTokenReceived = false;
 
       try {
         // Stream processing
@@ -861,9 +891,18 @@ ${userActivity.map((event: any, idx: number) => {
                   
                   // Extract content delta
                   if (choice.delta?.content) {
+                    // First token received!
+                    if (!firstTokenReceived) {
+                      res.write(`data: ${JSON.stringify({ type: 'status', message: '✨ streaming reply...' })}\n\n`);
+                      if (res.socket) res.socket.uncork();
+                      firstTokenReceived = true;
+                    }
+
                     fullResponse += choice.delta.content;
                     // Forward to client immediately
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
+                    // Force immediate transmission - bypass Node.js buffering
+                    if (res.socket) res.socket.uncork();
                   }
                   
                   // Check for finish_reason and usage data (silent)
@@ -889,6 +928,8 @@ ${userActivity.map((event: any, idx: number) => {
                 if (data.error) {
                   const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  // Force immediate transmission
+                  if (res.socket) res.socket.uncork();
                 }
               } catch (e) {
                 // Skip invalid JSON lines (silent)
@@ -908,6 +949,8 @@ ${userActivity.map((event: any, idx: number) => {
 
         // Signal completion
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
 
         // Track support query in database
         const userEmail = req.user?.claims?.email;
@@ -1006,6 +1049,8 @@ ${userActivity.map((event: any, idx: number) => {
       } catch (streamError) {
         console.error('[Chat] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
         res.end();
       }
     } catch (error: any) {
@@ -1489,6 +1534,11 @@ ${contextMarkdown}`;
       res.write('\n');
       res.flushHeaders(); // Ensure headers are sent immediately
 
+      // Disable TCP Nagle's algorithm for immediate transmission
+      if (res.socket) {
+        res.socket.setNoDelay(true);
+      }
+
       // Track the full response for analytics
       let fullResponse = '';
       let tokensIn = 0;
@@ -1534,6 +1584,8 @@ ${contextMarkdown}`;
                   if (choice.delta?.content) {
                     fullResponse += choice.delta.content;
                     res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
+                    // Force immediate transmission - bypass Node.js buffering
+                    if (res.socket) res.socket.uncork();
                   }
                   
                   // Stream finished - no logging needed
@@ -1551,6 +1603,8 @@ ${contextMarkdown}`;
                   console.error('[Welcome] OpenAI error:', data.error);
                   const errorMessage = data.error.message || 'Unknown error occurred';
                   res.write(`data: ${JSON.stringify({ type: 'error', message: errorMessage })}\n\n`);
+                  // Force immediate transmission
+                  if (res.socket) res.socket.uncork();
                 }
               } catch (e) {
                 console.error('[Welcome] JSON parse error:', e, 'Line:', line);
@@ -1569,6 +1623,8 @@ ${contextMarkdown}`;
         }
 
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
 
         // Track welcome greeting in database
         const userEmail = req.user?.claims?.email;
@@ -1661,6 +1717,8 @@ ${contextMarkdown}`;
       } catch (streamError) {
         console.error('[Welcome] Error processing stream:', streamError);
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream processing error' })}\n\n`);
+        // Force immediate transmission
+        if (res.socket) res.socket.uncork();
         res.end();
       }
     } catch (error: any) {

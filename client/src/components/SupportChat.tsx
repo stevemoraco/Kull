@@ -1080,7 +1080,12 @@ export function SupportChat() {
               try {
                 const data = JSON.parse(line.slice(6));
 
-                if (data.type === 'delta' && data.content) {
+                if (data.type === 'status' && data.message) {
+                  // Display status message in real-time
+                  flushSync(() => {
+                    setLatestGreeting(data.message);
+                  });
+                } else if (data.type === 'delta' && data.content) {
                   fullContent += data.content;
 
                   // STREAM TO UI - update greeting in real-time with immediate flush
@@ -1481,27 +1486,37 @@ export function SupportChat() {
         console.error('[Chat] Request timeout after 60 seconds');
       }, 60000);
 
+      // DEEP RESEARCH LOGGING: Verify what we're sending
+      const payload = {
+        message: messageText.trim(),
+        history: messages, // Send FULL conversation history - no truncation
+        userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
+        pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
+        allSessions: sessions, // Send ALL previous sessions for this user
+        sessionId: currentSessionId,
+        sessionStartTime, // For accurate session length calculation
+        calculatorData: {
+          shootsPerWeek: calculatorContext.shootsPerWeek,
+          hoursPerShoot: calculatorContext.hoursPerShoot,
+          billableRate: calculatorContext.billableRate,
+          hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
+          hasClickedPreset: calculatorContext.hasClickedPreset,
+        },
+      };
+
+      console.log('[DEEP RESEARCH] Sending to /api/chat/message:');
+      console.log('  - message length:', messageText.trim().length);
+      console.log('  - history:', messages.length, 'messages');
+      console.log('  - history[0]:', messages[0] ? JSON.stringify(messages[0]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - history[last]:', messages.length > 0 ? JSON.stringify(messages[messages.length - 1]).substring(0, 100) + '...' : 'N/A');
+      console.log('  - payload size:', JSON.stringify(payload).length, 'chars');
+
       const response = await fetch('/api/chat/message', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: messageText.trim(),
-          history: messages, // Send FULL conversation history - no truncation
-          userActivity: JSON.parse(sessionStorage.getItem('kull-user-activity') || '[]'),
-          pageVisits: JSON.parse(sessionStorage.getItem('kull-page-visits') || '[]'),
-          allSessions: sessions, // Send ALL previous sessions for this user
-          sessionId: currentSessionId,
-          sessionStartTime, // For accurate session length calculation
-          calculatorData: {
-            shootsPerWeek: calculatorContext.shootsPerWeek,
-            hoursPerShoot: calculatorContext.hoursPerShoot,
-            billableRate: calculatorContext.billableRate,
-            hasManuallyAdjusted: calculatorContext.hasManuallyAdjusted,
-            hasClickedPreset: calculatorContext.hasClickedPreset,
-          },
-        }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
 
@@ -1570,7 +1585,20 @@ export function SupportChat() {
             try {
               const data = JSON.parse(line.slice(6));
 
-              if (data.type === 'delta' && data.content) {
+              if (data.type === 'status' && data.message) {
+                // Display status message in real-time in the pending AI message
+                flushSync(() => {
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    const lastMsg = updated[updated.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                      lastMsg.content = data.message;
+                      lastMsg.isStreaming = true;
+                    }
+                    return updated;
+                  });
+                });
+              } else if (data.type === 'delta' && data.content) {
                 // Mark that we've received the first token
                 if (!firstTokenReceived) {
                   firstTokenReceived = true;

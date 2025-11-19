@@ -262,7 +262,8 @@ export async function getChatResponseStream(
   pageVisits?: any[],
   allSessions?: any[],
   sessionId?: string,
-  userId?: string
+  userId?: string,
+  statusCallback?: (status: string) => void
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -274,9 +275,11 @@ export async function getChatResponseStream(
 
   try {
     // Fetch repo content (STATIC - highly cacheable)
+    statusCallback?.('🗂️  loading cached codebase (150k tokens)...');
     const repoContent = await fetchRepoContent();
 
     // Build STATIC system message (repo content + instructions) - goes first for caching
+    statusCallback?.('⚡ using cached prompt (saves ~$0.02/message)...');
     const staticInstructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
 
     // Build DYNAMIC context (user-specific data) - goes at end, not cached
@@ -303,6 +306,13 @@ export async function getChatResponseStream(
       });
     }
 
+    // DEEP RESEARCH LOGGING: Verify history before building messages
+    console.log('[DEEP RESEARCH] getChatResponseStream received history:', history ? `${history.length} messages` : 'undefined/null');
+    if (history && history.length > 0) {
+      console.log('  - First message:', JSON.stringify(history[0]).substring(0, 150) + '...');
+      console.log('  - Last message:', JSON.stringify(history[history.length - 1]).substring(0, 150) + '...');
+    }
+
     // Build messages array - static first (cacheable), then dynamic, then conversation
     const messages = [
       {
@@ -325,6 +335,12 @@ export async function getChatResponseStream(
       },
     ];
 
+    // DEEP RESEARCH LOGGING: Verify messages array built correctly
+    console.log('[DEEP RESEARCH] Built messages array:', messages.length, 'total messages');
+    console.log('  - System messages:', messages.filter(m => m.role === 'system').length);
+    console.log('  - User messages:', messages.filter(m => m.role === 'user').length);
+    console.log('  - Assistant messages:', messages.filter(m => m.role === 'assistant').length);
+
     // Generate per-user prompt_cache_key for isolated caching
     // This ensures each user gets their own cache, preventing cross-user contamination
     const promptCacheKey = userId
@@ -336,6 +352,7 @@ export async function getChatResponseStream(
     // Concise log with caching info
     console.log(`[Chat] ${model} | ${messages.length} msgs | Static: ${Math.round(staticInstructions.length/1000)}k | Dynamic: ${Math.round(dynamicContext.length/1000)}k | Cache key: ${promptCacheKey.substring(0, 20)}...`);
 
+    statusCallback?.('⏳ waiting for first token from openai...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
