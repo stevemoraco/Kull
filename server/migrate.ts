@@ -14,7 +14,9 @@ export async function runMigrations() {
       CREATE OR REPLACE FUNCTION generate_message_hash()
       RETURNS TRIGGER AS $$
       BEGIN
-        IF NEW.user_message IS NOT NULL THEN
+        IF NEW.ai_response IS NOT NULL THEN
+          NEW.message_hash := LEFT(ENCODE(DIGEST(NEW.ai_response, 'sha256'), 'hex'), 16);
+        ELSIF NEW.user_message IS NOT NULL THEN
           NEW.message_hash := LEFT(ENCODE(DIGEST(NEW.user_message, 'sha256'), 'hex'), 16);
         END IF;
         RETURN NEW;
@@ -28,7 +30,7 @@ export async function runMigrations() {
     
     await db.execute(sql`
       CREATE TRIGGER set_message_hash
-        BEFORE INSERT ON support_queries
+        BEFORE INSERT OR UPDATE ON support_queries
         FOR EACH ROW
         EXECUTE FUNCTION generate_message_hash();
     `);

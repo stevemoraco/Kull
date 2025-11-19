@@ -2812,26 +2812,28 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Replies with toggle - dark aqua gradient, transparent when closed, scrollable when open */}
-          <div className={`border-t ${showSuggestions ? 'border-slate-700/50 bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm' : 'border-transparent'}`}>
+          {/* Quick Replies with toggle - consistent light grey background */}
+          <div className="bg-gray-100">
             <button
               onClick={() => setShowSuggestions(!showSuggestions)}
-              className={`w-full px-4 py-3 flex items-center justify-between transition-all ${
-                showSuggestions ? 'hover:bg-slate-700/30' : 'hover:bg-slate-800/20'
-              }`}
+              className="w-full px-4 py-2 flex items-center justify-between transition-all hover:bg-gray-200"
               data-testid="button-toggle-suggestions"
             >
-              <p className={`text-xs font-semibold ${showSuggestions ? 'text-cyan-300' : 'text-muted-foreground'}`}>
-                Quick Replies ({quickQuestions.length})
-              </p>
-              {showSuggestions ? (
-                <ChevronUp className="w-4 h-4 text-cyan-300" />
-              ) : (
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              {!showSuggestions && (
+                <p className="text-xs font-semibold text-gray-600">
+                  Quick Replies ({quickQuestions.length})
+                </p>
               )}
+              <div className={showSuggestions ? 'w-full flex justify-end' : ''}>
+                {showSuggestions ? (
+                  <ChevronUp className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                )}
+              </div>
             </button>
             {showSuggestions && quickQuestions.length > 0 && (
-              <div className="px-4 pb-4 pt-2 max-h-40 overflow-y-auto flex flex-wrap gap-2">
+              <div className="px-4 pb-3 pt-1 max-h-40 overflow-y-auto flex flex-wrap gap-1.5">
                 {quickQuestions.map((question, idx) => (
                   <button
                     key={idx}
@@ -2839,7 +2841,7 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
                       console.log('[Chat] Quick question clicked:', question);
                       sendMessage(question);
                     }}
-                    className="text-xs bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white border border-cyan-400/30 rounded-full px-4 py-2 hover-elevate active-elevate-2 transition-all shadow-lg shadow-cyan-500/20"
+                    className="text-xs bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white border border-cyan-400/30 rounded-full px-3 py-1.5 hover-elevate active-elevate-2 transition-all shadow-lg shadow-cyan-500/20"
                     data-testid={`button-quick-question-${idx}`}
                   >
                     {question}
