@@ -81,7 +81,7 @@ export function CompactSavingsSummary() {
         {/* Responsive layout: flex column on mobile, row on desktop */}
         <div className="relative z-10 flex flex-col md:flex-row">
           {/* Kull Logo - Top on mobile, Left square section on desktop */}
-          <div className="flex flex-col items-center md:items-start md:justify-center md:w-[30%] p-6 md:p-8 gap-3 md:min-h-full">
+          <div className="flex flex-col items-center md:items-start md:justify-center md:w-[30%] pt-16 px-6 pb-6 md:p-8 gap-3 md:min-h-full">
             <div className="flex flex-col items-center gap-3">
               <div className={`relative w-32 h-32 md:w-full md:h-auto md:aspect-square md:max-w-[200px] bg-white border-2 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                 isButtonHovered
@@ -145,14 +145,14 @@ export function CompactSavingsSummary() {
               onMouseEnter={() => setIsButtonHovered(true)}
               onMouseLeave={() => setIsButtonHovered(false)}
               size="lg"
-              className={`w-full sm:w-auto rounded-3xl font-black text-base px-6 py-4 shadow-xl transition-all duration-300 border-2 hover:scale-105 transform-gpu relative overflow-hidden ${
+              className={`w-full sm:w-auto rounded-3xl font-black text-base px-6 py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
                 isButtonHovered
-                  ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-shimmer'
-                  : 'bg-gradient-to-r from-[hsl(180,70%,35%)] via-primary to-white text-[hsl(180,70%,15%)] border-[hsl(180,80%,60%)] shadow-black/30'
+                  ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-dance-tilt'
+                  : 'bg-gradient-to-r from-cyan-600 via-teal-500 to-emerald-600 text-white border-cyan-400 shadow-cyan-500/30 hover:scale-105'
               }`}
               style={isButtonHovered ? {
                 backgroundSize: '200% 100%',
-                animation: 'shimmer 2s infinite linear'
+                animation: 'shimmer 2s infinite linear, dance-tilt 1s ease-in-out infinite'
               } : {}}
             >
               <Download className="w-5 h-5 mr-2 inline-block relative z-10" />

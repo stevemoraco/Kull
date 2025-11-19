@@ -38,9 +38,9 @@ export function Hero() {
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 py-12 md:py-20 text-center">
-        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4" data-testid="badge-announcement">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Edit Unlimited Photoshoots With Our Risk Free Trial</span>
+        <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-full px-4 py-2 mb-4 max-w-[90vw]" data-testid="badge-announcement">
+          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+          <span className="text-sm font-semibold text-foreground text-center leading-tight">Edit Unlimited Photoshoots<br className="md:hidden" /> With Our Risk Free Trial</span>
         </div>
 
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6 text-foreground max-w-5xl mx-auto" data-testid="text-hero-headline">

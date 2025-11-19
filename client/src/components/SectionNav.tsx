@@ -20,6 +20,8 @@ const sections: Section[] = [
 
 export function SectionNav() {
   const [activeSection, setActiveSection] = useState("top");
+  const [isMobileExpanded, setIsMobileExpanded] = useState(false);
+  const [showMobileNav, setShowMobileNav] = useState(false);
 
   useEffect(() => {
     const observerOptions = {
@@ -88,6 +90,22 @@ export function SectionNav() {
     return () => observer.disconnect();
   }, []);
 
+  // Show mobile nav after user scrolls past hero
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+      setShowMobileNav(scrollY > 300);
+
+      // Auto-collapse when scrolling
+      if (scrollY > 300 && isMobileExpanded) {
+        setIsMobileExpanded(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobileExpanded]);
+
   const scrollToSection = (id: string) => {
     if (id === "top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -116,38 +134,101 @@ export function SectionNav() {
   };
 
   return (
-    <nav className="hidden xl:block fixed left-8 top-1/2 -translate-y-1/2 z-40">
-      <div className="bg-card/80 backdrop-blur-lg border border-border/40 rounded-2xl p-4 shadow-xl">
-        <div className="space-y-1">
-          {sections.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
+    <>
+      {/* Desktop sidebar - left side */}
+      <nav className="hidden xl:block fixed left-8 top-1/2 -translate-y-1/2 z-40">
+        <div className="bg-card/80 backdrop-blur-lg border border-border/40 rounded-2xl p-4 shadow-xl">
+          <div className="space-y-1">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
 
-            return (
-              <button
-                key={section.id}
-                onClick={() => scrollToSection(section.id)}
-                className={`
-                  w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
-                  transition-all duration-200 group
-                  ${
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }
-                `}
-                data-testid={`section-nav-${section.id}`}
-              >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "" : "group-hover:scale-110 transition-transform"}`} />
-                <span className="whitespace-nowrap">{section.label}</span>
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
-                )}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={`
+                    w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium
+                    transition-all duration-200 group
+                    ${
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }
+                  `}
+                  data-testid={`section-nav-${section.id}`}
+                >
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "" : "group-hover:scale-110 transition-transform"}`} />
+                  <span className="whitespace-nowrap">{section.label}</span>
+                  {isActive && (
+                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Mobile floating side navigation */}
+      {showMobileNav && (
+        <nav className="xl:hidden fixed right-4 top-1/2 -translate-y-1/2 z-40">
+          {isMobileExpanded ? (
+            // Expanded state - show all sections
+            <div className="bg-card/95 backdrop-blur-lg border border-border/40 rounded-2xl p-2 shadow-2xl animate-in fade-in zoom-in duration-200">
+              <div className="space-y-1">
+                {sections.map((section) => {
+                  const Icon = section.icon;
+                  const isActive = activeSection === section.id;
+
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => {
+                        scrollToSection(section.id);
+                        setIsMobileExpanded(false);
+                      }}
+                      className={`
+                        w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium
+                        transition-all duration-200
+                        ${
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        }
+                      `}
+                      data-testid={`section-nav-mobile-${section.id}`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="whitespace-nowrap">{section.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Close button */}
+              <button
+                onClick={() => setIsMobileExpanded(false)}
+                className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground py-2"
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            // Collapsed state - floating pill with current section
+            <button
+              onClick={() => setIsMobileExpanded(true)}
+              className="bg-primary text-primary-foreground rounded-full p-4 shadow-2xl hover:scale-110 transition-all duration-200 animate-in fade-in slide-in-from-right"
+              data-testid="mobile-nav-toggle"
+            >
+              {(() => {
+                const currentSection = sections.find(s => s.id === activeSection);
+                const Icon = currentSection?.icon || Home;
+                return <Icon className="w-5 h-5" />;
+              })()}
+            </button>
+          )}
+        </nav>
+      )}
+    </>
   );
 }
