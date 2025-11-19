@@ -11,7 +11,7 @@ const sections: Section[] = [
   { id: "top", label: "What is Kull?", icon: Home },
   { id: "problem", label: "The Problem: Culling", icon: AlertCircle },
   { id: "calculator", label: "Calculate Time Saved", icon: DollarSign },
-  { id: "features", label: "Kull: The Solution", icon: Zap },
+  { id: "features", label: "The Solution: Kull App", icon: Zap },
   { id: "value", label: "What you get", icon: Star },
   { id: "referrals", label: "Get 3 Months Free", icon: Gift },
   { id: "download", label: "Pricing/Download", icon: Download },
@@ -80,20 +80,9 @@ export function SectionNav() {
     }
 
     // Special handling for calculator section
-    const calculatorElement = document.getElementById('calculator-sliders');
+    const calculatorElement = document.getElementById('calculator');
     if (calculatorElement) {
-      // Create a wrapper div with id="calculator" if it doesn't exist
-      if (!document.getElementById('calculator')) {
-        const wrapper = document.createElement('div');
-        wrapper.id = 'calculator';
-        wrapper.style.position = 'absolute';
-        wrapper.style.top = '-80px'; // Account for nav offset
-        calculatorElement.parentElement?.insertBefore(wrapper, calculatorElement);
-      }
-      const calcWrapper = document.getElementById('calculator');
-      if (calcWrapper) {
-        observer.observe(calcWrapper);
-      }
+      observer.observe(calculatorElement);
     }
 
     return () => observer.disconnect();
@@ -102,6 +91,18 @@ export function SectionNav() {
   const scrollToSection = (id: string) => {
     if (id === "top") {
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    // Special handling for calculator - scroll to top of calculator panel
+    if (id === "calculator") {
+      const element = document.getElementById('calculator');
+      if (element) {
+        const offset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+        window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+      }
       return;
     }
 

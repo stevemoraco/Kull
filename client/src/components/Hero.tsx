@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Zap, Sparkles, Star } from "lucide-react";
+import { Download, Sparkles, Star } from "lucide-react";
 import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
 
 function getRelativeTime(dateString: string): string {
@@ -159,14 +159,23 @@ export function Hero() {
             onClick={handleStartTrial}
             data-testid="button-start-trial-hero"
           >
-            <Zap className="w-5 h-5 mr-2" />
-            Start Free Trial Now
+            <Download className="w-5 h-5 mr-2" />
+            Download Kull Free
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="text-lg h-14 px-8 min-w-[240px] bg-background/80 backdrop-blur-sm"
             data-testid="button-watch-demo"
+            onClick={() => {
+              const element = document.getElementById('features');
+              if (element) {
+                const offset = 80;
+                const elementPosition = element.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - offset;
+                window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+              }
+            }}
           >
             Watch Demo
           </Button>

@@ -5,10 +5,12 @@ interface CalculatorContextType {
   hoursPerShoot: number;
   billableRate: number;
   hasManuallyAdjusted: boolean;
+  hasClickedPreset: boolean;
   setShootsPerWeek: (value: number) => void;
   setHoursPerShoot: (value: number) => void;
   setBillableRate: (value: number) => void;
   setHasManuallyAdjusted: (value: boolean) => void;
+  setHasClickedPreset: (value: boolean) => void;
 }
 
 const CalculatorContext = createContext<CalculatorContextType | undefined>(undefined);
@@ -18,6 +20,7 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
   const [hoursPerShoot, setHoursPerShoot] = useState(1.5);
   const [billableRate, setBillableRate] = useState(35);
   const [hasManuallyAdjusted, setHasManuallyAdjusted] = useState(false);
+  const [hasClickedPreset, setHasClickedPreset] = useState(false);
 
   return (
     <CalculatorContext.Provider
@@ -26,10 +29,12 @@ export function CalculatorProvider({ children }: { children: ReactNode }) {
         hoursPerShoot,
         billableRate,
         hasManuallyAdjusted,
+        hasClickedPreset,
         setShootsPerWeek,
         setHoursPerShoot,
         setBillableRate,
         setHasManuallyAdjusted,
+        setHasClickedPreset,
       }}
     >
       {children}

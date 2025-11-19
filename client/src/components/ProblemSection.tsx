@@ -5,9 +5,11 @@ import { useCalculator } from "@/contexts/CalculatorContext";
 
 export function ProblemSection() {
   const [showCalculator, setShowCalculator] = useState(false);
-  const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, setShootsPerWeek, setHoursPerShoot, setBillableRate, setHasManuallyAdjusted } = useCalculator();
+  const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset, setShootsPerWeek, setHoursPerShoot, setBillableRate, setHasManuallyAdjusted, setHasClickedPreset } = useCalculator();
   const [teamSize, setTeamSize] = useState(1);
   const [hasBillableRateChanged, setHasBillableRateChanged] = useState(false);
+  const [isTopButtonHovered, setIsTopButtonHovered] = useState(false);
+  const [isBottomButtonHovered, setIsBottomButtonHovered] = useState(false);
 
   // Logarithmic scale for billable rate (20 to 2000)
   const minRate = 20;
@@ -30,7 +32,9 @@ export function ProblemSection() {
   // Check if user has manually customized the values (not via preset buttons)
   const headerText = hasManuallyAdjusted
     ? "Culling Manually Is Wasting Your Most Precious Productive Hours"
-    : "The Average Kull Customer Wastes...";
+    : hasClickedPreset
+    ? "You Could Be Saving As Much As..."
+    : "The average Kull customer used to waste...";
 
   // Preset functions
   const applyDefaultPreset = () => {
@@ -39,6 +43,7 @@ export function ProblemSection() {
     setBillableRate(35);
     setTeamSize(1);
     setHasManuallyAdjusted(false);
+    setHasClickedPreset(false);
   };
 
   const applyLessPreset = () => {
@@ -47,6 +52,7 @@ export function ProblemSection() {
     setBillableRate(30);
     setTeamSize(1);
     setHasManuallyAdjusted(false);
+    setHasClickedPreset(true);
   };
 
   const applyMorePreset = () => {
@@ -55,6 +61,7 @@ export function ProblemSection() {
     setBillableRate(50);
     setTeamSize(1);
     setHasManuallyAdjusted(false);
+    setHasClickedPreset(true);
   };
 
   const problems = [
@@ -137,43 +144,54 @@ export function ProblemSection() {
         </div>
 
         {/* Interactive Calculator */}
-        <div className="mt-8 max-w-4xl mx-auto">
+        <div id="calculator" className="mt-8 max-w-4xl mx-auto">
           <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border-2 border-primary/30 rounded-3xl p-8 md:p-10 shadow-2xl">
             {/* Header */}
             <div className="text-center mb-10">
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <DollarSign className="w-10 h-10 text-primary flex-shrink-0" />
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-                  Manual culling is a pain that's wasting your time & your creativity
+              {/* Main headline */}
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-3 bg-destructive/10 border border-destructive/20 rounded-full px-6 py-2 mb-6">
+                  <DollarSign className="w-6 h-6 text-destructive" />
+                  <span className="text-sm md:text-base font-semibold text-destructive tracking-wide uppercase">
+                    Value Calculator
+                  </span>
+                </div>
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground mb-3 leading-tight">
+                  Manual culling is a pain.
                 </h2>
+                <p className="text-xl md:text-2xl text-muted-foreground">
+                  Why waste another minute of your time & your creativity?
+                </p>
               </div>
-              <div className="mb-6">
-                <h3 className="text-3xl md:text-4xl font-black text-foreground">
-                  Would you guess you're wasting{" "}
-                  <span className="inline-flex items-center gap-2 bg-muted/50 border border-border rounded-full px-1 py-0.5 mx-2">
+
+              {/* Interactive question */}
+              <div className="bg-gradient-to-br from-background to-muted/30 border-2 border-border rounded-2xl p-6 md:p-8 mb-6 shadow-inner">
+                <p className="text-xl md:text-2xl font-bold text-foreground mb-4 leading-relaxed">
+                  If you had to Guess: Do you think you're wasting{" "}
+                  <span className="inline-flex items-center gap-2 bg-background border-2 border-destructive/30 rounded-full px-2 py-1 mx-1 shadow-sm">
                     <button
                       onClick={() => {
                         setShowCalculator(false);
                         applyLessPreset();
                       }}
-                      className={`px-4 py-1.5 rounded-full font-bold text-lg transition-all ${
+                      className={`px-4 py-2 rounded-full font-black text-base transition-all ${
                         !showCalculator
-                          ? "bg-destructive text-destructive-foreground shadow-md"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "bg-destructive text-destructive-foreground shadow-md scale-110"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
                       less
                     </button>
-                    <span className="text-muted-foreground font-normal">/</span>
+                    <span className="text-muted-foreground font-bold px-1">/</span>
                     <button
                       onClick={() => {
                         setShowCalculator(true);
                         applyMorePreset();
                       }}
-                      className={`px-4 py-1.5 rounded-full font-bold text-lg transition-all ${
+                      className={`px-4 py-2 rounded-full font-black text-base transition-all ${
                         showCalculator
-                          ? "bg-destructive text-destructive-foreground shadow-md"
-                          : "text-muted-foreground hover:text-foreground"
+                          ? "bg-destructive text-destructive-foreground shadow-md scale-110"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
                       }`}
                     >
                       more
@@ -182,18 +200,24 @@ export function ProblemSection() {
                   than{" "}
                   <button
                     onClick={applyDefaultPreset}
-                    className="text-destructive hover:underline cursor-pointer"
+                    className="text-destructive hover:text-destructive/80 underline decoration-2 underline-offset-4 cursor-pointer transition-colors font-black"
                   >
                     $5,460/year
-                  </button>?
-                </h3>
-                <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto mt-4">
+                  </button>{" "}
+                  culling manually?
+                </p>
+              </div>
+
+              {/* Call to action */}
+              <div className="text-center text-base md:text-lg text-muted-foreground">
+                <p>
                   <button
                     onClick={() => document.getElementById('calculator-sliders')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                    className="font-bold text-destructive hover:text-destructive/80 underline cursor-pointer transition-colors"
+                    className="font-bold text-primary hover:text-primary/80 underline decoration-2 underline-offset-4 cursor-pointer transition-colors"
                   >
                     Move the sliders below
-                  </button> to calculate exactly how much time/effort/energy you could save if you used Kull starting today.
+                  </button>{" "}
+                  to calculate exactly how much effort and energy you could save if you downloaded Kull free today.
                 </p>
               </div>
             </div>
@@ -234,20 +258,22 @@ export function ProblemSection() {
                       </p>
                     </div>
                   </div>
-                  <div className="mt-6 pt-6 border-t border-white/20">
-                    <p className="text-base md:text-lg text-white font-semibold text-center">
-                      That means Kull can help you reclaim <span className="text-destructive font-bold">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
-                    </p>
-                  </div>
-                  <div className="mt-6 pt-6 border-t border-white/20">
-                    <p className="text-sm md:text-base text-white/80 leading-relaxed">
-                      Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
-                      By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
-                      gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
-                      editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
-                    </p>
-                  </div>
                 </div>
+                </div>
+              </div>
+
+              {/* Blue/Green Box for Reclaim Section */}
+              <div className="bg-gradient-to-br from-cyan-500/90 via-teal-500/90 to-emerald-500/90 border-2 border-cyan-400 rounded-2xl p-6 md:p-8 mb-6 shadow-xl">
+                <p className="text-base md:text-lg text-white font-semibold text-center mb-6">
+                  That means Kull can help you reclaim <span className="text-white font-black text-xl md:text-2xl">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
+                </p>
+                <div className="pt-6 border-t border-white/30">
+                  <p className="text-sm md:text-base text-white/95 leading-relaxed text-center">
+                    Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
+                    By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
+                    gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
+                    editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
+                  </p>
                 </div>
               </div>
 
@@ -257,10 +283,23 @@ export function ProblemSection() {
 
               <Button
                 size="lg"
-                className="w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black bg-gradient-to-r from-[hsl(25,80%,30%)] via-destructive to-white hover:from-[hsl(25,85%,35%)] hover:via-[hsl(25,85%,60%)] hover:to-white text-[hsl(25,80%,15%)] px-4 py-4 shadow-xl shadow-destructive/30 transition-all duration-300 border-2 border-[hsl(25,85%,60%)] hover:border-[hsl(25,90%,70%)] hover:scale-105"
+                onMouseEnter={() => setIsTopButtonHovered(true)}
+                onMouseLeave={() => setIsTopButtonHovered(false)}
+                className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
+                  isTopButtonHovered
+                    ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-dance-tilt'
+                    : 'bg-gradient-to-r from-cyan-600 via-teal-500 to-emerald-600 text-white border-cyan-400 shadow-cyan-500/30 hover:scale-105'
+                }`}
+                style={isTopButtonHovered ? {
+                  backgroundSize: '200% 100%',
+                  animation: 'shimmer 2s infinite linear, dance-tilt 1s ease-in-out infinite'
+                } : {}}
                 onClick={() => window.location.href = "/api/login"}
               >
-                <span className="break-words leading-snug text-center">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                <span className="break-words leading-snug text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                {isTopButtonHovered && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine" />
+                )}
               </Button>
               <p className="text-center mt-4 text-lg font-semibold text-muted-foreground">
                 Reclaim <span className="text-foreground font-bold">{weeksReclaimed} entire workweeks</span> × <span className="text-foreground font-bold">{Math.round(totalHoursPerYear).toLocaleString()} billable hours</span> this year!
@@ -459,20 +498,22 @@ export function ProblemSection() {
                           </p>
                         </div>
                       </div>
-                      <div className="mt-6 pt-6 border-t border-white/20">
-                        <p className="text-base md:text-lg text-white font-semibold text-center">
-                          That means Kull can help you reclaim <span className="text-destructive font-bold">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
-                        </p>
-                      </div>
-                      <div className="mt-6 pt-6 border-t border-white/20">
-                        <p className="text-sm md:text-base text-white/80 leading-relaxed">
-                          Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
-                          By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
-                          gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
-                          editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
-                        </p>
-                      </div>
                     </div>
+                    </div>
+                  </div>
+
+                  {/* Blue/Green Box for Reclaim Section */}
+                  <div className="bg-gradient-to-br from-cyan-500/90 via-teal-500/90 to-emerald-500/90 border-2 border-cyan-400 rounded-2xl p-6 md:p-8 mb-6 shadow-xl">
+                    <p className="text-base md:text-lg text-white font-semibold text-center mb-6">
+                      That means Kull can help you reclaim <span className="text-white font-black text-xl md:text-2xl">{weeksReclaimed} weeks</span> you could be spending time with family or doing your actual creative work you love!
+                    </p>
+                    <div className="pt-6 border-t border-white/30">
+                      <p className="text-sm md:text-base text-white/95 leading-relaxed text-center">
+                        Today is <span className="font-semibold text-white">{today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
+                        By the end of {today.getFullYear()}, you'll have saved <span className="font-bold text-white">${savingsByEndOfYear.toLocaleString()}</span> and
+                        gained <span className="font-bold text-white">{hoursByEndOfYear} extra hours</span> for the important part of your creative work:
+                        editing the best, in focus, shots with compositions you like, without having to manually search and find them first—they'll just automatically rise to the top.
+                      </p>
                     </div>
                   </div>
 
@@ -482,10 +523,23 @@ export function ProblemSection() {
 
                   <Button
                     size="lg"
-                    className="w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black bg-gradient-to-r from-[hsl(25,80%,30%)] via-destructive to-white hover:from-[hsl(25,85%,35%)] hover:via-[hsl(25,85%,60%)] hover:to-white text-[hsl(25,80%,15%)] px-4 py-4 shadow-xl shadow-destructive/30 transition-all duration-300 border-2 border-[hsl(25,85%,60%)] hover:border-[hsl(25,90%,70%)] hover:scale-105"
+                    onMouseEnter={() => setIsBottomButtonHovered(true)}
+                    onMouseLeave={() => setIsBottomButtonHovered(false)}
+                    className={`w-full h-auto min-h-[4rem] rounded-3xl text-base md:text-lg font-black px-4 py-4 shadow-xl transition-all duration-300 border-2 transform-gpu relative overflow-hidden ${
+                      isBottomButtonHovered
+                        ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-dance-tilt'
+                        : 'bg-gradient-to-r from-cyan-600 via-teal-500 to-emerald-600 text-white border-cyan-400 shadow-cyan-500/30 hover:scale-105'
+                    }`}
+                    style={isBottomButtonHovered ? {
+                      backgroundSize: '200% 100%',
+                      animation: 'shimmer 2s infinite linear, dance-tilt 1s ease-in-out infinite'
+                    } : {}}
                     onClick={() => window.location.href = "/api/login"}
                   >
-                    <span className="break-words leading-snug text-center">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                    <span className="break-words leading-snug text-center relative z-10">Start Your Free Trial Now to Save ${totalCostPerYear.toLocaleString()}/yr</span>
+                    {isBottomButtonHovered && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine" />
+                    )}
                   </Button>
                   <p className="text-center mt-4 text-lg font-semibold text-muted-foreground">
                     Reclaim <span className="text-foreground font-bold">{weeksReclaimed} entire workweeks</span> × <span className="text-foreground font-bold">{Math.round(totalHoursPerYear).toLocaleString()} billable hours</span> this year!

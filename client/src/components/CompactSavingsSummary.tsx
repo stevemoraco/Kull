@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
+import { Shield, Download } from "lucide-react";
 import { useCalculator } from "@/contexts/CalculatorContext";
 import { useState, useRef, MouseEvent } from "react";
 
 export function CompactSavingsSummary() {
   // Get real-time values from calculator context
-  const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted } = useCalculator();
+  const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = useCalculator();
   const teamSize = 1;
 
   // Simple hover effect
@@ -45,26 +45,34 @@ export function CompactSavingsSummary() {
 
   const headerText = hasManuallyAdjusted
     ? "Culling manually is wasting your most precious productive hours. Instead you could save..."
-    : "The Average Kull Customer Saves...";
+    : hasClickedPreset
+    ? "You could be saving as much as..."
+    : "The average Kull customer saves...";
 
   return (
-    <div className="max-w-4xl mx-auto mt-16 px-4">
+    <div className="max-w-4xl mx-auto mt-16 px-4 pb-8">
       <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`relative bg-gradient-to-br from-black via-[hsl(180,95%,15%)] to-[hsl(180,85%,35%)] border-4 rounded-2xl shadow-2xl cursor-pointer transition-all duration-300 ${
-          isHovered
-            ? 'shadow-[0_35px_100px_-15px_hsl(180,70%,45%)] border-primary scale-105'
-            : 'shadow-primary/40 border-[hsl(180,70%,45%)] scale-100'
-        }`}
+        className="relative border-4 rounded-2xl cursor-pointer overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgb(0, 0, 0) 0%, hsl(180, 95%, 15%) 30%, hsl(180, 85%, 35%) 60%, rgb(6, 182, 212) 60%, rgb(45, 212, 191) 80%, rgb(16, 185, 129) 100%)',
+          backgroundSize: '400% 400%',
+          backgroundPosition: isHovered ? '100% 100%' : '0% 0%',
+          animation: isHovered ? 'gradientPulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' : 'none',
+          transition: 'background-position 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), box-shadow 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), border-color 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)',
+          boxShadow: isHovered
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            : '0 10px 30px -5px rgba(0, 0, 0, 0.4)',
+          borderColor: isHovered ? 'rgb(103, 232, 249)' : 'hsl(180, 70%, 45%)'
+        }}
       >
         {/* Inner gradient overlays for intense depth */}
-        <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-300 ${
-          isHovered ? 'bg-gradient-to-t from-black/60 to-transparent' : 'bg-gradient-to-t from-black/50 to-transparent'
+        <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-all duration-500 ${
+          isHovered ? 'bg-gradient-to-t from-cyan-700/30 to-transparent' : 'bg-gradient-to-t from-black/50 to-transparent'
         }`} />
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/10 to-transparent rounded-2xl pointer-events-none" />
-        <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-opacity duration-300 ${
-          isHovered ? 'bg-gradient-to-br from-white/10 via-transparent to-primary/20 opacity-100' : 'opacity-0'
+        <div className={`absolute inset-0 rounded-2xl pointer-events-none transition-all duration-500 ${
+          isHovered ? 'bg-gradient-to-br from-white/20 via-transparent to-emerald-400/20' : 'bg-gradient-to-br from-transparent via-primary/10 to-transparent'
         }`} />
 
         {/* Responsive layout: flex column on mobile, row on desktop */}
@@ -72,12 +80,13 @@ export function CompactSavingsSummary() {
           {/* Kull Logo - Top on mobile, Left square section on desktop */}
           <div className="flex flex-col items-center md:items-start md:justify-center md:w-[30%] p-6 md:p-8 gap-3 md:min-h-full">
             <div className="flex flex-col items-center gap-3">
-              <div className={`relative w-32 h-32 md:w-full md:h-auto md:aspect-square md:max-w-[200px] rounded-3xl bg-white border-2 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+              <div className={`relative w-32 h-32 md:w-full md:h-auto md:aspect-square md:max-w-[200px] bg-white border-2 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                 isButtonHovered
                   ? 'border-white scale-105'
                   : 'border-primary/40 shadow-lg shadow-black/50'
-              }`}>
-                <img src="/kull-logo.png" alt="Kull" className="w-11/12 h-11/12 rounded-2xl" />
+              }`}
+              style={{ borderRadius: '22.37%' }}>
+                <img src="/kull-logo.png" alt="Kull" className="w-11/12 h-11/12" style={{ borderRadius: '20%' }} />
               </div>
               <p className="text-white text-base font-semibold tracking-wide">Kull</p>
             </div>
@@ -133,9 +142,21 @@ export function CompactSavingsSummary() {
               onMouseEnter={() => setIsButtonHovered(true)}
               onMouseLeave={() => setIsButtonHovered(false)}
               size="lg"
-              className="w-full sm:w-auto rounded-3xl bg-gradient-to-r from-[hsl(180,70%,35%)] via-primary to-white hover:from-[hsl(180,75%,40%)] hover:via-[hsl(180,75%,50%)] hover:to-white text-[hsl(180,70%,15%)] font-black text-base px-6 py-4 shadow-xl shadow-primary/30 transition-all duration-300 border-2 border-[hsl(180,80%,60%)] hover:border-[hsl(180,90%,70%)] hover:scale-105 transform-gpu"
+              className={`w-full sm:w-auto rounded-3xl font-black text-base px-6 py-4 shadow-xl transition-all duration-300 border-2 hover:scale-105 transform-gpu relative overflow-hidden ${
+                isButtonHovered
+                  ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-amber-900 border-amber-300 shadow-amber-500/50 animate-shimmer'
+                  : 'bg-gradient-to-r from-[hsl(180,70%,35%)] via-primary to-white text-[hsl(180,70%,15%)] border-[hsl(180,80%,60%)] shadow-black/30'
+              }`}
+              style={isButtonHovered ? {
+                backgroundSize: '200% 100%',
+                animation: 'shimmer 2s infinite linear'
+              } : {}}
             >
-              ⚡ Start Free Trial — Save ${totalCostPerYear.toLocaleString()}/yr now
+              <Download className="w-5 h-5 mr-2 inline-block relative z-10" />
+              <span className="relative z-10">Download Kull Free</span>
+              {isButtonHovered && (
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine" />
+              )}
             </Button>
           </div>
         </div>

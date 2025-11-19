@@ -433,7 +433,7 @@ export function FinalCTA() {
                   At your next shoot on {formattedDate},
                 </p>
                 <p className="text-xs text-foreground/70 uppercase tracking-wide mb-3">
-                  here's how your editing and post-processing experience will be different:
+                  Here's how your editing and post-processing experience will be different:
                 </p>
 
                 {/* Comparison: Without Kull vs With Kull */}

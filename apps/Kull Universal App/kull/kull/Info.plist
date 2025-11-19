@@ -4,7 +4,7 @@
 <dict>
 	<!-- App Metadata -->
 	<key>CFBundleDisplayName</key>
-	<string>Kull</string>
+	<string>Kull iOS App</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundleIdentifier</key>
