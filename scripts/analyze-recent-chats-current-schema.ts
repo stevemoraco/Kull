@@ -22,6 +22,8 @@ async function analyzeRecentChats() {
       scriptStep: chatSessions.scriptStep,
       updatedAt: chatSessions.updatedAt,
       title: chatSessions.title,
+      lastQuickReplies: chatSessions.lastQuickReplies,
+      lastNextMessageSeconds: chatSessions.lastNextMessageSeconds,
     })
     .from(chatSessions)
     .where(gte(chatSessions.updatedAt, twoHoursAgo))
@@ -41,6 +43,8 @@ async function analyzeRecentChats() {
     usedPreviousAnswers: 0,
     askedWithoutContext: 0,
     totalQuestions: 0,
+    sessionsWithQuickReplies: 0,
+    sessionsWithTimingValue: 0,
   };
 
   const examples = {
@@ -59,6 +63,16 @@ async function analyzeRecentChats() {
     console.log(`   Updated: ${new Date(session.updatedAt).toLocaleTimeString()}`);
     console.log(`   Script Step: ${session.scriptStep || 1}`);
     console.log(`   Messages: ${messages.length} total (${assistantMessages.length} AI, ${userMessages.length} user)`);
+
+    // Check Quick Replies persistence
+    if (session.lastQuickReplies && session.lastQuickReplies.length > 0) {
+      issues.sessionsWithQuickReplies++;
+      console.log(`   Quick Replies: ${session.lastQuickReplies.length} options`);
+    }
+    if (session.lastNextMessageSeconds !== null && session.lastNextMessageSeconds !== undefined) {
+      issues.sessionsWithTimingValue++;
+      console.log(`   Timing: ${session.lastNextMessageSeconds} seconds`);
+    }
     console.log('─'.repeat(80));
 
     // Check script progression
@@ -205,6 +219,10 @@ async function analyzeRecentChats() {
     });
   }
 
+  console.log('\n**Quick Replies Persistence:**');
+  console.log(`  - Sessions with Quick Replies: ${issues.sessionsWithQuickReplies} of ${sessions.length} (${Math.round(issues.sessionsWithQuickReplies / sessions.length * 100)}%)`);
+  console.log(`  - Sessions with timing value: ${issues.sessionsWithTimingValue} of ${sessions.length} (${Math.round(issues.sessionsWithTimingValue / sessions.length * 100)}%)`);
+
   console.log('\n' + '═'.repeat(80));
   console.log('\n🎯 KEY INSIGHTS:\n');
 
@@ -222,6 +240,14 @@ async function analyzeRecentChats() {
 
   if (issues.workedActivityIntoScript / Math.max(issues.respondedToActivity, 1) > 0.7) {
     console.log('  ✅ GOOD: 70%+ of activity responses integrated into script');
+  }
+
+  if (issues.sessionsWithQuickReplies === sessions.length) {
+    console.log('  ✅ GOOD: 100% of sessions have Quick Replies persisted');
+  } else if (issues.sessionsWithQuickReplies > 0) {
+    console.log(`  ⚠️  PARTIAL: Only ${Math.round(issues.sessionsWithQuickReplies / sessions.length * 100)}% of sessions have Quick Replies persisted`);
+  } else {
+    console.log('  🚨 CRITICAL: No sessions have Quick Replies persisted - persistence not working');
   }
 
   console.log('\n✅ Analysis complete\n');

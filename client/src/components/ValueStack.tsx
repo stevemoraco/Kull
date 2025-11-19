@@ -61,50 +61,50 @@ export function ValueStack() {
   const coreFeatures = [
     {
       icon: Cpu,
-      title: "Your Choice of&nbsp;AI",
-      description: "Freedom to use ONLY the model(s) YOU prefer or on-device local AI to cull images for&nbsp;you",
+      title: "Your Choice of AI",
+      description: "Freedom to use ONLY the model(s) YOU prefer or on-device local AI to cull images for you",
       color: "from-purple-500 to-pink-500"
     },
     {
       icon: Star,
-      title: "Smart&nbsp;Ratings",
-      description: "Real-time 1-5 star ratings, titles, descriptions, tags, and&nbsp;color-coding",
+      title: "Smart Ratings",
+      description: "Real-time 1-5 star ratings, titles, descriptions, tags, and color-coding",
       color: "from-amber-500 to-orange-500"
     },
     {
       icon: Zap,
-      title: "No Rate&nbsp;Limits",
-      description: "Process unlimited photos without throttling or&nbsp;waiting",
+      title: "No Rate Limits",
+      description: "Process unlimited photos without throttling or waiting",
       color: "from-yellow-500 to-amber-500"
     },
     {
       icon: MonitorSmartphone,
-      title: "Universal Mac&nbsp;App",
-      description: "Works with any folder on your Mac&nbsp;- no library imports&nbsp;needed",
+      title: "Universal Mac App",
+      description: "Works with any folder on your Mac - no library imports needed",
       color: "from-blue-500 to-cyan-500"
     },
     {
       icon: Smartphone,
-      title: "Mobile&nbsp;Companion",
-      description: "iPhone &amp; iPad companion apps for on-the-go&nbsp;organization",
+      title: "Mobile Companion",
+      description: "iPhone &amp; iPad companion apps for on-the-go organization",
       color: "from-teal-500 to-emerald-500"
     },
     {
       icon: RefreshCw,
-      title: "Auto&nbsp;Sync",
-      description: "Automatic sync across all your devices in&nbsp;real-time",
+      title: "Auto Sync",
+      description: "Automatic sync across all your devices in real-time",
       color: "from-green-500 to-teal-500"
     },
     {
       icon: TrendingUp,
-      title: "Priority&nbsp;Queue",
-      description: "Priority processing queue for faster results when you need&nbsp;them",
+      title: "Priority Queue",
+      description: "Priority processing queue for faster results when you need them",
       color: "from-cyan-500 to-blue-500"
     },
     {
       icon: Lock,
-      title: "Always&nbsp;Updated",
-      description: "Regular AI model updates and improvements&nbsp;- always the latest&nbsp;tech",
+      title: "Always Updated",
+      description: "Regular AI model updates and improvements - always the latest tech",
       color: "from-indigo-500 to-purple-500"
     }
   ];
@@ -112,26 +112,26 @@ export function ValueStack() {
   const bonuses = [
     {
       icon: Filter,
-      title: "Advanced&nbsp;Filtering",
-      description: "Advanced filtering and batch processing for power&nbsp;users",
+      title: "Advanced Filtering",
+      description: "Advanced filtering and batch processing for power users",
       color: "from-rose-500 to-pink-500"
     },
     {
       icon: Sliders,
-      title: "Custom&nbsp;Presets",
-      description: "Custom rating presets for different shoot types (weddings, portraits,&nbsp;etc.)",
+      title: "Custom Presets",
+      description: "Custom rating presets for different shoot types (weddings, portraits, etc.)",
       color: "from-fuchsia-500 to-purple-500"
     },
     {
       icon: Eye,
-      title: "AI&nbsp;Insights",
-      description: "Detailed AI insights and composition analysis for every&nbsp;photo",
+      title: "AI Insights",
+      description: "Detailed AI insights and composition analysis for every photo",
       color: "from-violet-500 to-indigo-500"
     },
     {
       icon: FileOutput,
-      title: "Universal&nbsp;Export",
-      description: "Export ratings to any catalog format (Lightroom, Capture&nbsp;One, etc.)",
+      title: "Universal Export",
+      description: "Export ratings to any catalog format (Lightroom, Capture One, etc.)",
       color: "from-blue-500 to-cyan-500"
     }
   ];
@@ -146,10 +146,10 @@ export function ValueStack() {
       <div className="relative z-10 max-w-4xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-white" data-testid="text-value-headline">
-            Everything You Get With&nbsp;Kull
+            Everything You Get With Kull
           </h2>
           <p className="text-lg md:text-xl text-cyan-100/80">
-            A complete AI-powered photo rating system that saves you hundreds of&nbsp;hours
+            A complete AI-powered photo rating system that saves you hundreds of hours
           </p>
         </div>
 
@@ -174,7 +174,7 @@ export function ValueStack() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center shadow-lg">
               <Gift className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-2xl md:text-3xl font-bold text-white">Bonus Features <span className="text-emerald-400">(Included&nbsp;Free)</span></h3>
+            <h3 className="text-2xl md:text-3xl font-bold text-white">Bonus Features <span className="text-emerald-400">(Included Free)</span></h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {bonuses.map((feature, index) => (
@@ -185,23 +185,23 @@ export function ValueStack() {
 
         {/* Total value */}
         <div className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-sm border border-cyan-400/30 rounded-xl p-6 mb-8 text-center shadow-xl shadow-cyan-500/5">
-          <p className="text-sm text-cyan-300/70 mb-2 font-semibold tracking-wide">TOTAL&nbsp;VALUE</p>
+          <p className="text-sm text-cyan-300/70 mb-2 font-semibold tracking-wide">TOTAL VALUE</p>
           <p className="text-3xl md:text-4xl font-bold text-white mb-2">
             <span className="line-through text-cyan-100/40">$2,400/year</span>
-            <span className="text-cyan-400 ml-4">Starting at&nbsp;$99/mo</span>
+            <span className="text-cyan-400 ml-4">Starting at $99/mo</span>
           </p>
-          <p className="text-sm text-cyan-200/70">Save 200+&nbsp;hours&nbsp;annually</p>
+          <p className="text-sm text-cyan-200/70">Save 200+ hours annually</p>
         </div>
 
         {/* Risk reversal */}
         <div className="bg-gradient-to-br from-emerald-900/30 to-teal-900/30 backdrop-blur-sm border border-emerald-400/30 rounded-xl p-6 text-center shadow-xl shadow-emerald-500/5">
           <div className="flex items-center justify-center gap-3 mb-3">
             <Shield className="w-6 h-6 text-emerald-400" />
-            <h4 className="font-bold text-lg text-white">Zero Risk&nbsp;Guarantee</h4>
+            <h4 className="font-bold text-lg text-white">Zero Risk Guarantee</h4>
           </div>
           <p className="text-emerald-100/80 leading-relaxed">
-            Start with a <strong className="text-white">1-day unlimited free&nbsp;trial</strong>.
-            Cancel anytime&mdash;no questions&nbsp;asked.
+            Start with a <strong className="text-white">1-day unlimited free trial</strong>.
+            Cancel anytime&mdash;no questions asked.
           </p>
         </div>
 

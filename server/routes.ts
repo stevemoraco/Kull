@@ -997,6 +997,49 @@ ${userActivity.map((event: any, idx: number) => {
       // Get current step from conversation state
       const currentStep = conversationState?.currentStep || 1;
 
+      // Detect user activity type and inject activity template
+      let activityPrompt = '';
+      if (userActivity && userActivity.length > 0 && enrichedCalculatorData) {
+        const { detectActivityType, getActivityDescription } = await import('./activityDetector');
+        const { getActivityTemplate, fillTemplateVariables } = await import('./activityTemplates');
+
+        const activityType = detectActivityType(userActivity);
+
+        if (activityType) {
+          const template = getActivityTemplate(currentStep, activityType);
+
+          if (template) {
+            // Fill template with calculator data
+            const filledTemplate = fillTemplateVariables(template, {
+              annualShoots: enrichedCalculatorData.annualShoots,
+              hoursPerShoot: enrichedCalculatorData.hoursPerShoot,
+              billableRate: enrichedCalculatorData.billableRate,
+              annualCost: enrichedCalculatorData.annualCost,
+            });
+
+            activityPrompt = `\n\n## 🎯 ACTIVITY-AWARE RESPONSE SUGGESTION
+
+User is currently ${getActivityDescription(activityType)}.
+
+**SUGGESTED RESPONSE (weaves activity into script):**
+"${filledTemplate}"
+
+Use this template or a natural variation that:
+1. Acknowledges their ${activityType} activity
+2. Transitions smoothly to the Step ${currentStep} script question
+3. Maintains your casual, friendly tone
+
+**CRITICAL:** If you mention their activity, you MUST also ask the script question. Don't just comment on activity alone.
+`;
+
+            // Add activity prompt to userActivityMarkdown
+            userActivityMarkdown += activityPrompt;
+
+            console.log(`[Activity Integration] Detected ${activityType} activity, suggesting template for Step ${currentStep}`);
+          }
+        }
+      }
+
       // getChatResponseStream will send its own status updates:
       // - 🗂️ loading codebase...
       // - ✅ codebase loaded (Xms)
@@ -1110,7 +1153,14 @@ ${userActivity.map((event: any, idx: number) => {
         const hasUnicodeMarker = fullResponse.includes('␞');
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
-          console.error('[Chat] ⚠️  Missing metadata - FUQ:', hasFollowUpQuestions, 'NM:', hasNextMessage);
+          console.error('[Chat] 🚨 CRITICAL ERROR: AI response missing required metadata!');
+          console.error('[Chat]   - QUICK_REPLIES present:', hasFollowUpQuestions);
+          console.error('[Chat]   - NEXT_MESSAGE present:', hasNextMessage);
+          console.error('[Chat]   - Unicode marker present:', hasUnicodeMarker);
+          console.error('[Chat]   - Last 200 chars of response:', fullResponse.slice(-200));
+          console.error('[Chat] ⚠️  User will see NO suggested replies for this message!');
+        } else {
+          console.log('[Chat] ✅ Response includes QUICK_REPLIES and NEXT_MESSAGE');
         }
 
         // Signal completion
@@ -1141,6 +1191,69 @@ ${userActivity.map((event: any, idx: number) => {
           } catch (cacheError) {
             console.error('[QuestionCache] Error during post-response validation:', cacheError);
             // Don't fail the request if cache fails
+          }
+
+          // Validate activity integration
+          try {
+            const { validateActivityIntegration } = await import('./activityDetector');
+            const hadActivityDetected = activityPrompt.length > 0;
+
+            if (!validateActivityIntegration(fullResponse, hadActivityDetected)) {
+              console.warn(`[Activity Integration] ❌ Response mentioned activity without script question`);
+              // Log for monitoring but don't block response
+            } else if (hadActivityDetected) {
+              console.log(`[Activity Integration] ✅ Successfully integrated activity into script`);
+            }
+          } catch (validationError) {
+            console.error('[Activity Integration] Error during validation:', validationError);
+            // Don't fail the request if validation fails
+          }
+
+          // Comprehensive response validation
+          try {
+            const { validateResponse } = await import('./responseValidator');
+
+            const validation = validateResponse(
+              fullResponse,
+              history || [],
+              currentStep,
+              userActivity,
+              enrichedCalculatorData
+            );
+
+            if (!validation.valid) {
+              console.warn(`[Validation] ⚠️  Issues detected (${validation.severity}):`, validation.issues);
+
+              // Log specific issues
+              validation.issues.forEach(issue => {
+                if (issue.startsWith('REPEATED_QUESTION')) {
+                  console.warn(`  🔄 ${issue}`);
+                } else if (issue.startsWith('ACTIVITY_WITHOUT_SCRIPT')) {
+                  console.warn(`  🎯 ${issue}`);
+                } else if (issue.startsWith('OFF_SCRIPT')) {
+                  console.warn(`  📋 ${issue}`);
+                } else if (issue.startsWith('LOW_CONTEXT_USAGE')) {
+                  console.warn(`  🧠 ${issue}`);
+                }
+              });
+
+              // TODO: Save validation issues to database for admin dashboard
+              // await db.insert(validationLogs).values({
+              //   sessionId,
+              //   response: fullResponse,
+              //   issues: validation.issues,
+              //   severity: validation.severity,
+              //   timestamp: new Date(),
+              // });
+            } else {
+              console.log(`[Validation] ✅ Response passed all checks`);
+            }
+
+            // Log metrics for tracking
+            console.log(`[Validation Metrics] Repeated: ${validation.metrics.hasRepeatedQuestion}, ActivityScript: ${!validation.metrics.hasActivityWithoutScript}, OnScript: ${!validation.metrics.isOffScript}, Context: ${validation.metrics.usesContext}`);
+          } catch (validationError) {
+            console.error('[Validation] Error during response validation:', validationError);
+            // Don't fail the request if validation fails
           }
         }
 
@@ -1747,11 +1860,28 @@ You have access to:
 - ONLY use URLs that exist in the GitHub repository code - NEVER invent or make up URLs
 - Extract real URLs from the repository content, routes, and HTML files
 
-**REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP):**
+**URL NAVIGATION (CRITICAL):**
+
+You can SEND USERS TO ANY PAGE on the site by including markdown links in your response.
+- When you include a markdown link like [click here to see pricing](/pricing), the user will be AUTOMATICALLY redirected to that page
+- Use this to guide users through the site as part of the conversation
+- Available pages you can link to:
+  * [calculator](/calculator) or /#calculator - scroll to calculator on homepage
+  * [pricing](/pricing) - pricing page
+  * [features](/features) - features page
+  * [testimonials](/testimonials) - testimonials/case studies
+  * [login](/api/login) - sign in page
+  * ANY other page on the site - just link it
+
+Example usage: "want to see what others are saying? [check out these case studies](/testimonials)"
+
+**🚨 REQUIRED ENDING (ABSOLUTELY CRITICAL - DO NOT SKIP) 🚨**
 You MUST ALWAYS end EVERY response with these EXACT TWO lines:
 
 ␞QUICK_REPLIES: question1 | question2 | question3 | question4
 ␞NEXT_MESSAGE: X
+
+**IF YOU FORGET THESE, THE USER WILL SEE NO SUGGESTED REPLIES AND THE CHAT WILL BREAK!**
 
 CRITICAL REQUIREMENTS:
 - Start each line with the exact character "␞" (Unicode U+241E) - NO EXCEPTIONS
@@ -1761,8 +1891,8 @@ CRITICAL REQUIREMENTS:
 - Format them as if the user is typing them: "How does X work?" NOT "How many X do you have?"
 - Make them actionable queries the user can click to learn more from you
 - Each question must be 5-15 words, natural, and directly relevant to their current activity
-- NEXT_MESSAGE = seconds until your next message (20-60 recommended based on engagement level)
-- These lines are NOT optional - EVERY response must include them
+- NEXT_MESSAGE = seconds until your next message (5-500 seconds, adjust based on engagement level)
+- **THESE LINES ARE MANDATORY IN EVERY SINGLE RESPONSE - NO EXCEPTIONS EVER!**
 
 CORRECT EXAMPLE - Questions user asks YOU:
 Your 1-2 sentence message here...
@@ -1987,7 +2117,14 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         const hasUnicodeMarker = fullResponse.includes('␞');
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
-          console.error('[Welcome] ⚠️  Missing metadata - FUQ:', hasFollowUpQuestions, 'NM:', hasNextMessage);
+          console.error('[Welcome] 🚨 CRITICAL ERROR: AI response missing required metadata!');
+          console.error('[Welcome]   - QUICK_REPLIES present:', hasFollowUpQuestions);
+          console.error('[Welcome]   - NEXT_MESSAGE present:', hasNextMessage);
+          console.error('[Welcome]   - Unicode marker present:', hasUnicodeMarker);
+          console.error('[Welcome]   - Last 200 chars of response:', fullResponse.slice(-200));
+          console.error('[Welcome] ⚠️  User will see NO suggested replies for this message!');
+        } else {
+          console.log('[Welcome] ✅ Response includes QUICK_REPLIES and NEXT_MESSAGE');
         }
 
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
@@ -2220,6 +2357,8 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
           state: metadata?.state || null,
           country: metadata?.country || null,
           calculatorData: calculatorData || session.calculatorData || null,
+          lastQuickReplies: session.lastQuickReplies || null,
+          lastNextMessageSeconds: session.lastNextMessageSeconds || null,
           createdAt: new Date(session.createdAt),
           updatedAt: new Date(session.updatedAt),
         };

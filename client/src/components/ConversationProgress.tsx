@@ -149,71 +149,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
             </div>
           )}
 
-          {/* Next 2 upcoming questions */}
-          {upcomingQuestions.length > 0 && (
-            <div className="space-y-1.5">
-              {upcomingQuestions.map((q, index) => (
-                <div
-                  key={`preview-${q.step}`}
-                  className="bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg p-2.5 opacity-70"
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <ChevronRight className="w-4 h-4 text-white/70" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-white border-l-2 border-white/40 pl-2">
-                        {index === 0 ? 'Next: ' : 'Coming soon: '}
-                        {q.question}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Remaining questions (collapsible) */}
-          {remainingCount > 0 && (
-            <div className="mt-2">
-              <button
-                onClick={() => setShowUpcoming(!showUpcoming)}
-                className="w-full flex items-center justify-between p-2 bg-white rounded-lg hover:bg-gray-50 transition-colors duration-200"
-              >
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Circle className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="font-medium">
-                    {remainingCount} more question{remainingCount !== 1 ? 's' : ''}...
-                  </span>
-                </div>
-                {showUpcoming ? (
-                  <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                )}
-              </button>
-
-              {showUpcoming && remainingQuestions.length > 0 && (
-                <div className="mt-1.5 space-y-1.5 max-h-48 overflow-y-auto overflow-x-hidden bg-white border border-gray-200 rounded-lg p-2">
-                  {remainingQuestions.map((q, index) => (
-                    <div
-                      key={`upcoming-${q.step}`}
-                      className="bg-gradient-to-r from-gray-300 to-gray-400 rounded-lg p-2.5"
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="flex-shrink-0 mt-0.5">
-                          <div className="w-4 h-4 rounded-full border-2 border-white/60 flex items-center justify-center">
-                            <span className="text-xs text-white font-semibold">{q.step}</span>
-                          </div>
-                        </div>
-                        <p className="text-xs text-white">{q.question}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Future questions hidden - user should not see what's coming */}
 
           {/* Empty state */}
           {questionsAnswered.length === 0 && !currentQuestion && (

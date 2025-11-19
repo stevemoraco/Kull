@@ -67,8 +67,8 @@ export function ProblemSection() {
   const problems = [
     {
       icon: Clock,
-      title: "Hours Wasted on Manual&nbsp;Rating",
-      description: "Spending hours sorting through thousands of photos from a single&nbsp;shoot"
+      title: "Hours Wasted on Manual Rating",
+      description: "Spending hours sorting through thousands of photos from a single shoot"
     },
     {
       icon: Eye,
@@ -77,13 +77,13 @@ export function ProblemSection() {
     },
     {
       icon: Frown,
-      title: "Delayed&nbsp;Deliveries",
-      description: "Clients waiting days or weeks for their photos because culling takes&nbsp;forever"
+      title: "Delayed Deliveries",
+      description: "Clients waiting days or weeks for their photos because culling takes forever"
     },
     {
       icon: XCircle,
-      title: "Missing&nbsp;Revenue",
-      description: "Can't take on more clients because you're stuck in the editing workflow&nbsp;bottleneck"
+      title: "Missing Revenue",
+      description: "Can't take on more clients because you're stuck in the editing workflow bottleneck"
     }
   ];
 
@@ -114,9 +114,9 @@ export function ProblemSection() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 text-foreground" data-testid="text-problem-headline">
-            The Photo Rating&nbsp;Nightmare
+            The Photo Rating Nightmare
             <br />
-            Every Photographer&nbsp;Knows
+            Every Photographer Knows
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
             You love capturing moments, not spending hours staring at thumbnails deciding which shots make the cut.
@@ -157,10 +157,10 @@ export function ProblemSection() {
                   </span>
                 </div>
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-black text-foreground mb-3 leading-tight">
-                  Manual culling is a&nbsp;pain.
+                  Manual culling is a pain.
                 </h2>
                 <p className="text-xl md:text-2xl text-muted-foreground">
-                  Why waste another minute of your time &amp;&nbsp;your&nbsp;creativity?
+                  Why waste another minute of your time & your creativity?
                 </p>
               </div>
 

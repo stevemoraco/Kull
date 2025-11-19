@@ -100,7 +100,7 @@ export function addQuestion(sessionId: string, question: string): void {
     normalized,
   });
 
-  console.log(`[QuestionCache] Added question for session ${sessionId}: "${question.substring(0, 80)}..."`);
+  console.log(`[QuestionCache] Added question, total: ${questions.length} for session ${sessionId.substring(0, 8)}...`);
 }
 
 /**

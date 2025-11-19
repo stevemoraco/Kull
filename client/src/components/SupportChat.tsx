@@ -1397,22 +1397,11 @@ export function SupportChat() {
             setLastParsedNextMessage(nextMsgSeconds);
           }
 
-          // Parse and display follow-up questions
-          if (followUpMatch) {
-            const questionsText = followUpMatch[1].trim();
-            const newQuestions = questionsText
-              .split('|')
-              .map((q: string) => q.trim())
-              // Remove any trailing metadata that slipped through
-              .map((q: string) => q.replace(/␞.*$/, '').replace(/NEXT_MESSAGE.*$/i, '').trim())
-              .filter((q: string) => q.length > 5 && q.length < 200);
-
-            if (newQuestions.length > 0) {
-              setQuickQuestions(newQuestions);
-              setShowSuggestions(true);
-              setLastParsedQuickReplies(newQuestions);
-            }
-          }
+          // 🚨 DON'T parse quick replies from welcome messages - they're different type (questions vs answers)
+          // Welcome messages have QUESTIONS user can ask AI ("How does pricing work?")
+          // Sales chat has ANSWERS user can give AI ("150 shoots", "yes", "not sure")
+          // Only the sales chat endpoint should update quick replies
+          console.log('[Chat] Welcome message generated - NOT updating quick replies (preserving sales chat answers)');
 
           if (!currentGreetingGenerated) {
             // First generation: store for initial greeting
@@ -2088,29 +2077,64 @@ export function SupportChat() {
                   playCyberpunkDing();
                 }
 
-                // Final cleanup - check for metadata one last time
-                if (!cutoffDetected) {
-                  // Use the same robust detection as in the stream loop
-                  const unicodeMarkerIdx = fullContent.indexOf('␞');
-                  const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
-                  const followUpMatch = fullContent.match(followUpPattern);
-                  const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
-                  const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
-                  const nextMsgMatch = fullContent.match(nextMsgPattern);
-                  const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
+                // 🚨 CRITICAL: ALWAYS parse quick replies on stream completion, even if we did it during streaming
+                // This ensures we catch them if they arrive in the final chunk
+                const unicodeMarkerIdx = fullContent.indexOf('␞');
+                const followUpPattern = /(?:\n\s*|\s+)QUICK_REPLIES:/i;
+                const followUpMatch = fullContent.match(followUpPattern);
+                const followUpIdx = followUpMatch ? followUpMatch.index! : -1;
+                const nextMsgPattern = /(?:\n\s*|\s+)NEXT_MESSAGE:/i;
+                const nextMsgMatch = fullContent.match(nextMsgPattern);
+                const nextMsgIdx = nextMsgMatch ? nextMsgMatch.index! : -1;
 
-                  const indices = [unicodeMarkerIdx, followUpIdx, nextMsgIdx].filter(idx => idx !== -1);
-                  if (indices.length > 0) {
-                    const cutoffIndex = Math.min(...indices);
-                    const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+                const indices = [unicodeMarkerIdx, followUpIdx, nextMsgIdx].filter(idx => idx !== -1);
+                if (indices.length > 0) {
+                  const cutoffIndex = Math.min(...indices);
+                  const cleanContent = fullContent.substring(0, cutoffIndex).trim();
+                  const questionsSection = fullContent.substring(cutoffIndex);
 
-                    setMessages(prev =>
-                      prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { ...msg, content: cleanContent }
-                          : msg
-                      )
-                    );
+                  // Extract quick replies from metadata section
+                  const quickRepliesMatch = questionsSection.match(/QUICK_REPLIES:\s*([^␞\n]+?)(?:\s*␞|\s*NEXT_MESSAGE|$)/i);
+                  if (quickRepliesMatch) {
+                    const questionsText = quickRepliesMatch[1].trim();
+                    const newQuestions = questionsText
+                      .split('|')
+                      .map((q: string) => q.trim())
+                      .map((q: string) => q.replace(/␞.*$/, '').replace(/NEXT_MESSAGE.*$/i, '').trim())
+                      .filter((q: string) => q.length > 5 && q.length < 200);
+
+                    if (newQuestions.length > 0) {
+                      console.log('[Chat] ✅ Parsed quick replies on stream completion:', newQuestions);
+                      flushSync(() => {
+                        setQuickQuestions(newQuestions);
+                        setShowSuggestions(true);
+                        setLastParsedQuickReplies(newQuestions);
+                      });
+                    } else {
+                      console.warn('[Chat] ⚠️  QUICK_REPLIES found but no valid questions parsed!');
+                    }
+                  } else {
+                    console.warn('[Chat] ⚠️  Stream complete but NO QUICK_REPLIES found in response!');
+                  }
+
+                  // Extract next message timing
+                  const nextMessageMatch = questionsSection.match(/(?:␞\s*)?(?:\n\n?)?NEXT_MESSAGE:\s*(\d+)/i);
+                  if (nextMessageMatch) {
+                    const nextMsgSeconds = parseInt(nextMessageMatch[1], 10);
+                    setNextMessageIn(nextMsgSeconds);
+                  }
+
+                  // Update message with clean content (remove metadata)
+                  if (!cutoffDetected) {
+                    flushSync(() => {
+                      setMessages(prev =>
+                        prev.map(msg =>
+                          msg.id === assistantMessageId
+                            ? { ...msg, content: cleanContent }
+                            : msg
+                        )
+                      );
+                    });
                   }
                 }
               }
@@ -2425,7 +2449,11 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
   };
 
   const handleSwitchSession = (sessionId: string) => {
+    console.log('[Chat] Switching to session:', sessionId);
     setCurrentSessionId(sessionId);
+
+    // Persist to localStorage so it survives page reloads
+    localStorage.setItem('kull-current-session-id', sessionId);
 
     // Reset quick replies when switching
     setQuickQuestions([
@@ -2434,6 +2462,9 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
       "How does the rating system work?",
       "Can I cancel my trial?",
     ]);
+
+    // Ensure chat stays open when switching sessions
+    setIsOpen(true);
   };
 
   const handleResetChat = () => {

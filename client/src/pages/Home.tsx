@@ -115,9 +115,9 @@ export default function Home() {
               <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                 <Download className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold mb-3 text-card-foreground">Download for&nbsp;Mac</h2>
+              <h2 className="text-2xl font-bold mb-3 text-card-foreground">Download for Mac</h2>
               <p className="text-muted-foreground mb-6">
-                Get the universal Mac app and start rating, organizing, and tagging photos from any&nbsp;folder.
+                Get the universal Mac app and start rating, organizing, and tagging photos from any folder.
               </p>
               <Button className="w-full" data-testid="button-download-dmg">
                 <Download className="w-4 h-4 mr-2" />
@@ -130,9 +130,9 @@ export default function Home() {
               <div className="w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
                 <Smartphone className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold mb-3 text-card-foreground">iPhone &amp; iPad&nbsp;Apps</h2>
+              <h2 className="text-2xl font-bold mb-3 text-card-foreground">iPhone &amp; iPad Apps</h2>
               <p className="text-muted-foreground mb-6">
-                Rate and organize photos on the go with automatic sync across all&nbsp;devices.
+                Rate and organize photos on the go with automatic sync across all devices.
               </p>
               <Button className="w-full" variant="outline" data-testid="button-download-ios">
                 <Smartphone className="w-4 h-4 mr-2" />
@@ -157,10 +157,10 @@ export default function Home() {
               <Gift className="w-8 h-8 text-primary" />
             </div>
             <h2 className="text-2xl md:text-3xl font-bold mb-3 text-foreground">
-              Refer Friends &amp; Earn&nbsp;Rewards
+              Refer Friends &amp; Earn Rewards
             </h2>
             <p className="text-muted-foreground">
-              Invite up to 10&nbsp;photographers and unlock bonuses from extra features to free&nbsp;months
+              Invite up to 10 photographers and unlock bonuses from extra features to free months
             </p>
           </div>
           <ReferralForm />
