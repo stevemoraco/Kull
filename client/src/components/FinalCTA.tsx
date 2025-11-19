@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Zap, Sparkles, Clock, Monitor, Smartphone, Tablet, HelpCircle, Shield, Star, Calendar } from "lucide-react";
+import { Zap, Sparkles, Clock, Monitor, Smartphone, Tablet, HelpCircle, Shield, Star, Calendar, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 import { CompactSavingsSummary } from "@/components/CompactSavingsSummary";
+import { useCalculator } from "@/contexts/CalculatorContext";
 
 export function FinalCTA() {
   const [nextShoot, setNextShoot] = useState<"week" | "month" | "date">("week");
@@ -9,13 +10,12 @@ export function FinalCTA() {
   const [customShootCount, setCustomShootCount] = useState("4");
   const [selectedDate, setSelectedDate] = useState("");
 
+  // Get real-time calculator values
+  const { shootsPerWeek, hoursPerShoot, billableRate } = useCalculator();
+
   const handleStartTrial = () => {
     window.location.href = "/api/login";
   };
-
-  // Default calculation values (matching ProblemSection defaults)
-  const hoursPerShoot = 1.5;
-  const billableRate = 35;
 
   // Calculate actual shoot count
   const shootCount = photosInEditing === "more"
@@ -42,6 +42,56 @@ export function FinalCTA() {
   const totalHoursSaved = shootCount * hoursPerShoot;
   const totalMoneySaved = totalHoursSaved * billableRate;
   const nextShootSavings = hoursPerShoot * billableRate;
+
+  // Format the shoot date for display
+  const getFormattedShootDate = () => {
+    let targetDate: Date;
+
+    if (nextShoot === "date" && selectedDate) {
+      targetDate = new Date(selectedDate);
+    } else {
+      // Calculate the date based on daysUntilShoot
+      targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + daysUntilShoot);
+    }
+
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric'
+    };
+
+    // Format with ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+    const day = targetDate.getDate();
+    const ordinalSuffix = (day: number) => {
+      if (day > 3 && day < 21) return 'th';
+      switch (day % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    };
+
+    const weekday = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = targetDate.toLocaleDateString('en-US', { month: 'long' });
+
+    return `${weekday}, ${month} ${day}${ordinalSuffix(day)}`;
+  };
+
+  const formattedDate = getFormattedShootDate();
+
+  // Photo processing calculations
+  const photosPerShoot = 2000;
+  const totalPhotos = shootCount * photosPerShoot;
+  const processingRatePerMinute = 30000;
+  const processingTimeSeconds = (totalPhotos / processingRatePerMinute) * 60;
+  const processingTimeDisplay = processingTimeSeconds < 60
+    ? `${Math.round(processingTimeSeconds)} seconds`
+    : `${(processingTimeSeconds / 60).toFixed(1)} minutes`;
+
+  // Single shoot processing time
+  const singleShootProcessingTime = (photosPerShoot / processingRatePerMinute) * 60; // in seconds
 
   const faqs = [
     {
@@ -327,14 +377,30 @@ export function FinalCTA() {
                 </button>
               </div>
               {photosInEditing === "more" && (
-                <input
-                  type="number"
-                  min="1"
-                  value={customShootCount}
-                  onChange={(e) => setCustomShootCount(e.target.value)}
-                  className="w-32 px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm text-center"
-                  placeholder="Enter number"
-                />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCustomShootCount(String(Math.max(4, parseInt(customShootCount) - 1)))}
+                    className="w-10 h-10 rounded-lg bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity"
+                    aria-label="Decrease count"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="4"
+                    value={customShootCount}
+                    onChange={(e) => setCustomShootCount(e.target.value)}
+                    className="w-20 px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm text-center"
+                    placeholder="4"
+                  />
+                  <button
+                    onClick={() => setCustomShootCount(String(parseInt(customShootCount) + 1))}
+                    className="w-10 h-10 rounded-lg bg-primary text-primary-foreground font-bold hover:opacity-90 transition-opacity"
+                    aria-label="Increase count"
+                  >
+                    +
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -348,26 +414,58 @@ export function FinalCTA() {
                 </p>
                 <div className="flex items-center justify-center gap-8">
                   <div>
-                    <p className="text-3xl font-black text-primary">{totalHoursSaved.toFixed(1)} hrs</p>
-                    <p className="text-xs text-muted-foreground">of your time</p>
+                    <p className="text-3xl font-black text-foreground">{totalHoursSaved.toFixed(1)} hrs</p>
+                    <p className="text-xs text-foreground/70">of your time</p>
                   </div>
                   <div>
-                    <p className="text-3xl font-black text-primary">${totalMoneySaved.toFixed(0)}</p>
-                    <p className="text-xs text-muted-foreground">in billable hours</p>
+                    <p className="text-3xl font-black text-foreground">${totalMoneySaved.toFixed(0)}</p>
+                    <p className="text-xs text-foreground/70">in billable hours</p>
                   </div>
                 </div>
+                <p className="text-sm text-foreground/80 mt-4">
+                  Your estimated <span className="font-semibold text-foreground">{totalPhotos.toLocaleString()} photos</span> will process in <span className="font-semibold text-foreground">{processingTimeDisplay}</span>
+                </p>
               </div>
             )}
-            <div className="text-center pt-4 border-t border-primary/20">
-              <p className="text-base font-semibold text-foreground mb-2">
-                Your next shoot in {daysUntilShoot} {daysUntilShoot === 1 ? 'day' : 'days'}:
-              </p>
-              <p className="text-lg text-primary font-bold">
-                Save {hoursPerShoot} hours and ${nextShootSavings.toFixed(0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Processed in <span className="text-primary font-semibold">seconds</span>, not hours. Reclaim your time.
-              </p>
+            <div className="pt-4 border-t border-primary/20 space-y-3">
+              <div className="text-center">
+                <p className="text-sm font-bold text-foreground mb-1">
+                  At your next shoot on {formattedDate},
+                </p>
+                <p className="text-xs text-foreground/70 uppercase tracking-wide mb-3">
+                  here's how your editing and post-processing experience will be different:
+                </p>
+
+                {/* Comparison: Without Kull vs With Kull */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-card/50 border border-border rounded-lg p-3">
+                    <p className="text-xs text-foreground/70 mb-1">Without Kull</p>
+                    <p className="text-2xl font-black text-foreground">{hoursPerShoot} hrs</p>
+                    <p className="text-xs text-foreground/70">Manual culling time</p>
+                  </div>
+                  <div className="bg-card/50 border border-border rounded-lg p-3">
+                    <p className="text-xs text-foreground/70 mb-1">With Kull</p>
+                    <p className="text-2xl font-black text-foreground">{Math.round(singleShootProcessingTime)}s</p>
+                    <p className="text-xs text-foreground/70">Automated processing</p>
+                  </div>
+                </div>
+
+                {/* Key insight based on their workflow */}
+                <div className="bg-card/30 border border-border/50 rounded-lg p-3 text-left">
+                  <p className="text-sm text-foreground leading-relaxed">
+                    <span className="font-bold">At your pace of {shootsPerWeek} {shootsPerWeek === 1 ? 'shoot' : 'shoots'}/week</span>,
+                    Kull will save you <span className="font-bold">{(shootsPerWeek * hoursPerShoot).toFixed(1)} hours every week</span>.
+                    That's <span className="font-bold">${(shootsPerWeek * hoursPerShoot * billableRate).toLocaleString()}/week</span> in
+                    billable time you can spend {billableRate >= 100 ? 'on high-value client work' : 'editing your best shots or with family'}.
+                  </p>
+                </div>
+
+                {/* Processing speed insight */}
+                <p className="text-xs text-foreground/80 mt-2">
+                  While you grab coffee, Kull processes 2,000 photos in <span className="font-semibold">{Math.round((2000 / 30000) * 60)} seconds</span>.
+                  Manual culling? <span className="font-semibold">{hoursPerShoot} hours</span>.
+                </p>
+              </div>
             </div>
             <div className="text-center pt-4 border-t border-primary/20">
               <p className="text-sm font-bold text-foreground flex items-center justify-center gap-2">

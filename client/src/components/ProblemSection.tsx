@@ -1,14 +1,12 @@
 import { XCircle, Clock, Eye, Frown, DollarSign, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useCalculator } from "@/contexts/CalculatorContext";
 
 export function ProblemSection() {
   const [showCalculator, setShowCalculator] = useState(false);
-  const [shootsPerWeek, setShootsPerWeek] = useState(2);
-  const [hoursPerShoot, setHoursPerShoot] = useState(1.5);
-  const [billableRate, setBillableRate] = useState(35);
+  const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, setShootsPerWeek, setHoursPerShoot, setBillableRate, setHasManuallyAdjusted } = useCalculator();
   const [teamSize, setTeamSize] = useState(1);
-  const [hasManuallyAdjusted, setHasManuallyAdjusted] = useState(false);
   const [hasBillableRateChanged, setHasBillableRateChanged] = useState(false);
 
   // Logarithmic scale for billable rate (20 to 2000)
@@ -40,6 +38,7 @@ export function ProblemSection() {
     setHoursPerShoot(1.5);
     setBillableRate(35);
     setTeamSize(1);
+    setHasManuallyAdjusted(false);
   };
 
   const applyLessPreset = () => {
@@ -47,6 +46,7 @@ export function ProblemSection() {
     setHoursPerShoot(1);
     setBillableRate(30);
     setTeamSize(1);
+    setHasManuallyAdjusted(false);
   };
 
   const applyMorePreset = () => {
@@ -54,6 +54,7 @@ export function ProblemSection() {
     setHoursPerShoot(2.5);
     setBillableRate(50);
     setTeamSize(1);
+    setHasManuallyAdjusted(false);
   };
 
   const problems = [
@@ -89,9 +90,9 @@ export function ProblemSection() {
   const today = new Date();
   const endOfYear = new Date(today.getFullYear(), 11, 31); // December 31 of current year
   const daysInYear = new Date(today.getFullYear(), 11, 31).getDate() === 31
-    ? (new Date(today.getFullYear(), 11, 31) - new Date(today.getFullYear(), 0, 1)) / (1000 * 60 * 60 * 24) + 1
+    ? (new Date(today.getFullYear(), 11, 31).getTime() - new Date(today.getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24) + 1
     : 365;
-  const daysRemaining = Math.max(0, Math.ceil((endOfYear - today) / (1000 * 60 * 60 * 24)) + 1);
+  const daysRemaining = Math.max(0, Math.ceil((endOfYear.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   const yearProgressRatio = daysRemaining / daysInYear;
   const savingsByEndOfYear = Math.round(totalCostPerYear * yearProgressRatio);
   const hoursByEndOfYear = Math.round(totalHoursPerYear * yearProgressRatio);
@@ -213,7 +214,7 @@ export function ProblemSection() {
                           <span className="inline-block">(
                           <button
                             onClick={() => document.getElementById('calculator-sliders')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                            className="font-bold text-white hover:text-white/80 underline cursor-pointer transition-colors"
+                            className="font-bold text-foreground hover:text-foreground/80 underline cursor-pointer transition-colors"
                           >
                             change the sliders
                           </button> if that's not accurate)</span>
@@ -245,7 +246,7 @@ export function ProblemSection() {
                 </div>
               </div>
 
-              <p className="text-center text-base md:text-lg font-bold text-white italic mb-4">
+              <p className="text-center text-base md:text-lg font-bold text-foreground italic mb-4">
                 How valuable is that extra time in your creative zone, or spent with your loved ones?
               </p>
 
@@ -433,7 +434,7 @@ export function ProblemSection() {
                               <span className="inline-block">(
                               <button
                                 onClick={() => document.getElementById('calculator-sliders')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                                className="font-bold text-white hover:text-white/80 underline cursor-pointer transition-colors"
+                                className="font-bold text-foreground hover:text-foreground/80 underline cursor-pointer transition-colors"
                               >
                                 change the sliders
                               </button> if that's not accurate)</span>
@@ -465,7 +466,7 @@ export function ProblemSection() {
                     </div>
                   </div>
 
-                  <p className="text-center text-base md:text-lg font-bold text-white italic mb-4">
+                  <p className="text-center text-base md:text-lg font-bold text-foreground italic mb-4">
                     How valuable is that extra time in your creative zone, or spent with your loved ones?
                   </p>
 
