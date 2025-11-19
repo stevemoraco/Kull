@@ -849,6 +849,95 @@ User's current calculator inputs:
 `;
       }
 
+      // Add section timing data
+      if (sectionHistory && sectionHistory.length > 0) {
+        // Sort sections by total time spent (descending)
+        const sortedSections = [...sectionHistory].sort((a, b) => b.totalTimeSpent - a.totalTimeSpent);
+
+        // Format time in minutes and seconds
+        const formatTime = (ms: number): string => {
+          const totalSeconds = Math.floor(ms / 1000);
+          const minutes = Math.floor(totalSeconds / 60);
+          const seconds = totalSeconds % 60;
+
+          if (minutes > 0) {
+            return `${minutes}m ${seconds}s`;
+          }
+          return `${seconds}s`;
+        };
+
+        // Get top 3 sections by time spent
+        const topSections = sortedSections.slice(0, 3);
+
+        // Build section timing markdown
+        userActivityMarkdown += `\n\n## ⏱️ Section Reading Time
+
+User has spent time reading these sections (sorted by time spent):
+`;
+
+        sortedSections.forEach((section: any, idx: number) => {
+          const timeStr = formatTime(section.totalTimeSpent);
+          const isTopSection = idx < 3;
+          const marker = idx === 0 ? ' (MOST INTERESTED)' : '';
+
+          userActivityMarkdown += `${idx + 1}. **${section.title}** - ${timeStr}${marker}\n`;
+        });
+
+        // Add insights based on top section
+        if (topSections.length > 0) {
+          const topSection = topSections[0];
+          const topicMap: Record<string, string> = {
+            'calculator': 'ROI calculation and cost savings',
+            'pricing': 'pricing plans and costs',
+            'features': 'product capabilities',
+            'hero': 'the landing page (just arrived)',
+            'problem': 'pain points and challenges',
+            'value': 'the value proposition',
+            'testimonials': 'customer reviews and success stories',
+            'faq': 'frequently asked questions',
+            'cta': 'taking action / getting started',
+          };
+
+          let topicInsight = topSection.title.toLowerCase();
+          for (const [key, value] of Object.entries(topicMap)) {
+            if (topSection.id.toLowerCase().includes(key) || topSection.title.toLowerCase().includes(key)) {
+              topicInsight = value;
+              break;
+            }
+          }
+
+          userActivityMarkdown += `
+**🎯 Key Insight:** User is most interested in ${topicInsight}
+
+**💡 Recommendation:** Frame your questions around what they were reading. Examples:
+`;
+
+          // Add contextual examples based on top section
+          if (topSection.id.toLowerCase().includes('calculator')) {
+            userActivityMarkdown += `- "i see you spent ${formatTime(topSection.totalTimeSpent)} playing with the calculator - did you find your numbers?"\n`;
+            userActivityMarkdown += `- "those calculator numbers accurate for your workflow?"\n`;
+          } else if (topSection.id.toLowerCase().includes('pricing')) {
+            userActivityMarkdown += `- "noticed you were reading pricing for a while - have questions about the cost?"\n`;
+            userActivityMarkdown += `- "you spent ${formatTime(topSection.totalTimeSpent)} on pricing - want to see how it compares to what you're wasting now?"\n`;
+          } else if (topSection.id.toLowerCase().includes('feature')) {
+            userActivityMarkdown += `- "you were checking out features - which one caught your eye?"\n`;
+            userActivityMarkdown += `- "spent ${formatTime(topSection.totalTimeSpent)} reading features - what stood out?"\n`;
+          } else if (topSection.id.toLowerCase().includes('problem')) {
+            userActivityMarkdown += `- "you spent time reading about pain points - which one hits hardest for you?"\n`;
+            userActivityMarkdown += `- "those problems resonate with your workflow?"\n`;
+          } else if (topSection.id.toLowerCase().includes('testimonial')) {
+            userActivityMarkdown += `- "saw you reading testimonials - any of those stories sound familiar?"\n`;
+            userActivityMarkdown += `- "you spent ${formatTime(topSection.totalTimeSpent)} on case studies - which one matched your situation?"\n`;
+          } else {
+            userActivityMarkdown += `- "noticed you spent ${formatTime(topSection.totalTimeSpent)} reading ${topSection.title} - what caught your attention?"\n`;
+          }
+
+          userActivityMarkdown += `
+**⚠️ CRITICAL:** Reference the section they spent the most time on in your FIRST response. Show you're paying attention to what they're reading.
+`;
+        }
+      }
+
       if (userActivity && userActivity.length > 0) {
         userActivityMarkdown += `\n\n## 🖱️ User Activity History
 
@@ -1529,7 +1618,7 @@ Use this template or a natural variation that:
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
-      const { context, history, lastAiMessageTime, currentTime, sessionId, calculatorData } = req.body;
+      const { context, history, lastAiMessageTime, currentTime, sessionId, calculatorData, sectionHistory } = req.body;
 
       // Silent mode - only log errors
 

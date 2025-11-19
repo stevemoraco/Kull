@@ -6,10 +6,22 @@ import { ReferralSection } from "@/components/ReferralSection";
 import { FinalCTA } from "@/components/FinalCTA";
 import { Footer } from "@/components/Footer";
 import { SectionNav } from "@/components/SectionNav";
+import { SupportChat } from "@/components/SupportChat";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { useSectionTiming } from "@/hooks/useSectionTiming";
 
 export default function Landing() {
+  // Track section timing
+  const { timingData } = useSectionTiming([
+    'hero',
+    'problem',
+    'solution',
+    'value-stack',
+    'referrals',
+    'final-cta',
+  ]);
+
   const handleLogin = () => {
     window.location.href = "/api/login";
   };
@@ -86,20 +98,29 @@ export default function Landing() {
 
       {/* Add top padding to account for fixed nav */}
       <div className="pt-16">
-        <Hero />
-        <ProblemSection />
-        <div id="features">
+        <div data-section="hero">
+          <Hero />
+        </div>
+        <div data-section="problem">
+          <ProblemSection />
+        </div>
+        <div id="features" data-section="solution">
           <SolutionSection />
         </div>
-        <ValueStack />
-        <div id="referrals">
+        <div data-section="value-stack">
+          <ValueStack />
+        </div>
+        <div id="referrals" data-section="referrals">
           <ReferralSection />
         </div>
-        <div id="download">
+        <div id="download" data-section="final-cta">
           <FinalCTA />
         </div>
         <Footer />
       </div>
+
+      {/* Support Chat with section timing data */}
+      <SupportChat sectionTiming={timingData} />
     </div>
   );
 }

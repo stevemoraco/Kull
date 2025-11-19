@@ -397,7 +397,11 @@ function parseConversationState(messages: Message[], currentState?: Conversation
   };
 }
 
-export function SupportChat() {
+interface SupportChatProps {
+  sectionTiming?: Record<string, number>; // Section ID -> milliseconds spent
+}
+
+export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
   // Get calculator context
   const calculatorContext = useCalculator();
 
