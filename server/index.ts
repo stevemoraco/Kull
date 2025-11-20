@@ -79,9 +79,16 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await runMigrations();
+  // Bootstrap notification adapters (lightweight)
   bootstrapNotificationAdapters();
+  
+  // Register routes and create server immediately
   const server = await registerRoutes(app);
+  
+  // Run migrations asynchronously after server setup to reduce startup time
+  runMigrations().catch(err => {
+    log(`[Migrations] Database migration failed: ${err.message}`);
+  });
 
   // Setup WebSocket server
   log('[WebSocket] Setting up WebSocket server...');
@@ -137,41 +144,62 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
+  // Start the server immediately to ensure port 5000 is opened quickly
   server.listen(port, () => {
     log(`serving on port ${port}`);
-
-    // Start email processor (runs every minute)
-    startEmailProcessor();
-
-    // Initialize knowledge base cache immediately on startup (Layer 2 prompt caching)
-    log('[Knowledge Base] Initializing knowledge base cache on startup...');
-    initializeKnowledgeBase().catch(err => {
-      log(`[Knowledge Base] Initial cache load failed: ${err.message}`);
-    });
-
-    // Initialize GitHub repo cache immediately on startup
-    log('[Repo Cache] Initializing GitHub repository cache on startup...');
-    refreshRepoCache().catch(err => {
-      log(`[Repo Cache] Initial cache load failed: ${err.message}`);
-    });
-
-    // Refresh GitHub repo cache every hour
-    setInterval(() => {
-      log('[Repo Cache] Running hourly cache refresh...');
-      refreshRepoCache().catch(err => {
-        log(`[Repo Cache] Hourly refresh failed: ${err.message}`);
-      });
-    }, 60 * 60 * 1000); // 1 hour
-
-    log('[Repo Cache] Hourly cache refresh scheduled');
-
-    // Warm OpenAI prompt cache immediately on startup
-    log('[Cache Warmer] Warming OpenAI prompt cache on startup...');
-    warmPromptCache().catch(err => {
-      log(`[Cache Warmer] Initial cache warming failed: ${err.message}`);
-    });
-
-    // Start cache warming interval (every 4 minutes to keep cache hot)
-    startCacheWarmerInterval();
   });
+
+  // Run all background initialization tasks asynchronously after server starts
+  // This prevents blocking the server startup
+  Promise.all([
+    // Initialize knowledge base cache (Layer 2 prompt caching)
+    (async () => {
+      log('[Knowledge Base] Initializing knowledge base cache on startup...');
+      try {
+        await initializeKnowledgeBase();
+      } catch (err: any) {
+        log(`[Knowledge Base] Initial cache load failed: ${err.message}`);
+      }
+    })(),
+
+    // Initialize GitHub repo cache
+    (async () => {
+      log('[Repo Cache] Initializing GitHub repository cache on startup...');
+      try {
+        await refreshRepoCache();
+      } catch (err: any) {
+        log(`[Repo Cache] Initial cache load failed: ${err.message}`);
+      }
+    })(),
+
+    // Warm OpenAI prompt cache
+    (async () => {
+      log('[Cache Warmer] Warming OpenAI prompt cache on startup...');
+      try {
+        await warmPromptCache();
+      } catch (err: any) {
+        log(`[Cache Warmer] Initial cache warming failed: ${err.message}`);
+      }
+    })()
+  ]).then(() => {
+    log('[Initialization] All background tasks completed');
+  }).catch(err => {
+    log(`[Initialization] Some background tasks failed: ${err.message}`);
+  });
+
+  // Start email processor (runs every minute)
+  startEmailProcessor();
+
+  // Set up hourly GitHub repo cache refresh
+  setInterval(() => {
+    log('[Repo Cache] Running hourly cache refresh...');
+    refreshRepoCache().catch(err => {
+      log(`[Repo Cache] Hourly refresh failed: ${err.message}`);
+    });
+  }, 60 * 60 * 1000); // 1 hour
+  log('[Repo Cache] Hourly cache refresh scheduled');
+
+  // Start cache warming interval (every 4 minutes to keep cache hot)
+  startCacheWarmerInterval();
 })();
