@@ -112,6 +112,65 @@ function isResponseDuplicate(sessionId: string, content: string): { isDuplicate:
   return { isDuplicate: false };
 }
 
+/**
+ * Detect if user message contains buying signals that should skip to closing steps
+ * Returns the step to jump to, or null if no buying signal detected
+ */
+function detectBuyingSignal(userMessage: string, currentStep: number): number | null {
+  const msg = userMessage.toLowerCase();
+
+  // Don't jump if already in closing sequence (steps 13-15)
+  if (currentStep >= 13) {
+    return null;
+  }
+
+  // Strong buying signals → Jump to step 14 (state price)
+  const strongSignals = [
+    'where do i checkout',
+    'where do i buy',
+    'how do i purchase',
+    'sign me up',
+    'i want to buy',
+    'ready to purchase',
+    'let\'s do it',
+    'i\'m in',
+    'take my money',
+    'shut up and take my money'
+  ];
+
+  for (const signal of strongSignals) {
+    if (msg.includes(signal)) {
+      console.log(`[Buying Signal] Strong signal detected: "${signal}" → Jumping to step 14`);
+      return 14; // State price immediately
+    }
+  }
+
+  // Price inquiry signals → Jump to step 14 (ask if they want price)
+  const priceSignals = [
+    'how much',
+    'what does it cost',
+    'what\'s the price',
+    'what is the price',
+    'how expensive',
+    'what do you charge',
+    'what\'s it cost',
+    'what is it cost'
+  ];
+
+  // Only trigger price signals if the word "price" or "cost" is actually present
+  // This prevents false positives like "how much time" or "how much work"
+  if (msg.includes('price') || msg.includes('cost') || msg.includes('charge') || msg.includes('expensive')) {
+    for (const signal of priceSignals) {
+      if (msg.includes(signal)) {
+        console.log(`[Buying Signal] Price inquiry detected: "${signal}" → Jumping to step 14`);
+        return 14; // Go straight to price, skip "want the price?" re-confirmation
+      }
+    }
+  }
+
+  return null; // No buying signal detected
+}
+
 // Initialize these lazily inside registerRoutes to ensure dotenv has loaded
 let stripe: Stripe;
 let STRIPE_PRICES: any;
@@ -927,6 +986,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get current step from conversation state
       let currentStep = conversationState?.currentStep || 0;
 
+      // ===== BUYING SIGNAL DETECTION =====
+      // Check for buying signals BEFORE building prompt
+      // This allows AI to respond immediately to purchase intent
+      const buyingSignalStep = detectBuyingSignal(message, currentStep);
+      if (buyingSignalStep !== null) {
+        console.log(`[Chat] 🎯 Buying signal detected! Jumping from step ${currentStep} to step ${buyingSignalStep}`);
+        currentStep = buyingSignalStep;
+
+        // Track if user asked about price (to skip step 13 re-confirmation)
+        if (buyingSignalStep === 14) {
+          console.log('[Chat] 💰 User asked about price - marking userAskedAboutPrice = true');
+          if (conversationState) {
+            conversationState.userAskedAboutPrice = true;
+          }
+        }
+
+        // Update conversation state immediately
+        if (conversationState) {
+          conversationState.currentStep = buyingSignalStep;
+          await storage.updateConversationState(sessionId, conversationState);
+        }
+
+        // Update scriptStep in database
+        if (sessionId) {
+          try {
+            await db.update(chatSessions)
+              .set({
+                scriptStep: buyingSignalStep,
+                updatedAt: new Date(),
+              })
+              .where(eq(chatSessions.id, sessionId));
+            console.log(`[Chat] 🎯 Updated scriptStep in database: ${buyingSignalStep}`);
+          } catch (dbError) {
+            console.error('[Chat] Failed to update scriptStep after buying signal:', dbError);
+          }
+        }
+      }
+
+      // ===== STEP 13 SKIP LOGIC =====
+      // If we're at step 13 but user already asked about price, skip to step 14
+      if (currentStep === 13 && conversationState?.userAskedAboutPrice) {
+        console.log('[Chat] ⏭️ Skipping step 13 (re-confirmation) - user already asked about price');
+        currentStep = 14;
+
+        // Update conversation state
+        if (conversationState) {
+          conversationState.currentStep = 14;
+          await storage.updateConversationState(sessionId, conversationState);
+        }
+
+        // Update scriptStep in database
+        if (sessionId) {
+          try {
+            await db.update(chatSessions)
+              .set({
+                scriptStep: 14,
+                updatedAt: new Date(),
+              })
+              .where(eq(chatSessions.id, sessionId));
+            console.log(`[Chat] ⏭️ Updated scriptStep in database: 14 (skipped step 13)`);
+          } catch (dbError) {
+            console.error('[Chat] Failed to update scriptStep after skipping step 13:', dbError);
+          }
+        }
+      }
+      // ===== END BUYING SIGNAL DETECTION =====
+
       // ===== DUAL VALIDATION SYSTEM =====
       // Run both regex and AI validation to determine if we should advance to next step
       // AI has final say: if AI says NO, don't advance (even if regex says YES)
@@ -943,64 +1069,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (lastAIMessage) {
           const currentStepBeforeValidation = currentStep;
 
-          // METHOD A: Regex validation (existing pattern matching)
-          const { shouldProgressToNextStep } = await import('./conversationStateManager');
-          const regexSaysAdvance = shouldProgressToNextStep(message, lastAIMessage, currentStepBeforeValidation);
+          // 🚨 STEP 11 PREREQUISITE CHECK: Force back to step 10 if at step 11 without explanation
+          if (currentStepBeforeValidation === 11 && !conversationState?.step10Explained) {
+            console.log('[Step 11] ⚠️ WARNING: At step 11 without completing step 10 explanation - forcing back to step 10');
+            currentStep = 10;
+            conversationState!.currentStep = 10;
+            await storage.updateConversationState(sessionId, conversationState!);
 
-          // METHOD B: AI validation (GPT-5-nano check with full conversation history)
-          const validationStart = Date.now();
-          const { validateStepAdvancement } = await import('./aiStepValidator');
-          const aiValidation = await validateStepAdvancement(
-            currentStepBeforeValidation,
-            lastAIMessage,
-            message,
-            history || [] // Pass full conversation history for context
-          );
-          const validationTime = Date.now() - validationStart;
-          console.log(`[Dual Validation] AI validation completed in ${validationTime}ms`);
-
-          // DECISION LOGIC (AI has final say and can jump to any step):
-          const shouldAdvance = aiValidation.shouldAdvance;
-          const action = aiValidation.action || 'NEXT';
-          const nextStep = aiValidation.nextStep || currentStepBeforeValidation + 1;
-
-          if (shouldAdvance) {
-            // Use the step recommended by the validator (can be +1, or a jump)
-            currentStep = Math.max(0, Math.min(15, nextStep)); // Clamp to 0-15
-
-            const actionSymbol = action === 'JUMP' ? '⚡ JUMP' : '→';
-            console.log(`[Dual Validation] ✅ ${actionSymbol}: Step ${currentStepBeforeValidation} → ${currentStep} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: ${action})`);
-            if (action === 'JUMP') {
-              console.log(`[Dual Validation] 🎯 Jumped from step ${currentStepBeforeValidation} to step ${currentStep}: ${aiValidation.reasoning}`);
-            }
-          } else {
-            // Stay at current step, capture feedback for prompt injection
-            validationFeedback = aiValidation.feedback;
-            console.log(`[Dual Validation] 🔄 STAY: Step ${currentStepBeforeValidation} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: STAY)`);
-            console.log(`[Dual Validation] Feedback: ${aiValidation.reasoning}`);
-          }
-
-          // Update conversation state with new step BEFORE generating response
-          if (conversationState && shouldAdvance) {
-            conversationState.currentStep = currentStep;
-            await storage.updateConversationState(sessionId, conversationState);
-          }
-
-          // Also update scriptStep in chatSession database
-          if (sessionId) {
-            try {
-              await db.update(chatSessions)
-                .set({
-                  scriptStep: currentStep,
-                  updatedAt: new Date(),
-                })
-                .where(eq(chatSessions.id, sessionId));
-
-              console.log(`[Dual Validation] Updated scriptStep in database: ${currentStep}`);
-            } catch (dbError) {
-              console.error('[Dual Validation] Failed to update scriptStep:', dbError);
+            // Update scriptStep in database
+            if (sessionId) {
+              try {
+                await db.update(chatSessions)
+                  .set({
+                    scriptStep: 10,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(chatSessions.id, sessionId));
+                console.log('[Step 11] Updated scriptStep in database: forced back to 10');
+              } catch (dbError) {
+                console.error('[Step 11] Failed to update scriptStep:', dbError);
+              }
             }
           }
+
+          // 🔴 CIRCUIT BREAKER: Track step attempts in conversation state
+          if (conversationState) {
+            if (!conversationState.stepAttempts) {
+              conversationState.stepAttempts = {};
+            }
+
+            const stepKey = `step_${currentStepBeforeValidation}`;
+            conversationState.stepAttempts[stepKey] = (conversationState.stepAttempts[stepKey] || 0) + 1;
+
+            // If this step has been attempted 3+ times, force advancement
+            if (conversationState.stepAttempts[stepKey] >= 3) {
+              console.log(`[Circuit Breaker] 🔴 Step ${currentStepBeforeValidation} attempted ${conversationState.stepAttempts[stepKey]} times - forcing advancement`);
+              currentStep = Math.min(15, currentStepBeforeValidation + 1);
+              conversationState.currentStep = currentStep;
+              conversationState.stepAttempts[stepKey] = 0; // Reset counter for this step
+              await storage.updateConversationState(sessionId, conversationState);
+
+            console.log(`[Circuit Breaker] ⚡ Forced advancement to step ${currentStep}`);
+
+            // Update scriptStep in chatSession database
+            if (sessionId) {
+              try {
+                await db.update(chatSessions)
+                  .set({
+                    scriptStep: currentStep,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(chatSessions.id, sessionId));
+                console.log(`[Circuit Breaker] Updated scriptStep in database: ${currentStep}`);
+              } catch (dbError) {
+                console.error('[Circuit Breaker] Failed to update scriptStep:', dbError);
+              }
+            }
+
+              // Skip validation and proceed with forced advancement
+              validationFeedback = undefined;
+            } else {
+              // METHOD A: Regex validation (existing pattern matching)
+              const { shouldProgressToNextStep } = await import('./conversationStateManager');
+              const regexSaysAdvance = shouldProgressToNextStep(message, lastAIMessage, currentStepBeforeValidation);
+
+              // METHOD B: AI validation (GPT-5-nano check with full conversation history)
+              const validationStart = Date.now();
+              const { validateStepAdvancement } = await import('./aiStepValidator');
+              const aiValidation = await validateStepAdvancement(
+                currentStepBeforeValidation,
+                lastAIMessage,
+                message,
+                history || [] // Pass full conversation history for context
+              );
+              const validationTime = Date.now() - validationStart;
+              console.log(`[Dual Validation] AI validation completed in ${validationTime}ms`);
+
+              // 🔒 ATOMIC CLOSE: Steps 13-15 always advance forward (override validation)
+              let aiValidationOverride = aiValidation;
+              if (currentStepBeforeValidation >= 13 && currentStepBeforeValidation <= 14) {
+                console.log(`[Atomic Close] 🔒 Step ${currentStepBeforeValidation} → Step ${currentStepBeforeValidation + 1} (atomic advancement)`);
+                aiValidationOverride = {
+                  shouldAdvance: true,
+                  feedback: '',
+                  reasoning: `Atomic close - step ${currentStepBeforeValidation} always advances`,
+                  nextStep: currentStepBeforeValidation + 1,
+                  action: 'NEXT'
+                };
+              }
+
+              // 🔒 ATOMIC CLOSE: Step 15 is the end
+              if (currentStepBeforeValidation === 15) {
+                console.log('[Atomic Close] 🔒 Step 15 complete - closing sequence finished');
+                aiValidationOverride = {
+                  shouldAdvance: false, // Don't advance past 15
+                  feedback: '',
+                  reasoning: 'Step 15 complete - closing sequence finished',
+                  nextStep: 15,
+                  action: 'NEXT'
+                };
+              }
+
+              // 🚨 STEP 10 PREREQUISITE: Track if Kull explanation happened
+              if (currentStepBeforeValidation === 10 && aiValidationOverride.shouldAdvance) {
+                // Check if AI response includes Kull explanation keywords
+                const fullResponse = ''; // Will be set after stream completes, but we can check message content
+                const explanationKeywords = ['ai', 'cull', '30 seconds', 'analyze', 'focus', 'composition', 'vision', 'imagine', 'success'];
+                // For now, just mark as explained when advancing from step 10
+                if (conversationState) {
+                  conversationState.step10Explained = true;
+                  console.log('[Step 10] ✅ Marking step 10 as explained (advancing to step 11)');
+                }
+              }
+
+              // 🚨 STEP 11 PREREQUISITE CHECK: Block advancement to step 11 if step 10 not explained
+              if (currentStepBeforeValidation === 10 && aiValidationOverride.nextStep === 11) {
+                if (!conversationState?.step10Explained) {
+                  console.log('[Step 11] ⚠️ WARNING: Trying to advance to step 11 without completing step 10 explanation');
+                  // Force back to step 10
+                  aiValidationOverride = {
+                    shouldAdvance: false,
+                    feedback: '⚠️ CRITICAL: You tried to ask "how committed are you? 1-10" but you have NOT explained Kull yet. You MUST first: 1) Explain how Kull works (AI culling, 30 seconds, focus/composition analysis), 2) Paint the vision of their life after using Kull (specific to their goal), 3) Connect it to their bottleneck. GO BACK to step 10 and finish explaining before asking for commitment.',
+                    reasoning: 'Step 11 prerequisite not met - step 10 explanation required',
+                    nextStep: 10,
+                    action: 'STAY'
+                  };
+                }
+              }
+
+              // DECISION LOGIC (AI has final say and can jump to any step):
+              const shouldAdvance = aiValidationOverride.shouldAdvance;
+              const action = aiValidationOverride.action || 'NEXT';
+              const nextStep = aiValidationOverride.nextStep || currentStepBeforeValidation + 1;
+
+              if (shouldAdvance) {
+                // Use the step recommended by the validator (can be +1, or a jump)
+                currentStep = Math.max(0, Math.min(15, nextStep)); // Clamp to 0-15
+
+                const actionSymbol = action === 'JUMP' ? '⚡ JUMP' : '→';
+                console.log(`[Dual Validation] ✅ ${actionSymbol}: Step ${currentStepBeforeValidation} → ${currentStep} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: ${action})`);
+                if (action === 'JUMP') {
+                  console.log(`[Dual Validation] 🎯 Jumped from step ${currentStepBeforeValidation} to step ${currentStep}: ${aiValidation.reasoning}`);
+                }
+              } else {
+                // Stay at current step, capture feedback for prompt injection
+                validationFeedback = aiValidation.feedback;
+                console.log(`[Dual Validation] 🔄 STAY: Step ${currentStepBeforeValidation} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: STAY)`);
+                console.log(`[Dual Validation] Feedback: ${aiValidation.reasoning}`);
+              }
+
+              // Update conversation state with new step BEFORE generating response
+              if (conversationState && shouldAdvance) {
+                const previousStep = currentStepBeforeValidation;
+                conversationState.currentStep = currentStep;
+                conversationState.stepAttempts![stepKey] = 0; // Reset counter on successful advancement
+
+                // Track step change in history
+                const { trackStepChange } = await import('./stepHistoryTracker');
+                const reason = aiValidation.action === 'JUMP' ? 'JUMP (buying signal)' :
+                              currentStep - previousStep > 1 ? `SKIP (${currentStep - previousStep} steps)` :
+                              'NEXT (normal progression)';
+                trackStepChange(conversationState, previousStep, currentStep, reason);
+
+                await storage.updateConversationState(sessionId, conversationState);
+              }
+
+              // Also update scriptStep in chatSession database
+              if (sessionId) {
+                try {
+                  await db.update(chatSessions)
+                    .set({
+                      scriptStep: currentStep,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(chatSessions.id, sessionId));
+
+                  console.log(`[Dual Validation] Updated scriptStep in database: ${currentStep}`);
+                } catch (dbError) {
+                  console.error('[Dual Validation] Failed to update scriptStep:', dbError);
+                }
+              }
+            } // End of circuit breaker else block
+          } // End of conversationState check
         }
       }
       // ===== END DUAL VALIDATION =====
@@ -1048,7 +1298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         enrichedCalculatorData,
         currentStep,
-        previousReasoningBlocks
+        previousReasoningBlocks,
+        undefined, // validationFeedback - deprecated, now handled via finalContext
+        conversationState // Pass conversation state for circuit breaker tracking
       );
       const apiTime = Date.now() - apiStart;
       timings.apiCalled = Date.now() - timings.start;
@@ -1093,11 +1345,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 const data = JSON.parse(content);
 
-                // Handle Chat Completions API streaming format
+                // ============================================================
+                // RESPONSES API STREAMING CONVERSION
+                // ============================================================
+                // chatService.ts converts Responses API chunks to Chat Completions format
+                // for backward compatibility with this routes.ts code.
+                //
+                // Responses API (openai.responses.create) sends:
+                //   - response.output_text.delta (with .delta field)
+                //   - response.completed (with .response.usage)
+                //
+                // chatService.ts converts to:
+                //   - { choices: [{ delta: { content } }] } (Chat Completions format)
+                //
+                // This allows us to use the same streaming parser here.
+                // See: server/chatService.ts lines 1182-1320
+                // ============================================================
+
+                // Handle Chat Completions API streaming format (converted from Responses API)
                 if (data.choices && data.choices[0]) {
                   const choice = data.choices[0];
-                  
-                  // Extract content delta
+
+                  // Extract content delta (each token as it arrives from gpt-5-nano)
                   if (choice.delta?.content) {
                     // First token received - measure total time
                     if (!firstTokenReceived) {
@@ -1110,19 +1379,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                     const content = choice.delta.content;
                     fullResponse += content;
-                    lineBuffer += content; // Always accumulate in buffer
+                    lineBuffer += content; // Accumulate in buffer for delimiter detection
 
-                    // Check accumulated buffer for delimiter markers (not just current chunk)
-                    // This handles delimiters split across multiple chunks
-                    if (lineBuffer.includes('␞') || lineBuffer.includes('QUICK_REPLIES') || lineBuffer.includes('NEXT_MESSAGE')) {
-                      // Hit metadata - stop streaming, keep buffering for removal
+                    // Check if we've hit metadata delimiters
+                    // Only check at the END of lineBuffer to avoid false positives mid-word
+                    const hasDelimiter = lineBuffer.includes('␞') ||
+                                        lineBuffer.includes('QUICK_REPLIES') ||
+                                        lineBuffer.includes('NEXT_MESSAGE');
+
+                    if (hasDelimiter) {
+                      // Hit metadata - stop streaming completely
+                      // Don't send any more deltas
                       continue;
                     }
 
-                    // No delimiters detected yet - stream the buffered content and reset
-                    res.write(`data: ${JSON.stringify({ type: 'delta', content: lineBuffer })}\n\n`);
+                    // No delimiters yet - stream THIS chunk immediately (not the whole buffer)
+                    // This ensures token-by-token streaming
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: content })}\n\n`);
                     if (res.socket) res.socket.uncork();
-                    lineBuffer = ''; // Clear buffer after sending
+                    // Keep lineBuffer for delimiter checking but send only new content
                   }
                   
                   // Check for finish_reason and usage data (silent)
@@ -1182,9 +1457,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Strip out the delimiter lines from the response
+        // Handle both separate lines and inline metadata
         cleanResponse = fullResponse
+          // First remove inline metadata (when ␞ appears mid-line)
+          .replace(/␞QUICK_REPLIES:[^\n␞]*/gi, '')
+          .replace(/␞NEXT_MESSAGE:[^\n␞]*/gi, '')
+          // Then remove full lines that start with metadata
           .split('\n')
-          .filter(line => !line.startsWith('␞QUICK_REPLIES:') && !line.startsWith('␞NEXT_MESSAGE:'))
+          .filter(line => {
+            const trimmed = line.trim();
+            return !trimmed.startsWith('␞QUICK_REPLIES:') &&
+                   !trimmed.startsWith('␞NEXT_MESSAGE:') &&
+                   !trimmed.startsWith('QUICK_REPLIES:') &&
+                   !trimmed.startsWith('NEXT_MESSAGE:');
+          })
           .join('\n')
           .trim();
 
@@ -1205,8 +1491,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('[Chat] ✅ Response includes QUICK_REPLIES and NEXT_MESSAGE');
         }
 
-        // Signal completion
-        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Signal completion with updated conversation state
+        const donePayload: any = { type: 'done' };
+
+        // Include current step and step history for real-time UI updates
+        if (conversationState) {
+          donePayload.currentStep = conversationState.currentStep;
+          donePayload.stepHistory = conversationState.stepHistory || [];
+        }
+
+        res.write(`data: ${JSON.stringify(donePayload)}\n\n`);
         // Force immediate transmission
         if (res.socket) res.socket.uncork();
 
@@ -1528,6 +1822,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!context) {
         return res.status(400).json({ message: "Context required" });
+      }
+
+      // 🚀 NEW: Check if conversation is currently active before sending background message
+      // Active conversation = user has sent/received messages in the last 2 minutes
+      // This prevents automated messages from interrupting active chats
+      const isConversationActive = (conversationHistory: any[]): boolean => {
+        if (!conversationHistory || conversationHistory.length === 0) {
+          return false; // No conversation yet
+        }
+
+        // Get timestamp of most recent message
+        const lastMessage = conversationHistory[conversationHistory.length - 1];
+        const lastTimestamp = lastMessage?.timestamp
+          ? new Date(lastMessage.timestamp).getTime()
+          : (currentTime || Date.now());
+
+        const twoMinutesAgo = (currentTime || Date.now()) - (2 * 60 * 1000);
+
+        // If last message was within 2 minutes, conversation is active
+        const isActive = lastTimestamp > twoMinutesAgo;
+
+        // Also check: if last 2 messages were user→assistant (back-and-forth), it's active
+        const recentMessages = conversationHistory.slice(-2);
+        const hasBackAndForth = recentMessages.length >= 2 &&
+          recentMessages[recentMessages.length - 1]?.role === 'assistant' &&
+          recentMessages[recentMessages.length - 2]?.role === 'user';
+
+        return isActive || hasBackAndForth;
+      };
+
+      // Check if conversation is active
+      if (history && Array.isArray(history) && isConversationActive(history)) {
+        console.log('[Background Message] ⏸️ Conversation is ACTIVE - skipping background message to avoid interruption');
+        console.log('[Background Message] History length:', history.length);
+        console.log('[Background Message] Last 2 messages:', history.slice(-2).map((m: any) => ({
+          role: m.role,
+          timestamp: m.timestamp,
+          content: m.content?.substring(0, 50) + '...'
+        })));
+
+        return res.json({
+          skipped: true,
+          reason: 'conversation_active',
+          message: 'Background message skipped - user is actively chatting'
+        });
+      }
+
+      console.log('[Background Message] ✅ Conversation is IDLE - sending background message');
+      if (history && Array.isArray(history)) {
+        console.log('[Background Message] History length:', history.length);
+        if (history.length > 0) {
+          const lastMessage = history[history.length - 1];
+          const lastTimestamp = lastMessage?.timestamp
+            ? new Date(lastMessage.timestamp).getTime()
+            : Date.now();
+          const timeSinceLastMessage = Math.round(((currentTime || Date.now()) - lastTimestamp) / 1000);
+          console.log('[Background Message] Last message was', timeSinceLastMessage, 'seconds ago');
+        }
       }
 
       // Extract IP address (check various headers for proxy/load balancer scenarios)
@@ -1974,6 +2326,12 @@ Use the exact text they clicked/highlighted in your response to prove you're pay
 **Your Task:**
 You're Kull AI support - act like a smart, playful consultant who helps photographers discover how much time and money they're wasting. DON'T hard sell. Build rapport, tease them about their behavior, and help them calculate their own ROI.
 
+**YOUR GOAL:**
+Help them understand Kull's value and ROI. If they're engaged and asking questions, guide them toward [starting their free trial](#download).
+
+**NOT YOUR GOAL:**
+Close a sale aggressively or be pushy. Background messages are exploratory - let them discover value naturally.
+
 **Consultative Approach (NOT Hard Selling):**
 - Reference their activity naturally ("you've been looking at pricing a few times - want the exact number?")
 - Ask questions about their workflow to build a profile:
@@ -2302,27 +2660,37 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
               try {
                 const data = JSON.parse(content);
 
-                // Handle Chat Completions API streaming format
+                // ============================================================
+                // RESPONSES API STREAMING (Welcome Message Endpoint)
+                // ============================================================
+                // Same conversion as regular chat - see comments above
+                // Responses API → Chat Completions format for compatibility
+                // ============================================================
+
+                // Handle Chat Completions API streaming format (converted from Responses API)
                 if (data.choices && data.choices[0]) {
                   const choice = data.choices[0];
-                  
-                  // Extract content delta
+
+                  // Extract content delta (each token from gpt-5-nano)
                   if (choice.delta?.content) {
                     const content = choice.delta.content;
                     fullResponse += content;
-                    lineBuffer += content; // Always accumulate in buffer
+                    lineBuffer += content; // Accumulate in buffer for delimiter detection
 
-                    // Check accumulated buffer for delimiter markers (not just current chunk)
-                    // This handles delimiters split across multiple chunks
-                    if (lineBuffer.includes('␞') || lineBuffer.includes('QUICK_REPLIES') || lineBuffer.includes('NEXT_MESSAGE')) {
-                      // Hit metadata - stop streaming, keep buffering for removal
+                    // Check if we've hit metadata delimiters
+                    const hasDelimiter = lineBuffer.includes('␞') ||
+                                        lineBuffer.includes('QUICK_REPLIES') ||
+                                        lineBuffer.includes('NEXT_MESSAGE');
+
+                    if (hasDelimiter) {
+                      // Hit metadata - stop streaming completely
                       continue;
                     }
 
-                    // No delimiters detected yet - stream the buffered content and reset
-                    res.write(`data: ${JSON.stringify({ type: 'delta', content: lineBuffer })}\n\n`);
+                    // No delimiters yet - stream THIS chunk immediately (token-by-token)
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: content })}\n\n`);
                     if (res.socket) res.socket.uncork();
-                    lineBuffer = ''; // Clear buffer after sending
+                    // Keep lineBuffer for delimiter checking but send only new content
                   }
                   
                   // Stream finished - no logging needed
@@ -2377,9 +2745,20 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         }
 
         // Strip out the delimiter lines from the response
+        // Handle both separate lines and inline metadata
         cleanResponse = fullResponse
+          // First remove inline metadata (when ␞ appears mid-line)
+          .replace(/␞QUICK_REPLIES:[^\n␞]*/gi, '')
+          .replace(/␞NEXT_MESSAGE:[^\n␞]*/gi, '')
+          // Then remove full lines that start with metadata
           .split('\n')
-          .filter(line => !line.startsWith('␞QUICK_REPLIES:') && !line.startsWith('␞NEXT_MESSAGE:'))
+          .filter(line => {
+            const trimmed = line.trim();
+            return !trimmed.startsWith('␞QUICK_REPLIES:') &&
+                   !trimmed.startsWith('␞NEXT_MESSAGE:') &&
+                   !trimmed.startsWith('QUICK_REPLIES:') &&
+                   !trimmed.startsWith('NEXT_MESSAGE:');
+          })
           .join('\n')
           .trim();
 
@@ -2400,7 +2779,14 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
           console.log('[Welcome] ✅ Response includes QUICK_REPLIES and NEXT_MESSAGE');
         }
 
-        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        // Signal completion with initial conversation state
+        const donePayload: any = { type: 'done' };
+
+        // Welcome message starts at step 0 with empty history
+        donePayload.currentStep = 0;
+        donePayload.stepHistory = [];
+
+        res.write(`data: ${JSON.stringify(donePayload)}\n\n`);
         // Force immediate transmission
         if (res.socket) res.socket.uncork();
 

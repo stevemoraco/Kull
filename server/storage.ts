@@ -100,6 +100,10 @@ export interface ConversationState {
   questionsAnswered: AnswerRecord[];
   currentStep: number;
   offTopicCount: number;
+  stepAttempts?: { [stepKey: string]: number }; // Track how many times each step has been attempted (circuit breaker)
+  stepHistory?: Array<{ fromStep: number; toStep: number; reason: string; timestamp: Date }>; // Track ALL step changes (moves, jumps, skips)
+  step10Explained?: boolean; // Track if Kull has been explained at step 10 (prerequisite for step 11)
+  userAskedAboutPrice?: boolean; // Track if user asked about price (to skip step 13 re-confirmation)
 }
 
 export interface IStorage {

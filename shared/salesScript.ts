@@ -90,14 +90,14 @@ export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
   {
     step: 10,
     shortLabel: "Position solution",
-    question: "this is exactly what i specialize in: removing the workflow block that's keeping you from those numbers. (then pause answering questions for a bit to tell them ALL about the service relative to their goals and how you think it'll help them most, be very direct based on our codebase how it actually works and help them imagine what success looks like, paint the vision of Kull integrated into their life)",
+    question: "this is exactly what i specialize in: removing the workflow block that's keeping you from those numbers. (🚨 CRITICAL: This is a MULTI-PART step. You MUST explain Kull thoroughly before moving to step 11. Take 3-4 messages to: 1) explain how AI culling works (30 seconds, focus/composition analysis), 2) paint the vision of their life after using Kull (reference their specific goal), 3) connect it to their bottleneck. DO NOT rush to step 11 until you've completed ALL parts.)",
     category: "commitment",
     required: true
   },
   {
     step: 11,
     shortLabel: "Commitment level",
-    question: "how committed are you to hitting that? 1–10. (make sure you've finished telling them all about what life will be like after they start using Kull and they're amazed first)",
+    question: "how committed are you to hitting that? 1–10. (🚨 PREREQUISITE CHECK: You can ONLY ask this if you've already explained: 1) How Kull works (AI culling, 30 seconds, analysis), 2) Vision of their life after using Kull, 3) Connection to their goal. If you haven't done ALL 3, GO BACK to step 10 and finish explaining. Never ask for commitment without context.)",
     category: "commitment",
     required: true
   },
@@ -125,7 +125,7 @@ export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
   {
     step: 15,
     shortLabel: "Discount close",
-    question: "alright — if you'll commit to the goal you told me, i'll discount it.",
+    question: "alright — if you'll commit to the goal you told me, i'll discount it. [start your free trial here](#download)",
     category: "close",
     required: true
   }

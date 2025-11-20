@@ -7,6 +7,7 @@ interface ConversationProgressProps {
   questionsAnswered: Array<{ step: number; question: string; answer: string }>;
   currentStep: number;
   totalSteps: number;
+  stepHistory?: Array<{ fromStep: number; toStep: number; reason: string; timestamp: Date | string }>;
 }
 
 export const ConversationProgress: React.FC<ConversationProgressProps> = ({
@@ -14,6 +15,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
   questionsAnswered,
   currentStep,
   totalSteps,
+  stepHistory = [],
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showUpcoming, setShowUpcoming] = useState(false);
@@ -77,7 +79,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
 
             <div className="text-left">
               <h3 className="text-xs font-semibold text-white flex items-center gap-1.5">
-                Progress: {questionsAnswered.length}/{totalSteps}
+                Step {currentStep}/{totalSteps} • {questionsAnswered.length} answered
               </h3>
             </div>
           </div>
@@ -98,6 +100,25 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
         } overflow-y-auto overflow-x-hidden bg-gray-100`}
       >
         <div className="px-4 pb-4 pt-2 space-y-1.5">
+          {/* Step History - Show all jumps/skips */}
+          {stepHistory && stepHistory.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2">
+              <div className="text-xs font-semibold text-blue-900 mb-1">Step History:</div>
+              <div className="text-xs text-blue-800 font-mono">
+                {stepHistory.map((h, idx) => {
+                  const icon = h.reason.includes('JUMP') ? '⚡' :
+                               h.reason.includes('SKIP') ? '→→' : '→';
+                  return (
+                    <span key={idx}>
+                      {h.fromStep}{icon}{h.toStep}
+                      {idx < stepHistory.length - 1 ? ', ' : ''}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Answered questions - Show in actual order with step numbers */}
           {questionsAnswered.length > 0 && (
             <div className="space-y-1.5">

@@ -1,0 +1,11 @@
+{
+  "message": "hi there! I am a photographer just starting out. 1 shoot a week, spending like 6 hours each time on culling. wait, before we get started - is this going to be expensive? i'm on a tight budget",
+  "history": [],
+  "sessionId": "test-jessica-001",
+  "calculatorData": {
+    "shootsPerWeek": 1,
+    "hoursPerShoot": 6,
+    "billableRate": 50
+  },
+  "currentTime": 1700000000000
+}

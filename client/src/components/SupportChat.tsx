@@ -98,6 +98,7 @@ interface ConversationState {
   questionsAnswered: Array<{ step: number; question: string; answer: string }>;
   currentStep: number;
   totalSteps: number;
+  stepHistory?: Array<{ fromStep: number; toStep: number; reason: string; timestamp: Date | string }>;
 }
 
 interface ChatSession {
@@ -1335,6 +1336,18 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
 
         if (!response.ok) throw new Error('Failed to generate greeting');
 
+        // 🚀 NEW: Check if server skipped the message because conversation is active
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          // JSON response means the server has something to tell us (like skipped message)
+          const jsonData = await response.json();
+          if (jsonData.skipped && jsonData.reason === 'conversation_active') {
+            console.log('[Chat] Background message skipped - conversation is active:', jsonData.message);
+            // Don't generate a greeting - conversation is already in progress
+            return;
+          }
+        }
+
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
         if (!reader) throw new Error('No response stream');
@@ -1414,6 +1427,22 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
                 } else if (data.type === 'done') {
                   // Track when AI last responded (welcome message)
                   lastAiMessageTimeRef.current = Date.now();
+
+                  // Update conversation state with server-provided step info
+                  if (typeof data.currentStep === 'number') {
+                    setSessions((prev: ChatSession[]) => prev.map((session: ChatSession) =>
+                      session.id === currentSessionId && session.conversationState
+                        ? {
+                            ...session,
+                            conversationState: {
+                              ...session.conversationState,
+                              currentStep: data.currentStep,
+                              stepHistory: data.stepHistory || session.conversationState?.stepHistory || []
+                            }
+                          }
+                        : session
+                    ));
+                  }
                 } else if (data.type === 'error') {
                   console.error('[Chat] Stream error:', data.message);
                 }
@@ -1893,8 +1922,8 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        credentials: 'include', // Include auth cookies
         },
+        credentials: 'include', // Include auth cookies
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
@@ -2016,16 +2045,8 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
                   // Clear status messages when real content starts
                   fullContent = '';
 
-                  // CRITICAL: Also clear the message state to remove status emojis
-                  flushSync(() => {
-                    setMessages(prev =>
-                      prev.map(msg =>
-                        msg.id === assistantMessageId
-                          ? { ...msg, content: '' }
-                          : msg
-                      )
-                    );
-                  });
+                  // Don't clear the message content here - it will be updated with actual content below
+                  // This prevents the bubble from disappearing during the transition
                 }
 
                 // If we already detected cutoff, ignore all further deltas
@@ -2139,14 +2160,20 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
                 // Track when AI last responded
                 lastAiMessageTimeRef.current = Date.now();
 
-                // 🚨 CRITICAL: If stream ended with no real content (only status messages), clear the message
-                if (!fullContent || fullContent.trim().length === 0) {
-                  console.log('[Chat] Stream ended with no content - removing message');
-                  flushSync(() => {
-                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                  });
-                  // Don't play ding for empty messages
-                  break;
+                // Update conversation state with server-provided step info
+                if (typeof data.currentStep === 'number') {
+                  setSessions((prev: ChatSession[]) => prev.map((session: ChatSession) =>
+                    session.id === currentSessionId && session.conversationState
+                      ? {
+                          ...session,
+                          conversationState: {
+                            ...session.conversationState,
+                            currentStep: data.currentStep,
+                            stepHistory: data.stepHistory || session.conversationState?.stepHistory || []
+                          }
+                        }
+                      : session
+                  ));
                 }
 
                 // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE (only if tab is visible)
@@ -2862,6 +2889,7 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
                   questionsAnswered={conversationState.questionsAnswered}
                   currentStep={conversationState.currentStep}
                   totalSteps={conversationState.totalSteps}
+                  stepHistory={conversationState.stepHistory}
                 />
               </div>
             </div>

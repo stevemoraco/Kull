@@ -4,6 +4,82 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+# ⚠️ ⚠️ ⚠️ CRITICAL: READ THIS FIRST ⚠️ ⚠️ ⚠️
+
+## STREAMING ARCHITECTURE DOCUMENTATION - MUST READ BEFORE CHANGING ANYTHING
+
+**BEFORE modifying ANY streaming code, read these documents:**
+
+1. **`/home/runner/workspace/STREAMING_ARCHITECTURE_DOCUMENTATION.md`**
+   - Complete technical explanation of OpenAI Responses API streaming
+   - Why we use Responses API (not Chat Completions)
+   - Three-layer architecture (chatService.ts → routes.ts → SupportChat.tsx)
+   - Common mistakes and how to avoid them
+   - Testing checklist
+
+2. **`/home/runner/workspace/INLINE_COMMENTS_GUIDE.md`**
+   - Copy-paste inline comments for critical sections
+   - Quick reference for what NOT to change
+   - Emergency rollback commands
+
+**The streaming system has been broken multiple times by well-meaning changes. These documents exist to prevent that from happening again.**
+
+---
+
+## RESPONSES API - NOT CHAT COMPLETIONS
+
+**THIS PROJECT USES OPENAI'S RESPONSES API, NOT CHAT COMPLETIONS API!**
+
+### RESPONSES API IS THE CURRENT, RECOMMENDED API (2025)
+
+Chat Completions is **DEPRECATED** - Responses is the NEW standard.
+
+### CRITICAL DIFFERENCES:
+
+```typescript
+// ❌ WRONG - Chat Completions (DEPRECATED)
+const response = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [...],
+  stream: true
+});
+
+// ✅ CORRECT - Responses API (CURRENT)
+const response = await openai.responses.create({
+  model: 'gpt-5-nano',  // gpt-5 models are REAL!
+  input: [...],         // NOT "messages"
+  text: {
+    format: { type: 'text' },
+    verbosity: 'low'
+  },
+  reasoning: {
+    effort: 'minimal',
+    summary: 'auto'
+  },
+  stream: true,
+  store: true,
+  include: ['reasoning.encrypted_content']
+});
+```
+
+### MODELS: gpt-5-nano, gpt-5-mini, gpt-5 ARE REAL
+
+**gpt-5-nano** is the default model for this project. It exists. It's real. DO NOT change it to gpt-4o!
+
+### STREAMING FORMAT IS DIFFERENT
+
+Responses API uses chunk types like:
+- `response.output_text.delta` - NOT `choices[0].delta.content`
+- `response.completed` - NOT `choices[0].finish_reason`
+- `response.content_part.done` - for reasoning blocks
+
+See: https://platform.openai.com/docs/guides/responses
+See: server/chatService.ts lines 1093-1320 for implementation
+
+### IF YOU CHANGE THIS TO CHAT COMPLETIONS, YOU WILL BREAK EVERYTHING
+
+---
+
 ## Vision, Mission & Values
 
 ### Vision
