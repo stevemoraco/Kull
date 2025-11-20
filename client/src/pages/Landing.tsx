@@ -6,14 +6,13 @@ import { ReferralSection } from "@/components/ReferralSection";
 import { FinalCTA } from "@/components/FinalCTA";
 import { Footer } from "@/components/Footer";
 import { SectionNav } from "@/components/SectionNav";
-import { SupportChat } from "@/components/SupportChat";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { useSectionTiming } from "@/hooks/useSectionTiming";
 
 export default function Landing() {
-  // Track section timing
-  const { timingData } = useSectionTiming([
+  // Track section timing (for analytics)
+  useSectionTiming([
     'hero',
     'problem',
     'solution',
@@ -118,9 +117,6 @@ export default function Landing() {
         </div>
         <Footer />
       </div>
-
-      {/* Support Chat with section timing data */}
-      <SupportChat sectionTiming={timingData} />
     </div>
   );
 }
