@@ -288,10 +288,8 @@ export function getNextQuestion(step: number, calculatorData?: any): string {
     11: "how committed are you to hitting that? 1–10.",
     12: "when do you want this fixed so you can hit those numbers?",
     13: "want the price?",
-    14: calculatorData?.annualCost
-      ? `everyday price is $${calculatorData.annualCost}/year to solve exactly the problem you just described.`
-      : "everyday price is based on your usage.",
-    15: "alright — if you'll commit to the goal you told me, i'll discount it."
+    14: "everyday price is $5,988/year to solve exactly the problem you just described.",
+    15: "alright — if you'll commit to the goal you told me, i'll discount it. [start your free trial here](#download)"
   };
 
   return questions[step] || questions[0];

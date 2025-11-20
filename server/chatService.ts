@@ -723,7 +723,7 @@ function buildVisibleScriptSection(currentStep: number, calculatorData?: any, us
   // Get relevant steps
   const previousStep = currentStep > 0 ? getQuestionByStep(currentStep - 1) : null;
   const currentStepData = getQuestionByStep(currentStep);
-  const nextStep = currentStep < 15 ? getQuestionByStep(currentStep + 1) : null;
+  const nextStep = currentStep < 15 ? getQuestionByStep(currentStep + 1) : null; // Step 15 is the end
 
   if (!currentStepData) {
     return `**CURRENT STEP:** ${currentStep}\nYou are at step ${currentStep} of the 16-step sales script.`;
@@ -763,6 +763,12 @@ function buildVisibleScriptSection(currentStep: number, calculatorData?: any, us
     section += `**WHY THIS MATTERS:**\n`;
     section += `- If they ASKED for price → Skip re-confirmation (redundant and annoying)\n`;
     section += `- If we're OFFERING price → Ask permission (polite and natural)\n\n`;
+  } else if (currentStep === 15) {
+    // Special handling for Step 15 - Final close with trial link
+    section += `**CURRENT STEP (15) - FINAL CLOSE:**\n`;
+    section += `**THIS IS NOT A QUESTION - THIS IS A STATEMENT:**\n\n`;
+    section += `"${getCurrentQuestion()}"\n\n`;
+    section += `**CRITICAL: This is the EXACT final statement to send. Include the markdown link [start your free trial here](#download) exactly as shown.**\n\n`;
   } else {
     // Normal step handling for all other steps
     section += `**CURRENT STEP (${currentStep}):** "${getCurrentQuestion()}"\n`;

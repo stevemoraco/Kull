@@ -119,8 +119,8 @@ function isResponseDuplicate(sessionId: string, content: string): { isDuplicate:
 function detectBuyingSignal(userMessage: string, currentStep: number): number | null {
   const msg = userMessage.toLowerCase();
 
-  // Don't jump if already in closing sequence (steps 13-15)
-  if (currentStep >= 13) {
+  // Don't jump if already at step 15 (conversation is complete)
+  if (currentStep >= 15) {
     return null;
   }
 
@@ -154,7 +154,13 @@ function detectBuyingSignal(userMessage: string, currentStep: number): number | 
     'how expensive',
     'what do you charge',
     'what\'s it cost',
-    'what is it cost'
+    'what is it cost',
+    'yes tell me the price',
+    'yes, tell me the price',
+    'show me the price',
+    'show me price',
+    'tell me price',
+    'tell me the price'
   ];
 
   // Only trigger price signals if the word "price" or "cost" is actually present
@@ -164,6 +170,28 @@ function detectBuyingSignal(userMessage: string, currentStep: number): number | 
       if (msg.includes(signal)) {
         console.log(`[Buying Signal] Price inquiry detected: "${signal}" → Jumping to step 14`);
         return 14; // Go straight to price, skip "want the price?" re-confirmation
+      }
+    }
+  }
+
+  // Affirmation signals at step 13 → Advance to step 14
+  if (currentStep === 13) {
+    const step13Affirmations = ['yes', 'yeah', 'yep', 'sure', 'ok', 'okay', 'alright', 'go for it', 'absolutely', 'definitely', 'for sure'];
+    for (const affirmation of step13Affirmations) {
+      if (msg.includes(affirmation)) {
+        console.log(`[Buying Signal] Step 13 affirmation detected: "${affirmation}" → Jumping to step 14`);
+        return 14; // Advance to price statement
+      }
+    }
+  }
+
+  // Positive responses at step 14 → Advance to step 15 (discount close)
+  if (currentStep === 14) {
+    const positiveResponses = ['yes', 'yeah', 'interested', 'great', 'sounds good', 'let\'s do it', 'ok', 'okay', 'alright', 'im in', 'i\'m in', 'makes sense'];
+    for (const response of positiveResponses) {
+      if (msg.includes(response)) {
+        console.log(`[Buying Signal] Step 14 positive response detected: "${response}" → Jumping to step 15`);
+        return 15; // Advance to discount close
       }
     }
   }
@@ -1145,7 +1173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const validationTime = Date.now() - validationStart;
               console.log(`[Dual Validation] AI validation completed in ${validationTime}ms`);
 
-              // 🔒 ATOMIC CLOSE: Steps 13-15 always advance forward (override validation)
+              // 🔒 ATOMIC CLOSE: Steps 13-14 always advance forward to next step (override validation)
               let aiValidationOverride = aiValidation;
               if (currentStepBeforeValidation >= 13 && currentStepBeforeValidation <= 14) {
                 console.log(`[Atomic Close] 🔒 Step ${currentStepBeforeValidation} → Step ${currentStepBeforeValidation + 1} (atomic advancement)`);
@@ -1158,9 +1186,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 };
               }
 
-              // 🔒 ATOMIC CLOSE: Step 15 is the end
+              // 🔒 ATOMIC CLOSE: Step 15 is the final end
               if (currentStepBeforeValidation === 15) {
-                console.log('[Atomic Close] 🔒 Step 15 complete - closing sequence finished');
+                console.log('[Atomic Close] 🔒 Step 15 complete - closing sequence finished (no further advancement)');
                 aiValidationOverride = {
                   shouldAdvance: false, // Don't advance past 15
                   feedback: '',
@@ -2115,7 +2143,7 @@ ${context.webglRenderer !== 'unknown' ? `- **GPU:** ${context.webglRenderer}` : 
 - **WebGL Support:** ${context.webglSupported ? 'Yes' : 'No'}
 
 ## 🌐 Connection
-- **Type:** ${context.connectionType.toUpperCase()}
+- **Type:** ${context.connectionType && context.connectionType !== 'unknown' ? context.connectionType.toUpperCase() : 'Unknown'}
 - **Downlink:** ${context.connectionDownlink !== 'unknown' ? context.connectionDownlink + ' Mbps' : 'Unknown'}
 - **RTT:** ${context.connectionRtt !== 'unknown' ? context.connectionRtt + ' ms' : 'Unknown'}
 - **Data Saver:** ${context.connectionSaveData ? 'Enabled' : 'Disabled'}
@@ -2284,7 +2312,7 @@ ${context.userActivity.map((event: any, idx: number) => {
 
 **🆕 NEW ACTIONS IN THE LAST ${Math.round((currentTime - (lastAiMessageTime || currentTime - 30000)) / 1000)} SECONDS:**
 
-${context.userActivity.filter((e: any) => {
+${context.userActivity && Array.isArray(context.userActivity) && context.userActivity.filter((e: any) => {
   const eventTime = new Date(e.timestamp).getTime();
   return eventTime > (lastAiMessageTime || 0);
 }).length > 0 ?
