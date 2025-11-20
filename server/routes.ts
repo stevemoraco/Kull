@@ -934,6 +934,13 @@ User has spent time reading these sections (sorted by time spent):
 
           userActivityMarkdown += `
 **⚠️ CRITICAL:** Reference the section they spent the most time on in your FIRST response. Show you're paying attention to what they're reading.
+
+**🔗 If you want to scroll them to that section, use these EXACT links:**
+- Calculator: [text](#calculator)
+- Features/Demo: [text](#features)
+- Pricing/Download: [text](#download)
+- Testimonials/Reviews: [text](#referrals)
+- Sign in: [text](/api/login)
 `;
         }
       }
@@ -1802,6 +1809,93 @@ User's current calculator inputs:
 **IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
 ` : ''}
 
+${sectionHistory && sectionHistory.length > 0 ? `
+## ⏱️ Section Reading Time
+
+User has spent time reading these sections (sorted by time spent):
+${(() => {
+  // Sort sections by total time spent (descending)
+  const sortedSections = [...sectionHistory].sort((a: any, b: any) => b.totalTimeSpent - a.totalTimeSpent);
+
+  // Format time in minutes and seconds
+  const formatTime = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  let result = '';
+  sortedSections.forEach((section: any, idx: number) => {
+    const timeStr = formatTime(section.totalTimeSpent);
+    const marker = idx === 0 ? ' (MOST INTERESTED)' : '';
+    result += `${idx + 1}. **${section.title}** - ${timeStr}${marker}\n`;
+  });
+
+  // Add insights based on top section
+  if (sortedSections.length > 0) {
+    const topSection = sortedSections[0];
+    const topicMap: Record<string, string> = {
+      'calculator': 'ROI calculation and cost savings',
+      'pricing': 'pricing plans and costs',
+      'features': 'product capabilities',
+      'hero': 'the landing page (just arrived)',
+      'problem': 'pain points and challenges',
+      'value': 'the value proposition',
+      'testimonials': 'customer reviews and success stories',
+      'faq': 'frequently asked questions',
+      'cta': 'taking action / getting started',
+    };
+
+    let topicInsight = topSection.title.toLowerCase();
+    for (const [key, value] of Object.entries(topicMap)) {
+      if (topSection.id.toLowerCase().includes(key) || topSection.title.toLowerCase().includes(key)) {
+        topicInsight = value;
+        break;
+      }
+    }
+
+    result += `\n**🎯 Key Insight:** User is most interested in ${topicInsight}\n\n`;
+    result += `**💡 Recommendation:** Frame your welcome message around what they were reading. Examples:\n`;
+
+    // Add contextual examples based on top section
+    if (topSection.id.toLowerCase().includes('calculator')) {
+      result += `- "i see you spent ${formatTime(topSection.totalTimeSpent)} playing with the calculator - did you find your numbers?"\n`;
+      result += `- "those calculator numbers accurate for your workflow?"\n`;
+    } else if (topSection.id.toLowerCase().includes('pricing')) {
+      result += `- "noticed you were reading pricing for a while - have questions about the cost?"\n`;
+      result += `- "you spent ${formatTime(topSection.totalTimeSpent)} on pricing - want to see how it compares to what you're wasting now?"\n`;
+    } else if (topSection.id.toLowerCase().includes('feature')) {
+      result += `- "you were checking out features - which one caught your eye?"\n`;
+      result += `- "spent ${formatTime(topSection.totalTimeSpent)} reading features - what stood out?"\n`;
+    } else if (topSection.id.toLowerCase().includes('problem')) {
+      result += `- "you spent time reading about pain points - which one hits hardest for you?"\n`;
+      result += `- "those problems resonate with your workflow?"\n`;
+    } else if (topSection.id.toLowerCase().includes('testimonial')) {
+      result += `- "saw you reading testimonials - any of those stories sound familiar?"\n`;
+      result += `- "you spent ${formatTime(topSection.totalTimeSpent)} on case studies - which one matched your situation?"\n`;
+    } else {
+      result += `- "noticed you spent ${formatTime(topSection.totalTimeSpent)} reading ${topSection.title} - what caught your attention?"\n`;
+    }
+
+    result += `\n**⚠️ CRITICAL:** Reference the section they spent the most time on in your welcome message. Show you're paying attention to what they're reading.\n`;
+
+    result += `\n**🔗 If you want to scroll them to that section, use these EXACT links:**
+- Calculator: [text](#calculator)
+- Features/Demo: [text](#features)
+- Pricing/Download: [text](#download)
+- Testimonials/Reviews: [text](#referrals)
+- Sign in: [text](/api/login)\n`;
+  }
+
+  return result;
+})()}
+` : ''}
+
 ## 🖱️ User Activity History
 ${context.userActivity && context.userActivity.length > 0 ? `
 Recent interactions (last ${context.userActivity.length} events):
@@ -1959,18 +2053,36 @@ You have access to:
 
 **URL NAVIGATION (CRITICAL):**
 
-You can SEND USERS TO ANY PAGE on the site by including markdown links in your response.
-- When you include a markdown link like [click here to see pricing](/pricing), the user will be AUTOMATICALLY redirected to that page
-- Use this to guide users through the site as part of the conversation
-- Available pages you can link to:
-  * [calculator](/calculator) or /#calculator - scroll to calculator on homepage
-  * [pricing](/pricing) - pricing page
-  * [features](/features) - features page
-  * [testimonials](/testimonials) - testimonials/case studies
-  * [login](/api/login) - sign in page
-  * ANY other page on the site - just link it
+You can SCROLL THE PAGE to different sections by including markdown links in your response.
+The page will smoothly scroll to that section - do NOT open new tabs.
 
-Example usage: "want to see what others are saying? [check out these case studies](/testimonials)"
+**AVAILABLE SECTIONS (use these EXACT hash anchors):**
+
+1. **Calculator** - [text here](#calculator)
+   - Example: "want to run your numbers? [try the calculator](#calculator)"
+   - Example: "curious about ROI? [check this out](#calculator)"
+
+2. **How It Works Video** - [text here](#features)
+   - Example: "see it in action - [watch the demo](#features)"
+   - Example: "want a quick tour? [see how it works](#features)"
+
+3. **Pricing & Download** - [text here](#download)
+   - Example: "ready to try? [grab the free trial](#download)"
+   - Example: "want pricing details? [see it here](#download)"
+
+4. **Case Studies** - [text here](#referrals)
+   - Example: "curious what photographers say? [read the reviews](#referrals)"
+   - Example: "want proof? [check these results](#referrals)"
+
+5. **Sign In Page** - [text here](/api/login)
+   - Example: "save your chat - [sign in here](/api/login)"
+   - Example: "want to save this? [quick login](/api/login)"
+
+**CRITICAL RULES:**
+- ALWAYS use # for same-page sections (NOT /features or /pricing)
+- Use the EXACT hash anchor names above (e.g., #calculator, NOT #roi-calculator or /calculator)
+- Format: [natural text](#section) - smooth scroll, no new tab
+- Do NOT make up section names - only use the 5 listed above
 
 **LOGIN STATUS AWARENESS (IMPORTANT):**
 

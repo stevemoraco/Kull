@@ -34,11 +34,11 @@ export const activityTemplates: Record<number, ActivityTemplate> = {
   },
 
   2: {
-    pricing: "pricing time soon! but first: are you happy with that {annualShoots}-shoot goal or looking to grow?",
-    calculator: "adjusting those numbers? cool. so are you happy with {annualShoots} shoots/year or want to do more?",
-    features: "exploring features? perfect. quick question: are you happy with your current {annualShoots} shoots/year or want to grow?",
-    security: "security matters, i get it. quick question: are you happy with {annualShoots} shoots/year or aiming higher?",
-    testimonials: "checking testimonials from other pros? smart. so are you happy with {annualShoots} shoots/year or want more?",
+    pricing: "pricing time soon! but first: what's your goal for next year? more shoots? less? more profitable? walk me through it.",
+    calculator: "adjusting those numbers? cool. so what's your goal for next year? more shoots? less? more profitable?",
+    features: "exploring features? perfect. quick question: what's your goal for next year? more shoots? less? more profitable?",
+    security: "security matters, i get it. quick question: what's your goal for next year? more? less? more profitable? walk me through it.",
+    testimonials: "checking testimonials from other pros? smart. so what's your goal for next year? more shoots? less? more profitable?",
   },
 
   3: {

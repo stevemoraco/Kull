@@ -31,11 +31,13 @@ const SCRIPT_STEPS: ScriptStepPattern[] = [
   {
     step: 2,
     description: "Validate their ambition",
-    keywords: ["happy", "number"],
+    keywords: ["goal", "next year", "more", "less", "profitable"],
     patterns: [
-      /are you happy with that number/i,
-      /happy with that/i,
-      /satisfied with that/i,
+      /what'?s your goal for next year/i,
+      /goal for next year/i,
+      /more shoots.*less/i,
+      /more profitable/i,
+      /walk me through it/i,
     ],
   },
   {

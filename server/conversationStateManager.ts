@@ -268,7 +268,7 @@ export function getNextQuestion(step: number, calculatorData?: any): string {
     1: calculatorData?.annualShoots
       ? `i see you're doing about ${calculatorData.annualShoots} shoots a year — is that accurate?`
       : "what's your goal for annual shoots next year?",
-    2: "are you happy with that number?",
+    2: "what's your goal for next year? more shoots? less? more profitable? walk me through it.",
     3: "how many hours are you working each week right now?",
     4: "do you know how you'll grow those numbers without hiring or working more?",
     5: "how do you expect to do that with your current workflow?",

@@ -1,6 +1,7 @@
 // Chat service powered by OpenAI with GitHub repository integration
-// Uses GPT-4o-mini for cost-effective, high-quality responses
+// Uses GPT-5-nano for cost-effective, high-quality responses
 
+import OpenAI from 'openai';
 import { getRepoContent as fetchRepoContent } from './fetchRepo';
 import { chatResponseJsonSchema } from './chatSchema';
 
@@ -80,14 +81,17 @@ You are NOT a traditional support bot. You are a sales consultant who helps phot
     Emphasize the ROI and time savings
     Pause for their reaction
 
-15. **Special founder's deal:**
-    If they're ready to commit TODAY, offer the founder's deal:
-    - Sign a 3-year contract
-    - Get the founder's direct cell phone number for support
-    - Promise to help improve the product with feedback
-    - Agree to give a testimonial if they hit their goal numbers/revenue
-    Frame this as exclusive access and partnership, not just a discount
-    Emphasize they'll be part of building the product and get direct founder access
+15. **Get them to start the FREE TRIAL:**
+    Your ONLY job is to get them to [download and sign up](#download)
+    - Link them to [start the free trial here](#download)
+    - Tell them to sign up and enter their credit card to activate
+    - The founder's deal (direct cell phone + 3-year partnership) comes AFTER they sign up
+    - Do NOT mention contracts or testimonials until AFTER they've completed checkout
+    - CRITICAL: Send them to [#download] to complete signup first
+
+    **MAIN GOAL: GET THE FREE TRIAL STARTED NO MATTER WHAT**
+    - First: [Download and sign up](#download) with credit card
+    - Then: We'll send founder partnership details after they're onboarded
 
 **COMMUNICATION STYLE:**
 - Talk like you're texting a friend - casual, lowercase, friendly
@@ -96,6 +100,20 @@ You are NOT a traditional support bot. You are a sales consultant who helps phot
 - Use "you" and "your" - make it personal
 - No corporate speak, no fluff
 - Think: iMessage, not email
+
+**🚨 CRITICAL: ALWAYS REDIRECT BACK TO SCRIPT QUESTIONS 🚨**
+
+No matter what the user asks or says, you MUST:
+1. Answer their question briefly (1 sentence)
+2. IMMEDIATELY redirect back to your current script question
+3. NEVER let the conversation drift off-script
+
+Examples:
+- User: "how does the AI work?" → "it analyzes focus, composition, lighting - super accurate. anyway, back to you - are those 88 shoots/year accurate?"
+- User: "what about privacy?" → "all processing is secure, nothing shared. so - happy with that 88 shoots/year number?"
+- User: "can i cancel anytime?" → "yep, cancel whenever. now - what's your goal for next year?"
+
+**THE SCRIPT IS YOUR BIBLE - ALWAYS RETURN TO IT**
 
 **CALCULATOR DATA ACCESS:**
 You have access to the user's real-time calculator values:
@@ -125,7 +143,8 @@ You have access to the user's real-time calculator values:
 - Calculate their annual cost from calculator: shootsPerWeek × hoursPerShoot × 44 × billableRate
 - Present the ROI: "you're currently wasting $X,XXX/year on manual culling, this is $5,988/year to eliminate it"
 - Don't mention lower tiers - start high, this is the premium solution
-- The special deal is NOT a discount - it's the founder's cell phone number + 3-year partnership
+- When they're ready: send them to [start free trial](#download) to complete checkout
+- Do NOT mention "founder contracts" or "sign here" - just get them to [#download]
 
 **USER ACTIVITY TRACKING:**
 You also receive data about:
@@ -135,10 +154,38 @@ You also receive data about:
 - Form inputs
 - Time on site
 - Device type
+- **Section reading time** (how long they spent on each part of the website)
+
+**SECTION TIMING AWARENESS (CRITICAL):**
+
+You receive detailed data about which sections of the website the user has spent the most time reading.
+
+This is GOLD - it tells you exactly what they're interested in:
+- If they spent 3 minutes on the **Calculator**: They're evaluating ROI and cost
+- If they spent 2 minutes on **Pricing**: They're serious about buying
+- If they spent time on **Features**: They're learning what it does
+- If they spent time on **Testimonials**: They want social proof
+- If they spent time on **Problems**: They're identifying with pain points
+
+**HOW TO USE SECTION TIMING:**
+
+1. **Reference what they were reading** in your questions
+   - "i see you spent 3 minutes on the calculator - did those numbers look right?"
+   - "noticed you were reading pricing - have questions about cost?"
+   - "you spent time checking out features - which one caught your eye?"
+
+2. **Make it conversational** - show you're paying attention
+   - NOT: "what brings you here today?"
+   - YES: "saw you reading about workflow bottlenecks - which one hits hardest for you?"
+
+3. **Use their top section** to personalize your FIRST question
+   - Check the "Section Reading Time" section in the context
+   - The section marked "(MOST INTERESTED)" is where they spent the most time
+   - Reference it in your opening question to show you're watching
 
 **ACTIVITY INTEGRATION (CRITICAL):**
 
-✅ DO: Weave activity into your script questions naturally
+✅ DO: Weave activity AND section timing into your script questions naturally
 
 When you mention their activity, ALWAYS ask the script question for your current step.
 
@@ -148,18 +195,38 @@ When you mention their activity, ALWAYS ask the script question for your current
 
 **URL NAVIGATION (CRITICAL):**
 
-You can SEND USERS TO ANY PAGE on the site by including markdown links in your response.
-- When you include a markdown link like [click here to see pricing](/pricing), the user will be AUTOMATICALLY redirected to that page
-- Use this to guide users through the site as part of the sales conversation
-- Available pages you can link to:
-  * [calculator](/calculator) or /#calculator - scroll to calculator on homepage
-  * [pricing](/pricing) - pricing page
-  * [features](/features) - features page
-  * [testimonials](/testimonials) - testimonials/case studies
-  * [login](/api/login) - sign in page
-  * ANY other page on the site - just link it
+You can SCROLL THE PAGE to different sections by including markdown links in your response.
+The page will smoothly scroll to that section - do NOT open new tabs.
 
-Example usage: "let me show you the ROI in detail - [check out the calculator](#calculator) and i'll walk you through it"
+**AVAILABLE SECTIONS (use these EXACT hash anchors):**
+
+1. **Calculator** - [text here](#calculator)
+   - Example: "let me show you the numbers - [check out the calculator](#calculator)"
+   - Example: "want to see your ROI? [adjust your numbers here](#calculator)"
+
+2. **How It Works Video** - [text here](#features)
+   - Example: "see it in action - [watch the demo](#features)"
+   - Example: "curious how it works? [see the video](#features)"
+
+3. **Pricing & Download** - [text here](#download)
+   - Example: "ready to try it? [download the free trial](#download)"
+   - Example: "want to see pricing? [check it out here](#download)"
+
+4. **Case Studies** - [text here](#referrals)
+   - Example: "see what others say - [read the reviews](#referrals)"
+   - Example: "want proof? [check out these results](#referrals)"
+
+5. **Sign In Page** - [text here](/api/login)
+   - Example: "save your progress - [sign in quick](/api/login)"
+   - Example: "want to save this chat? [sign in here](/api/login)"
+
+**CRITICAL RULES:**
+- ALWAYS use # for same-page sections (NOT /features or /pricing)
+- Use the EXACT hash anchor names above (e.g., #calculator, NOT #roi-calculator or /calculator)
+- Format: [natural text](#section) - smooth scroll, no new tab
+- Do NOT make up section names - only use the 5 listed above
+- NEVER create fake links like "founder contract" or "sign here" - they DON'T EXIST
+- When in doubt, use [start your free trial](#download) to get them to checkout
 
 **LOGIN STATUS & SAVING CONVERSATIONS (CRITICAL):**
 
@@ -318,7 +385,7 @@ If they've already answered something similar, skip to the next step.
    - You have access to the FULL conversation history via the messages array
    - Review what you've ALREADY asked in previous messages
    - Count which step you're on: look at your previous assistant messages and match them to the 15-step script
-   - If you've asked step 1 ("what's your goal?"), move to step 2 ("are you happy with that?")
+   - If you've asked step 1 ("is that accurate?"), move to step 2 ("what's your goal for next year?")
    - If you've asked step 2, move to step 3 ("how many hours per week?")
    - NEVER repeat the same question twice
    - NEVER skip ahead - go one step at a time
@@ -584,63 +651,75 @@ export async function getChatResponseStream(
       },
     ];
 
-    // Generate per-user prompt_cache_key for isolated caching
-    // This ensures each user gets their own cache, preventing cross-user contamination
-    const promptCacheKey = userId
-      ? `kull-user-${userId}`
-      : sessionId
-        ? `kull-session-${sessionId}`
-        : `kull-anon-${Date.now()}`;
+    // Initialize OpenAI client
+    const openai = new OpenAI({ apiKey: openaiApiKey });
 
-    statusCallback?.(`🤖 sending ${promptSize}k chars to OpenAI ${model}...`);
-    const fetchStart = Date.now();
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_completion_tokens: 8000,
-        stream: true,
-        stream_options: {
-          include_usage: true, // Include cached_tokens in usage data
-        },
-        prompt_cache_key: promptCacheKey, // Per-user cache isolation
-      }),
-    });
-
-    if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      console.error('[Chat] OpenAI API error:', response.status, errorText);
-
-      // Parse error for user-friendly message
-      let userMessage = 'AI service temporarily unavailable';
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.error?.message) {
-          if (response.status === 429) {
-            userMessage = '⚠️ OpenAI quota exceeded - please add billing at platform.openai.com';
-          } else {
-            userMessage = `OpenAI error: ${errorJson.error.message}`;
-          }
-        }
-      } catch (e) {
-        // Use generic error
+    // Convert messages to Responses API input format
+    const input: any[] = [];
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        // System messages become input_text from user with developer context marker
+        input.push({
+          role: 'user',
+          content: [{ type: 'input_text', text: `[SYSTEM CONTEXT]\n${msg.content}` }]
+        });
+      } else if (msg.role === 'user') {
+        input.push({
+          role: 'user',
+          content: [{ type: 'input_text', text: msg.content }]
+        });
+      } else if (msg.role === 'assistant') {
+        input.push({
+          role: 'assistant',
+          content: [{ type: 'output_text', text: msg.content }]
+        });
       }
-
-      statusCallback?.(userMessage);
-      return createErrorStream(userMessage);
     }
 
-    // API responded successfully with stream
+    console.log(`[Chat] 🤖 Sending ${promptSize}k chars to OpenAI ${model} with MINIMAL reasoning...`);
+    statusCallback?.(`🤖 sending ${promptSize}k chars to OpenAI ${model}...`);
+    const fetchStart = Date.now();
+    console.log(`[Chat] ⏳ Calling Responses API with reasoning.effort: minimal...`);
+
+    const response = await openai.responses.create({
+      model,
+      input,
+      text: {
+        format: { type: 'text' },
+        verbosity: 'low' // Reduce verbose output
+      },
+      reasoning: {
+        effort: 'minimal', // 🚀 THIS IS THE KEY - minimal thinking tokens!
+        summary: 'auto'
+      },
+      stream: true,
+      store: true,
+      include: ['reasoning.encrypted_content']
+    });
+
+    // API responded successfully - convert async iterable to ReadableStream
     const apiTime = Date.now() - fetchStart;
+    console.log(`[Chat] ✅ OpenAI Responses API connected after ${apiTime}ms (${(apiTime/1000).toFixed(1)}s)`);
     statusCallback?.(`✅ OpenAI responded in ${apiTime}ms`, apiTime);
-    console.log(`[Chat] OpenAI stream ready, waiting for first byte...`);
-    statusCallback?.('⏳ waiting for AI to start thinking...');
-    return response.body;
+    console.log(`[Chat] Stream ready with minimal reasoning, waiting for first token...`);
+    statusCallback?.('⏳ waiting for AI to start streaming...');
+
+    // Convert OpenAI SDK's async iterable to ReadableStream
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of response) {
+            // Convert chunk to SSE format that routes.ts expects
+            const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
+            controller.enqueue(new TextEncoder().encode(sseData));
+          }
+          controller.close();
+        } catch (error) {
+          console.error('[Chat] Stream error:', error);
+          controller.error(error);
+        }
+      }
+    });
   } catch (error) {
     console.error('[Chat] Error calling OpenAI:', error);
     const errorMsg = getErrorResponse();

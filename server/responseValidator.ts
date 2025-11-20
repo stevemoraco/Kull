@@ -110,7 +110,7 @@ export function getExpectedQuestion(step: number, calculatorData?: any): string 
 
   const questions: Record<number, string> = {
     1: `i see you're doing about ${annualShoots} shoots a year — is that accurate?`,
-    2: `are you happy with that ${annualShoots}-shoot number?`,
+    2: "what's your goal for next year? more shoots? less? more profitable? walk me through it.",
     3: `how many hours are you working each week right now?`,
     4: `do you know how you'll grow without hiring or working more?`,
     5: `what's holding you back from hitting your revenue goals?`,

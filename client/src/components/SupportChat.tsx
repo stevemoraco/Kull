@@ -1280,6 +1280,7 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
                 return [];
               }
             })(),
+            sectionTiming: sectionTiming, // Add section timing data
           }),
         });
 
@@ -1824,6 +1825,7 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
             return [];
           }
         })(),
+        sectionTiming: sectionTiming, // Add section timing data
       };
 
       console.log('[DEEP RESEARCH] Sending to /api/chat/message:');
@@ -1831,6 +1833,7 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
       console.log('  - history:', freshHistory.length, 'messages (FRESH - captured at millisecond precision)');
       console.log('  - currentSection:', payload.currentSection?.title || 'none');
       console.log('  - sectionHistory:', payload.sectionHistory.length, 'sections visited');
+      console.log('  - sectionTiming:', payload.sectionTiming);
       console.log('  - VERIFICATION: Last message in history IS the user message just sent:',
         freshHistory[freshHistory.length - 1]?.content === messageText.trim() ? '✅ YES' : '❌ NO - STALE!');
       console.log('  - history[0]:', freshHistory[0] ? JSON.stringify(freshHistory[0]).substring(0, 100) + '...' : 'N/A');
@@ -2267,6 +2270,7 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
             return [];
           }
         })(),
+        sectionTiming: sectionTiming, // Add section timing data
       };
 
       console.log('[Chat] Automated message payload prepared');
@@ -2795,14 +2799,14 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-card overscroll-contain">
-            {/* Chat messages - no padding, let them scroll behind progress */}
+            {/* Chat messages - first message gets extra padding for progress dropdown */}
             {messages
               .filter(m => !m.content.includes('[Continue conversation naturally based on context]'))
               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-              .map((message) => (
+              .map((message, index) => (
               <div
                 key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${index === 0 ? 'pt-8' : ''}`}
               >
                 <div
                   className={`max-w-[80%] rounded-2xl px-4 py-3 ${
