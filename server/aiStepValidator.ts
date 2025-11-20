@@ -110,14 +110,15 @@ export async function validateStepAdvancement(
       };
     }
 
-    // 🔒 ATOMIC CLOSE: Steps 13-15 always advance, no validation needed
-    if (currentStep >= 13 && currentStep <= 14) {
-      console.log(`[AI Validator] 🔒 ATOMIC CLOSE: Step ${currentStep} → Step ${currentStep + 1} (no validation required)`);
+    // 🔒 ATOMIC CLOSE: Step 13 always advances to 14 (price reveal triggers discount)
+    // Step 14 must validate normally before advancing to 15
+    if (currentStep === 13) {
+      console.log(`[AI Validator] 🔒 ATOMIC CLOSE: Step 13 → Step 14 (no validation required)`);
       return {
         shouldAdvance: true,
         feedback: '',
-        reasoning: `Atomic close - step ${currentStep} always advances to ${currentStep + 1}`,
-        nextStep: currentStep + 1,
+        reasoning: `Atomic close - step 13 always advances to 14`,
+        nextStep: 14,
         action: 'NEXT'
       };
     }

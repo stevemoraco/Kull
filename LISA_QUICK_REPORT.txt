@@ -1,0 +1,52 @@
+================================================================================
+LISA PERSONA TEST - QUICK REPORT
+================================================================================
+
+PERSONA:   Lisa - Budget Photographer
+SHOOTS:    1.5/week | RATE: $70/hr | PRICE THRESHOLD: $3,000/year
+GOAL:      Reach Step 15 and get trial link
+
+================================================================================
+RESULTS
+================================================================================
+
+Persona:       Lisa - Budget
+Turns:         17
+Final Step:    15
+Trial Link:    YES ✓
+Status:        SUCCESS ✓
+
+================================================================================
+ISSUES IDENTIFIED
+================================================================================
+
+1. Off-script conversation flow
+   - AI repeats calculator question 8+ times
+   - Steps not enforced sequentially
+
+2. Step 10 critical failure
+   - Missing 3-part explanation requirement
+   - No explanation of how Kull works
+
+3. Step 11 prerequisite not checked
+   - Asked commitment before explaining Kull
+
+4. Step 14 pricing vague
+   - Expected: "$5,988/year"
+   - Actual: "you're at step where we price..."
+
+5. Step 15 trial link format wrong
+   - Expected: "[start your free trial here](#download)"
+   - Actual: "[sign in quick](/api/login)"
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ Test PASSES functional requirement (reaches Step 15 + trial link)
+⚠️ Test FAILS conversation quality (off-script, repeated questions)
+
+The system works but needs improvement for proper sales script adherence
+and conversation quality.
+
+================================================================================

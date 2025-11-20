@@ -1,0 +1,335 @@
+================================================================================
+LISA PERSONA - BUDGET PHOTOGRAPHER - E2E TEST RESULT
+================================================================================
+
+```
+REPORT:
+Persona: Lisa - Budget
+Turns: 17
+Final Step: 15
+Trial Link: YES
+Issues: 
+  - Off-script responses (59% of conversation)
+  - Calculator question repeated 8+ times
+  - Step 10 explanation missing (CRITICAL)
+  - Step 11 prerequisite not enforced
+  - Step 14 price not clearly stated ($5,988/year)
+  - Step 15 trial link format incorrect
+Status: SUCCESS
+```
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+OBJECTIVE: Run full sales conversation with Lisa persona through all 16 steps,
+reach Step 15 (Discount Close), and obtain trial link.
+
+RESULT: SUCCESS ✓
+
+Persona successfully progressed through entire sales script from cold visitor
+to trial offer. Database state was persisted, no technical errors occurred,
+and trial link was provided as required.
+
+KEY FINDINGS:
+
+✓ PASSES FUNCTIONAL REQUIREMENTS:
+  - Reached Step 15
+  - Trial link provided
+  - Full 17-turn conversation completed
+  - Conversation state persisted to database
+  - No technical errors or crashes
+
+⚠️ FAILS QUALITY REQUIREMENTS:
+  - 59% of responses off-script (10/17 turns)
+  - Calculator question repeated 8 times
+  - Step 10 critical explanation completely missing
+  - Step 11 prerequisite validation not enforced
+  - Step 14 pricing vague (missing $5,988/year)
+  - Step 15 trial link format incorrect
+
+================================================================================
+CONVERSATION METRICS
+================================================================================
+
+Persona Details:
+  Name: Lisa - Budget Photographer
+  Shoots/Week: 1.5 (88/year reported)
+  Hourly Rate: $70/hr
+  Revenue Goal: $150,000/year
+  Current Hours: 35/week
+  Pain Point: Photo culling (3-4 hrs per shoot)
+  Primary Goal: Work-life balance, time off
+
+Conversation Flow:
+  Total Turns: 17
+  On-Script: ~7 turns (41%)
+  Off-Script: ~10 turns (59%)
+  Phases:
+    Phase 1 (Permission): ✓ CORRECT
+    Phase 2 (Discovery): ⚠️ PARTIAL (calculator repeats)
+    Phase 3 (Pain): ⚠️ OFF-SCRIPT (missing pain discussion)
+    Phase 4 (Commitment): ⚠️ OFF-SCRIPT (no Step 10 context)
+    Phase 5 (Pricing): ⚠️ VAGUE (price not clear)
+    Phase 6 (Close): ✓ SUCCESS (trial link provided)
+
+Trial Link Detection:
+  Found: YES ✓
+  Format: "[sign in quick](/api/login)"
+  Expected: "[start your free trial here](#download)"
+
+================================================================================
+CRITICAL ISSUES
+================================================================================
+
+ISSUE #1: STEP 10 EXPLANATION MISSING
+Severity: CRITICAL
+Status: NOT IMPLEMENTED
+
+Step 10 requires MULTI-PART explanation before proceeding to Step 11:
+  Part 1: Explain how Kull AI culling works (30 seconds)
+          - Focus/composition analysis
+          - Real-time processing
+  Part 2: Paint vision of their life AFTER using Kull
+          - Reference their specific goal: more time with family
+          - Reduced stress, weekends off
+  Part 3: Connect to their bottleneck
+          - "This removes the 3-4 hour culling bottleneck you mentioned"
+
+WHAT HAPPENED:
+- Step 10 was completely skipped in conversation
+- AI never explained how Kull works
+- AI never painted vision of their life after
+- AI jumped from pain discovery straight to asking commitment
+- No context for why they should commit
+
+IMPACT: High. Customers don't understand the solution before commitment.
+
+---
+
+ISSUE #2: STEP 11 PREREQUISITE NOT ENFORCED
+Severity: CRITICAL
+Status: NOT VALIDATED
+
+Step 11 script says:
+"PREREQUISITE CHECK: You can ONLY ask this if you've already explained:
+1) How Kull works
+2) Vision of their life after using Kull
+3) Connection to their goal"
+
+WHAT HAPPENED:
+- Step 11 (commitment question) asked without context
+- None of the prerequisites were provided
+- AI asked "how committed are you 1-10" without any explanation
+
+IMPACT: High. Asking for commitment without providing context.
+
+---
+
+ISSUE #3: CALCULATOR QUESTION REPEATED 8+ TIMES
+Severity: HIGH
+Status: ONGOING
+
+Pattern: "is your annual shoots number accurate? [click calculator]"
+
+Occurrences: Turns 5, 6, 8, 9, 10, 11, 13, 14
+
+WHAT HAPPENED:
+- First ask: Turn 3 (appropriate)
+- Confirm: Turn 4 (appropriate)
+- After that: Repeated 8+ times despite Lisa confirming
+
+IMPACT: High. Poor user experience, suggests state not tracked.
+
+---
+
+ISSUE #4: STEP 14 PRICE NOT CLEARLY STATED
+Severity: HIGH
+Status: VAGUE
+
+Script says: "everyday price is $5,988/year to solve exactly the problem
+             you just described."
+
+WHAT HAPPENED:
+- AI: "you're at step where we price the solution"
+- Price never explicitly stated
+- No $5,988/year mentioned
+
+IMPACT: Medium. Customer doesn't know cost before deciding.
+
+---
+
+ISSUE #5: STEP 15 TRIAL LINK FORMAT INCORRECT
+Severity: HIGH
+Status: WRONG FORMAT
+
+Expected: "[start your free trial here](#download)"
+Actual: "[sign in quick](/api/login)"
+
+IMPACT: Medium. Different UX flow, may confuse user.
+
+================================================================================
+ROOT CAUSE ANALYSIS
+================================================================================
+
+Why is the script not being followed properly?
+
+1. MASTER_SALES_PROMPT not enforcing step sequence
+   - AI uses pattern matching instead of strict state machine
+   - Repeats questions based on topic matching rather than step state
+
+2. conversationState.currentStep tracked but not enforced
+   - Database tracks step (5+ updates confirmed)
+   - But MASTER_SALES_PROMPT doesn't use it as SOURCE OF TRUTH
+   - Allows pattern matching to override state
+
+3. Step 10 multi-part handler not implemented
+   - Code exists to flag step10Explained
+   - But no logic to generate the 3-part explanation
+   - No prerequisite check before Step 11
+
+4. Prerequisite validation incomplete
+   - Step 11 prerequisite check exists in code
+   - But not being enforced properly
+   - Allows asking commitment without context
+
+5. Circuit breaker forcing advancement
+   - After 3 attempts at same step, forces advancement
+   - Calculator loop hit this limit multiple times
+   - Better approach: understand why question not understood
+
+================================================================================
+POSITIVE OBSERVATIONS
+================================================================================
+
+✓ NO TECHNICAL FAILURES
+  - Server didn't crash
+  - Database queries succeeded
+  - SSE streaming worked properly
+  - Session management functional
+
+✓ CONVERSATION COMPLETED END-TO-END
+  - All 17 turns processed
+  - No errors or exceptions
+  - Response generation consistent
+
+✓ TRIAL LINK PROVIDED
+  - Step 15 ultimately delivered trial offer
+  - Meets primary objective
+
+✓ STATE PERSISTENCE WORKING
+  - conversationState.currentStep updated
+  - Database persisted changes
+  - Session tracking functional
+
+✓ MODEL PERFORMANCE
+  - gpt-5-nano appropriate (cost-optimized per CLAUDE.md)
+  - Response quality reasonable despite off-script behavior
+  - Streaming format correct
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+CRITICAL (Fix immediately):
+
+1. Implement strict state machine
+   - Use conversationState.currentStep as SOURCE OF TRUTH
+   - Don't allow pattern matching to override state
+   - Validate exact step before responding
+
+2. Implement Step 10 multi-part handler
+   - Generate 3-part explanation
+   - Set step10Explained flag after completing
+   - Track that all 3 parts were delivered
+
+3. Enforce Step 11 prerequisite
+   - Check step10Explained == true before asking
+   - Force return to Step 10 if missing
+   - Show error message if prerequisites not met
+
+4. Fix calculator looping
+   - Track if already confirmed for session
+   - Don't repeat same question after confirmation
+   - Better detection of when to move forward
+
+HIGH PRIORITY (Should fix):
+
+5. Update Step 15 trial link
+   - Change from "/api/login" to "#download"
+   - Match script format exactly
+
+6. Clarify Step 14 pricing
+   - Always state: "$5,988/year"
+   - Never say "step where we price"
+   - Add value proposition
+
+7. Improve circuit breaker
+   - Don't just force advancement
+   - Log why step repetition happening
+   - Consider longer wait or different approach
+
+MEDIUM PRIORITY (Nice to have):
+
+8. Add conversation analytics
+   - Track which steps have issues
+   - Monitor script adherence percentage
+   - Alert when off-script > 50%
+
+9. Add prerequisite validation logs
+   - Log when prerequisites not met
+   - Make debugging easier
+
+================================================================================
+CONCLUSION
+================================================================================
+
+TEST RESULT: SUCCESS ✓ (with significant quality issues)
+
+FUNCTIONAL TEST: PASS
+The system successfully reaches Step 15 and provides a trial link as
+required. The conversation completes without technical errors.
+
+QUALITY TEST: FAIL
+The conversation deviates from the sales script 59% of the time. Critical
+Step 10 explanation is missing, making the pitch incomplete.
+
+VERDICT: The system is functionally capable but requires significant
+improvements to the conversation quality before production deployment.
+
+A real user (Lisa) would:
+1. Be confused by repeated calculator questions
+2. Not understand what Kull does (Step 10 missing)
+3. Struggle to make commitment decision (no context)
+4. Eventually get trial link but frustrated journey
+
+CONVERSION IMPACT: While Lisa ultimately signed up for trial, the poor
+experience would likely result in:
+- Higher abandonment rates
+- Lower conversion percentage
+- Reduced trial-to-paid conversion
+- Negative feedback about repetitive questions
+
+RECOMMENDATION: Fix critical issues #1-4 before production release.
+
+================================================================================
+FILES GENERATED
+================================================================================
+
+Analysis Files:
+1. /home/runner/workspace/lisa-persona-test.ts
+   - Executable E2E test (Node.js with SSE)
+
+2. /home/runner/workspace/LISA_PERSONA_TEST_REPORT.md
+   - Detailed turn-by-turn analysis
+
+3. /home/runner/workspace/FINAL_LISA_TEST_REPORT.txt
+   - Comprehensive findings
+
+4. /home/runner/workspace/LISA_QUICK_REPORT.txt
+   - Executive summary
+
+5. /home/runner/workspace/LISA_PERSONA_E2E_TEST_RESULT.txt
+   - This detailed result
+
+================================================================================

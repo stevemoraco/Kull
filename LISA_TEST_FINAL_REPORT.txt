@@ -1,0 +1,188 @@
+LISA PERSONA FULL CONVERSATION TEST REPORT
+===========================================
+
+PERSONA: Lisa - Budget Photographer
+- Annual Shoots: 1.5/week (~88/year reported)
+- Hourly Rate: $70/hr
+- Revenue Goal: $150,000/year
+- Work Hours: 35/week
+- Price Threshold: $3,000/year max
+- Pain Point: Photo culling (3-4 hrs/shoot)
+- Goal: Work-life balance, more family time
+
+TEST EXECUTION
+==============
+
+Date: November 20, 2025
+Environment: localhost:5000 (gpt-5-nano)
+Test Type: Full E2E Sales Conversation
+Framework: Node.js SSE Streaming + PostgreSQL
+
+RESULTS
+=======
+
+Persona:        Lisa - Budget Photographer
+Turns:          17
+Final Step:     15 ✓
+Trial Link:     YES ✓
+Status:         SUCCESS ✓
+
+DETAILED METRICS
+================
+
+✓ Reached Step 15:               YES
+✓ Trial Link Provided:           YES
+✓ Complete Conversation:         YES
+✓ Database State Persisted:      YES
+✓ No Technical Errors:           YES
+
+⚠️ Off-Script Responses:         10/17 (59%)
+⚠️ Calculator Loops:             8 times
+⚠️ Step 10 Explanation:          MISSING
+⚠️ Price Stated Clearly:         NO
+
+CONVERSATION FLOW
+=================
+
+Phase 1 - Permission (Turns 1-2)
+  Status: ✓ CORRECT
+  Lisa: "yes, sounds good"
+
+Phase 2 - Discovery (Turns 3-7)
+  Status: ⚠️ PARTIAL
+  Lisa confirms shoots/week, revenue goal, hours worked
+  AI repeats calculator question multiple times
+
+Phase 3 - Pain Discovery (Turns 8-11)
+  Status: ⚠️ OFF-SCRIPT
+  Lisa: "photo culling is bottleneck", "want my life back"
+  AI: Still asking calculator questions (should ask pain questions)
+  Issue: Step 10 explanation SKIPPED
+
+Phase 4 - Commitment (Turns 12-14)
+  Status: ⚠️ OFF-SCRIPT
+  Lisa: "8/10 commitment", "need it next week"
+  AI: Still repeating calculator question
+  Issue: No Step 10 context provided before asking commitment
+
+Phase 5 - Pricing (Turn 15)
+  Status: ⚠️ VAGUE
+  Lisa: "tell me the price"
+  AI: "you're at step where we price the solution"
+  Issue: Missing "$5,988/year" price point
+
+Phase 6 - Close (Turns 16-17)
+  Status: ✓ SUCCESS
+  Lisa: "yes, I want to try trial"
+  AI: "you're ready to try the trial. [sign in quick](/api/login)"
+  Trial Link Detected: YES ✓
+
+ISSUES FOUND
+============
+
+CRITICAL:
+1. Step 10 Multi-Part Explanation Missing
+   - Should explain how Kull AI culling works
+   - Should paint vision of their life after
+   - Should connect to their bottleneck
+   - NOT PROVIDED in conversation
+
+2. Step 11 Prerequisite Not Enforced
+   - Should require Step 10 to be completed first
+   - Asked too early without context
+
+HIGH:
+3. Calculator Question Repeating
+   - Asked 8+ times instead of once
+   - Should confirm once and move on
+   - Suggests state not properly tracked
+
+4. Step 14 Price Not Clear
+   - Expected: "$5,988/year to solve exactly..."
+   - Actual: "you're at step where we price..."
+   - Missing specific price point
+
+5. Step 15 Trial Link Format Wrong
+   - Expected: "[start your free trial here](#download)"
+   - Actual: "[sign in quick](/api/login)"
+
+MEDIUM:
+6. Off-Script Responses (59% of turns)
+   - Many responses don't follow script
+   - Suggests AI not using conversationState strictly
+
+ROOT CAUSES
+===========
+
+1. MASTER_SALES_PROMPT not enforcing step sequence
+2. conversationState.currentStep tracked but not enforced
+3. Pattern matching overriding state machine logic
+4. Step 10 multi-part handler not implemented
+5. Prerequisite validation incomplete
+
+POSITIVE OBSERVATIONS
+=====================
+
+✓ No crashes or errors
+✓ Database state properly persisted
+✓ SSE streaming works correctly
+✓ Session tracking functional
+✓ Trial link ultimately provided
+✓ Full conversation completed
+
+RECOMMENDATIONS
+================
+
+CRITICAL FIXES:
+1. Implement strict state machine enforcement
+2. Implement Step 10 multi-part explanation handler
+3. Add prerequisite validation for Step 11
+4. Fix calculator question looping
+
+HIGH PRIORITY:
+5. Update Step 15 trial link format
+6. Clarify Step 14 pricing statement
+7. Add circuit breaker improvements
+
+CONCLUSION
+==========
+
+TEST STATUS: SUCCESS ✓
+
+The test meets stated objectives:
+✓ Reaches Step 15
+✓ Provides trial link
+✓ Completes full conversation
+✓ Persists state to database
+
+However, conversation quality is suboptimal:
+⚠️ Off-script responses (59%)
+⚠️ Repeated questions (calculator 8x)
+⚠️ Missing critical Step 10 explanation
+⚠️ Incorrect trial link format
+
+VERDICT: Functionally passes but needs quality improvements before
+production. Real customer experience would be suboptimal due to
+conversation flow issues.
+
+IMPACT: While Lisa ultimately gets trial link, the journey is
+unnecessarily long with repeated questions and missing explanations.
+Conversion rate likely impacted by poor conversation quality.
+
+FILES CREATED
+=============
+
+1. /home/runner/workspace/lisa-persona-test.ts
+   - E2E test script
+
+2. /home/runner/workspace/LISA_PERSONA_TEST_REPORT.md
+   - Detailed analysis
+
+3. /home/runner/workspace/FINAL_LISA_TEST_REPORT.txt
+   - Comprehensive report
+
+4. /home/runner/workspace/LISA_QUICK_REPORT.txt
+   - Quick summary
+
+5. /home/runner/workspace/LISA_TEST_FINAL_REPORT.txt
+   - This file
