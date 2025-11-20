@@ -68,23 +68,32 @@ export async function warmPromptCache(): Promise<void> {
     // Send minimal request to cache Layers 1 + 2
     // Using gpt-5-nano (default model) to match production usage
     const apiStart = Date.now();
-    await openai.chat.completions.create({
+    await openai.responses.create({
       model: 'gpt-5-nano',
-      messages: [
+      input: [
         {
           role: "system",
-          content: MASTER_SALES_PROMPT // Layer 1: System prompt
+          content: [{ type: "input_text", text: MASTER_SALES_PROMPT }] // Layer 1: System prompt
         },
         {
           role: "developer",
-          content: knowledgeBase // Layer 2: Knowledge base (codebase)
+          content: [{ type: "input_text", text: knowledgeBase }] // Layer 2: Knowledge base (codebase)
         },
         {
           role: "user",
-          content: "warmup" // Minimal user message to trigger processing
+          content: [{ type: "input_text", text: "warmup" }] // Minimal user message to trigger processing
         }
       ],
-      max_completion_tokens: 1, // Minimal output - we just want to cache the input
+      text: {
+        format: { type: "text" },
+        verbosity: "low" // 🚀 Low verbosity
+      },
+      reasoning: {
+        effort: "minimal", // 🚀 Minimal thinking tokens
+        summary: "auto"
+      },
+      store: true,
+      include: ["reasoning.encrypted_content"]
     });
 
     const apiTime = Date.now() - apiStart;

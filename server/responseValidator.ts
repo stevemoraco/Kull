@@ -172,6 +172,13 @@ export function validateResponse(
   // Extract questions from current AI response
   const currentQuestions = extractQuestions(aiResponse);
 
+  // 🚨 NEW CHECK: Multiple Questions in Single Response
+  if (currentQuestions.length > 1) {
+    metrics.hasRepeatedQuestion = true; // Reuse this flag since it's a conversation flow issue
+    issues.push(`MULTIPLE_QUESTIONS: AI asked ${currentQuestions.length} questions in one message (should only ask ONE)`);
+    issues.push(`  Questions detected: ${currentQuestions.map(q => '"' + q.substring(0, 40) + '..."').join(' | ')}`);
+  }
+
   // Check 1: Repeated Question Detection
   const previousQuestions: string[] = [];
   for (const msg of conversationHistory) {

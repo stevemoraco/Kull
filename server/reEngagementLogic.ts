@@ -99,32 +99,32 @@ function generateActivityNudge(activity: UserActivityEvent[]): string {
 
   if (lastAction.type === 'click') {
     const element = extractElement(lastAction.target);
-    return `saw you click "${element}" - questions about that?`;
+    return `you clicked "${element}" - questions about that?`;
   }
 
   if (lastAction.type === 'hover') {
     const element = extractElement(lastAction.target);
-    return `noticed you hovering on ${element} - curious about something?`;
+    return `you were looking at ${element} - curious about something?`;
   }
 
   if (lastAction.type === 'scroll') {
     // Check if they scrolled to specific sections
     const target = lastAction.target.toLowerCase();
     if (target.includes('pricing')) {
-      return 'saw you checking out pricing - want to understand how it works?';
+      return 'you were checking out pricing - want to understand how it works?';
     }
     if (target.includes('feature')) {
-      return 'noticed you looking at features - questions?';
+      return 'you were looking at features - questions?';
     }
     if (target.includes('calculator')) {
-      return 'saw you scrolling through the calculator - want to talk numbers?';
+      return 'you were scrolling through the calculator - want to talk numbers?';
     }
-    return 'saw you scrolling - anything catch your eye?';
+    return 'you were scrolling - anything interest you?';
   }
 
   if (lastAction.type === 'input' || lastAction.type === 'select') {
     const element = extractElement(lastAction.target);
-    return `noticed you adjusting ${element} - want to talk about those numbers?`;
+    return `you were adjusting ${element} - want to talk about those numbers?`;
   }
 
   return 'still exploring? let me know if you have questions';

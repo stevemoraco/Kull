@@ -53,12 +53,42 @@ export async function validateStepAdvancement(
 
     // Build conversation context if history is provided
     let historyContext = '';
+    let hasAskedSameQuestionMultipleTimes = false;
     if (conversationHistory && conversationHistory.length > 0) {
       historyContext = '\n\n## CONVERSATION HISTORY (for context):\n\n';
       conversationHistory.slice(-6).forEach((msg, idx) => {
         historyContext += `${msg.role}: "${msg.content.substring(0, 200)}${msg.content.length > 200 ? '...' : ''}"\n`;
       });
       historyContext += '\n---\n';
+
+      // FAILSAFE: Check if AI has asked the same question 2+ times
+      const recentAIMessages = conversationHistory
+        .filter(m => m.role === 'assistant')
+        .slice(-3)
+        .map(m => m.content.toLowerCase());
+
+      // Extract question from current AI message (remove everything after ?)
+      const currentQuestion = aiMessage.split('?')[0]?.toLowerCase().trim();
+      if (currentQuestion) {
+        const timesAsked = recentAIMessages.filter(m =>
+          m.includes(currentQuestion.substring(0, 30)) // Match first 30 chars
+        ).length;
+        if (timesAsked >= 2) {
+          hasAskedSameQuestionMultipleTimes = true;
+          console.log(`[AI Validator] ⚠️ FAILSAFE: Same question asked ${timesAsked} times - forcing NEXT`);
+        }
+      }
+    }
+
+    // FAILSAFE: If same question repeated, automatically advance
+    if (hasAskedSameQuestionMultipleTimes) {
+      return {
+        shouldAdvance: true,
+        feedback: '',
+        reasoning: 'Same question repeated multiple times - breaking loop',
+        nextStep: currentStep + 1,
+        action: 'NEXT'
+      };
     }
 
     // Build validation prompt
@@ -75,22 +105,29 @@ User's response: "${userMessage}"
 
 ---
 
-QUESTION: What should happen next in this conversation?
+QUESTION: Should we advance to the next question?
 
-**SMART NAVIGATION OPTIONS:**
+**🚨 CRITICAL: ALMOST ALWAYS SAY NEXT 🚨**
 
-**NEXT (advance to step ${currentStep + 1})** - Use when:
-- User gave a good answer and we should move to the next question
-- Confirmations like "yep", "yes", "sure", "okay", "alright"
-- Direct answers like "45 hours", "$200k", "$200k revenue", "I want more shoots"
-- Brief acknowledgments like "hi", "hello", "got it"
-- User already answered this in conversation history
-- **DEFAULT TO NEXT - be generous, not strict**
+**NEXT (advance to step ${currentStep + 1})** - Use in these cases (99% of the time):
+- User gave ANY answer with substance (numbers, goals, feelings, descriptions)
+- Confirmations: "yep", "yes", "sure", "k", "okay", "alright" → NEXT
+- Direct answers: "45 hours", "$200k", "more shoots", "less stress" → NEXT
+- Multi-part: "2x, $200k, 2 months vacay", "$200k a year, 2 months vacay" → NEXT
+- Vague references: "that", "it", "what I said" (they're referring to previous answer) → NEXT
+- Frustration: "that's it dummy", "i told you", "are you serious" → NEXT
+- Previous AI message acknowledged their answer ("got it", "you're targeting") → **AUTOMATICALLY NEXT**
+- User already answered in conversation history → NEXT
+- **IF PREVIOUS AI MESSAGE REPEATED BACK WHAT USER SAID, YOU MUST SAY NEXT**
+- **DEFAULT: NEXT - When in any doubt whatsoever, advance**
 
-**STAY (repeat step ${currentStep})** - Use RARELY when:
-- User gave a completely vague non-answer ("idk", "huh?", "???")
-- User typed random characters or gibberish
-- **ONLY if truly impossible to interpret as any kind of answer**
+**STAY (repeat step ${currentStep})** - ONLY use in these 2 cases (1% of the time):
+1. User gave ONLY "idk" with ZERO other information AND no prior answer in history
+2. User typed pure gibberish like "asdfghjkl" with no context
+
+**CRITICAL RULE:** If the AI's previous message acknowledged or repeated back the user's answer, you MUST advance. Example:
+- AI: "got it — you're targeting $200k annual revenue and two months off"
+- This means user already answered → automatically say NEXT
 
 **JUMP (go to a specific step)** - EXTREMELY RARE, only when:
 - User explicitly says "I want to buy" or "sign me up" → JUMP FORWARD to step 13 (introduce price)
@@ -113,20 +150,31 @@ REASONING: One sentence explaining why`;
 
     const startTime = Date.now();
 
-    const response = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: 'gpt-5-nano',
-      messages: [
+      input: [
         {
           role: 'user',
-          content: prompt
+          content: [{ type: "input_text", text: prompt }]
         }
       ],
-      max_completion_tokens: 100,
-      temperature: 0.3, // Low temperature for consistent yes/no decisions
+      text: {
+        format: { type: "text" },
+        verbosity: "low" // 🚀 Low verbosity
+      },
+      reasoning: {
+        effort: "minimal", // 🚀 Minimal thinking tokens
+        summary: "auto"
+      },
+      store: true,
+      include: ["reasoning.encrypted_content"]
     });
 
     const responseTime = Date.now() - startTime;
-    const result = response.choices[0]?.message?.content?.trim() || '';
+
+    // Responses API returns output array with content
+    const output = (response as any).output?.find((item: any) => item.type === 'output_text');
+    const result = output?.text?.trim() || '';
 
     // Parse response
     const actionMatch = result.match(/ACTION:\s*(NEXT|STAY|JUMP)/i);

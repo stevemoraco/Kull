@@ -312,19 +312,19 @@ export function buildSectionTimingMarkdown(sectionHistory: SectionHistoryItem[] 
       markdown += `- "i see you spent ${timeStr} playing with the calculator - did you find your numbers?"\n`;
       markdown += `- "those calculator numbers accurate for your workflow?"\n`;
     } else if (topSection.id.toLowerCase().includes('pricing')) {
-      markdown += `- "noticed you were reading pricing for a while - have questions about the cost?"\n`;
+      markdown += `- "you were looking at pricing for a while - have questions about the cost?"\n`;
       markdown += `- "you spent ${timeStr} on pricing - want to see how it compares to what you're wasting now?"\n`;
     } else if (topSection.id.toLowerCase().includes('feature')) {
-      markdown += `- "you were checking out features - which one caught your eye?"\n`;
+      markdown += `- "you were checking out features - which one interests you most?"\n`;
       markdown += `- "spent ${timeStr} reading features - what stood out?"\n`;
     } else if (topSection.id.toLowerCase().includes('problem')) {
       markdown += `- "you spent time reading about pain points - which one hits hardest for you?"\n`;
       markdown += `- "those problems resonate with your workflow?"\n`;
     } else if (topSection.id.toLowerCase().includes('testimonial')) {
-      markdown += `- "saw you reading testimonials - any of those stories sound familiar?"\n`;
+      markdown += `- "you were reading testimonials - any of those stories sound familiar?"\n`;
       markdown += `- "you spent ${timeStr} on case studies - which one matched your situation?"\n`;
     } else {
-      markdown += `- "noticed you spent ${timeStr} reading ${topSection.title} - what caught your attention?"\n`;
+      markdown += `- "you spent ${timeStr} reading ${topSection.title} - what interests you most?"\n`;
     }
 
     markdown += `\n**⚠️ CRITICAL:** Reference the section they spent the most time on in your FIRST response. Show you're paying attention to what they're reading.\n\n`;
@@ -409,7 +409,7 @@ export function buildActivityHistoryMarkdown(userActivity: ActivityEvent[] | nul
           const elementText = event.value ? ` - TEXT: **"${event.value}"**` : '';
           markdown += `🔥 **JUST CLICKED** (${secondsAgo}s ago): \`${event.target}\`${elementText}\n`;
         } else if (event.type === 'hover') {
-          markdown += `👁️ **JUST HOVERED** (${secondsAgo}s ago): \`${event.target}\`\n`;
+          markdown += `**JUST HOVERED** (${secondsAgo}s ago): \`${event.target}\`\n`;
         } else if (event.type === 'input') {
           const displayValue = event.value && event.value.length > 0 ? `"${event.value}"` : '(empty)';
           markdown += `⌨️ **JUST TYPED** (${secondsAgo}s ago) in \`${event.target}\`: ${displayValue}\n`;
@@ -427,7 +427,7 @@ export function buildActivityHistoryMarkdown(userActivity: ActivityEvent[] | nul
     markdown += `- Did they highlight text? Reference that exact text\n`;
     markdown += `- Did they hover over something? They're curious - dig into it\n`;
     markdown += `- Are they reading? Ask about what they're seeing on the page\n\n`;
-    markdown += `Make your message feel SPOOKY and personalized - like you're watching them in real-time (because you are 👀).\n`;
+    markdown += `Make your message feel personalized based on their real-time activity.\n`;
     markdown += `Use the exact text they clicked/highlighted in your response to prove you're paying attention!\n`;
   }
 

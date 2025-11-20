@@ -415,7 +415,7 @@ export function formatPatternInsights(patterns: ActivityPatterns): string {
 
   // Journey phase
   const phaseEmoji = {
-    awareness: '👀',
+    awareness: '💡',
     consideration: '🤔',
     decision: '✅',
     abandonment: '⚠️',
@@ -520,7 +520,7 @@ function getRecommendedApproach(patterns: ActivityPatterns): string {
   }
 
   // Awareness phase
-  return '👀 **EARLY AWARENESS STAGE**\n- Just starting to explore\n- Ask permission to ask questions\n- Focus on discovery, not selling\n- Understand their current situation first';
+  return '💡 **EARLY AWARENESS STAGE**\n- Just starting to explore\n- Ask permission to ask questions\n- Focus on discovery, not selling\n- Understand their current situation first';
 }
 
 /**

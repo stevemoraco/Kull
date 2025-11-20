@@ -127,7 +127,7 @@ export const activityTemplates: Record<number, ActivityTemplate> = {
   },
 
   13: {
-    pricing: "caught you checking pricing 👀 — want the exact number?",
+    pricing: "checking out pricing — want the exact number?",
     calculator: "calculator's been showing you the math. want the actual price?",
     features: "features are worth it. want to know what it costs?",
     security: "everything's secure and encrypted. want the price?",

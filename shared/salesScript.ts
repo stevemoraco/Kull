@@ -61,8 +61,8 @@ export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
   },
   {
     step: 6,
-    shortLabel: "Annual target",
-    question: "what's your most important goal for next year? (or repeat it back to them if they've already said it, and ask why that one more than everything else they want to do)",
+    shortLabel: "Prioritize goal",
+    question: "got it. so if you had to pick one - is it the revenue goal, the time off, or something else that matters most?",
     category: "pain",
     required: true
   },
@@ -241,8 +241,8 @@ Step 4: Growth Plan
 Step 5: Current Workflow
 "do you expect to be able to do that with your current workflow?"
 
-Step 6: Annual Target
-"what's your actual target for annual shoots next year?"
+Step 6: Prioritize Goal
+"got it. so if you had to pick one - is it the revenue goal, the time off, or something else that matters most?"
 
 Step 7: Why That Goal?
 "why that specific number? what drives that goal?"

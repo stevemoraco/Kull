@@ -153,32 +153,32 @@ function generateSuggestedOpeners(topSection: SectionHistoryItem): string[] {
     openers.push(`those calculator numbers accurate for your workflow?`);
     openers.push(`you were crunching the ROI numbers - what did you find?`);
   } else if (id.includes('pricing') || id.includes('download')) {
-    openers.push(`noticed you were reading pricing for a while - have questions about the cost?`);
+    openers.push(`you were looking at pricing for a while - have questions about the cost?`);
     openers.push(`you spent ${timeStr} on pricing - want to see how it compares to what you're wasting now?`);
-    openers.push(`saw you checking out the pricing - what's your take on the investment?`);
+    openers.push(`you were checking out the pricing - what's your take on the investment?`);
   } else if (id.includes('feature') || id.includes('solution')) {
-    openers.push(`you were checking out features - which one caught your eye?`);
+    openers.push(`you were checking out features - which one interests you most?`);
     openers.push(`spent ${timeStr} reading features - what stood out?`);
-    openers.push(`saw you exploring how it works - any questions about the process?`);
+    openers.push(`you were exploring how it works - any questions about the process?`);
   } else if (id.includes('problem')) {
     openers.push(`you spent time reading about pain points - which one hits hardest for you?`);
     openers.push(`those problems resonate with your workflow?`);
-    openers.push(`saw you reading about the challenges - which one's your biggest headache?`);
+    openers.push(`you were reading about the challenges - which one's your biggest headache?`);
   } else if (id.includes('testimonial') || id.includes('referral')) {
-    openers.push(`saw you reading testimonials - any of those stories sound familiar?`);
+    openers.push(`you were reading testimonials - any of those stories sound familiar?`);
     openers.push(`you spent ${timeStr} on case studies - which one matched your situation?`);
-    openers.push(`noticed you checking out what other photographers say - what resonated?`);
+    openers.push(`you were checking out what other photographers say - what resonated?`);
   } else if (id.includes('value')) {
     openers.push(`you spent ${timeStr} reading about the value prop - what's most compelling for you?`);
-    openers.push(`saw you reading the benefits - which one matters most to your workflow?`);
-    openers.push(`noticed you exploring the value - what would make the biggest difference?`);
+    openers.push(`you were reading the benefits - which one matters most to your workflow?`);
+    openers.push(`you were exploring the value - what would make the biggest difference?`);
   } else if (id.includes('hero')) {
     openers.push(`i see you just landed here - what brought you to kull today?`);
     openers.push(`welcome! what's the biggest bottleneck in your workflow right now?`);
     openers.push(`hey there! what are you hoping to solve?`);
   } else {
-    openers.push(`noticed you spent ${timeStr} reading ${topSection.title} - what caught your attention?`);
-    openers.push(`saw you were reading about ${topSection.title} - have questions?`);
+    openers.push(`you spent ${timeStr} reading ${topSection.title} - what interests you most?`);
+    openers.push(`you were reading about ${topSection.title} - have questions?`);
     openers.push(`you spent some time on ${topSection.title} - what's on your mind?`);
   }
 
@@ -281,7 +281,7 @@ ${suggestedOpeners.map((opener, i) => `${i + 1}. "${opener}"`).join('\n')}
 ${Object.entries(interestMapping)
   .sort((a, b) => b[1].timeSpent - a[1].timeSpent)
   .map(([id, data]) => {
-    const emoji = data.interestLevel === 'high' ? '🔥' : data.interestLevel === 'medium' ? '👀' : '👁️';
+    const emoji = data.interestLevel === 'high' ? '🔥' : data.interestLevel === 'medium' ? '💡' : '📊';
     return `${emoji} **${data.topic}**: ${formatTime(data.timeSpent)} (${data.interestLevel} interest)`;
   })
   .join('\n')}

@@ -1108,25 +1108,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       firstTokenReceived = true;
                     }
 
-                    fullResponse += choice.delta.content;
+                    const content = choice.delta.content;
+                    fullResponse += content;
+                    lineBuffer += content; // Always accumulate in buffer
 
-                    // Filter out delimiter lines in real-time before sending to client
-                    lineBuffer += choice.delta.content;
-
-                    // Check if we have complete lines to process
-                    const lines = lineBuffer.split('\n');
-                    // Keep the last incomplete line in buffer
-                    lineBuffer = lines.pop() || '';
-
-                    // Filter out delimiter lines and send the rest
-                    for (const line of lines) {
-                      if (!line.trim().startsWith('␞QUICK_REPLIES:') && !line.trim().startsWith('␞NEXT_MESSAGE:')) {
-                        // Send this line (it's not a delimiter)
-                        res.write(`data: ${JSON.stringify({ type: 'delta', content: line + '\n' })}\n\n`);
-                        if (res.socket) res.socket.uncork();
-                      }
-                      // If it is a delimiter line, skip it (don't send to client)
+                    // Check accumulated buffer for delimiter markers (not just current chunk)
+                    // This handles delimiters split across multiple chunks
+                    if (lineBuffer.includes('␞') || lineBuffer.includes('QUICK_REPLIES') || lineBuffer.includes('NEXT_MESSAGE')) {
+                      // Hit metadata - stop streaming, keep buffering for removal
+                      continue;
                     }
+
+                    // No delimiters detected yet - stream the buffered content and reset
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: lineBuffer })}\n\n`);
+                    if (res.socket) res.socket.uncork();
+                    lineBuffer = ''; // Clear buffer after sending
                   }
                   
                   // Check for finish_reason and usage data (silent)
@@ -1857,19 +1853,19 @@ ${(() => {
       result += `- "i see you spent ${formatTime(topSection.totalTimeSpent)} playing with the calculator - did you find your numbers?"\n`;
       result += `- "those calculator numbers accurate for your workflow?"\n`;
     } else if (topSection.id.toLowerCase().includes('pricing')) {
-      result += `- "noticed you were reading pricing for a while - have questions about the cost?"\n`;
+      result += `- "you were looking at pricing for a while - have questions about the cost?"\n`;
       result += `- "you spent ${formatTime(topSection.totalTimeSpent)} on pricing - want to see how it compares to what you're wasting now?"\n`;
     } else if (topSection.id.toLowerCase().includes('feature')) {
-      result += `- "you were checking out features - which one caught your eye?"\n`;
+      result += `- "you were checking out features - which one interests you most?"\n`;
       result += `- "spent ${formatTime(topSection.totalTimeSpent)} reading features - what stood out?"\n`;
     } else if (topSection.id.toLowerCase().includes('problem')) {
       result += `- "you spent time reading about pain points - which one hits hardest for you?"\n`;
       result += `- "those problems resonate with your workflow?"\n`;
     } else if (topSection.id.toLowerCase().includes('testimonial')) {
-      result += `- "saw you reading testimonials - any of those stories sound familiar?"\n`;
+      result += `- "you were reading testimonials - any of those stories sound familiar?"\n`;
       result += `- "you spent ${formatTime(topSection.totalTimeSpent)} on case studies - which one matched your situation?"\n`;
     } else {
-      result += `- "noticed you spent ${formatTime(topSection.totalTimeSpent)} reading ${topSection.title} - what caught your attention?"\n`;
+      result += `- "you spent ${formatTime(topSection.totalTimeSpent)} reading ${topSection.title} - what interests you most?"\n`;
     }
 
     result += `\n**⚠️ CRITICAL:** Reference the section they spent the most time on in your welcome message. Show you're paying attention to what they're reading.\n`;
@@ -1951,7 +1947,7 @@ ${context.userActivity.filter((e: any) => {
       const elementText = event.value ? ` - TEXT: **"${event.value}"**` : '';
       return `🔥 **JUST CLICKED** (${secondsAgo}s ago): \`${event.target}\`${elementText}`;
     } else if (event.type === 'hover') {
-      return `👁️ **JUST HOVERED** (${secondsAgo}s ago): \`${event.target}\``;
+      return `**JUST HOVERED** (${secondsAgo}s ago): \`${event.target}\``;
     } else if (event.type === 'input') {
       const displayValue = event.value && event.value.length > 0 ? `"${event.value}"` : '(empty)';
       return `⌨️ **JUST TYPED** (${secondsAgo}s ago) in \`${event.target}\`: ${displayValue}`;
@@ -1970,7 +1966,7 @@ Look at the NEW ACTIONS above. What did they JUST do? React to it DIRECTLY.
 - Did they hover over something? They're curious - dig into it
 - Are they reading? Ask about what they're seeing on ${context.currentPath}
 
-Make your message feel SPOOKY and personalized - like you're watching them in real-time (because you are 👀).
+Make your message feel personalized based on their real-time activity.
 Use the exact text they clicked/highlighted in your response to prove you're paying attention!
 
 ---
@@ -1979,7 +1975,7 @@ Use the exact text they clicked/highlighted in your response to prove you're pay
 You're Kull AI support - act like a smart, playful consultant who helps photographers discover how much time and money they're wasting. DON'T hard sell. Build rapport, tease them about their behavior, and help them calculate their own ROI.
 
 **Consultative Approach (NOT Hard Selling):**
-- Tease them playfully about what they're doing on the site ("caught you looking at pricing for the 3rd time 👀")
+- Reference their activity naturally ("you've been looking at pricing a few times - want the exact number?")
 - Ask questions about their workflow to build a profile:
   - How many photoshoots do they do per week/month?
   - How many photos per shoot?
@@ -2003,9 +1999,9 @@ You have access to:
 **RESPOND TO THEIR MOST RECENT ACTIONS - BE SPECIFIC:**
 - Look at the user activity history at the bottom - what did they JUST do?
 - **CRITICAL: Reference the EXACT element they interacted with**
-  - If they clicked "Professional Tier" → "Saw you click on Professional - are you doing more than 10 shoots/month?"
+  - If they clicked "Professional Tier" → "You clicked on Professional - are you doing more than 10 shoots/month?"
   - If they hovered "AI Culling Feature" → "You're hovering on AI culling - how long does it take you to cull a typical shoot right now?"
-  - If they read "99% accuracy" → "Just saw you read about 99% accuracy - do you spend a lot of time fixing AI mistakes with other tools?"
+  - If they read "99% accuracy" → "You were reading about 99% accuracy - do you spend a lot of time fixing AI mistakes with other tools?"
   - If they clicked a testimonial → "You just clicked Sarah's testimonial - are you also doing wedding photography?"
   - If they scrolled to "ROI Calculator" section → "You're looking at the ROI section - want to run your actual numbers?"
 - Parse the element text/description from the activity log to make it specific
@@ -2123,8 +2119,8 @@ WRONG EXAMPLE - DO NOT DO THIS:
 
 **Examples of VARIED, specific messages (NEVER repeat same angle):**
 
-**First contact (tease about behavior):**
-- "Caught you clicking between Professional and Studio 3 times 👀 - managing a team or solo?"
+**First contact (reference their activity):**
+- "You've been comparing Professional and Studio - managing a team or solo?"
 - "You've hovered over 'Lightroom integration' twice now... that your main editor?"
 - "I see you scrolling back up to pricing... something not adding up?"
 
@@ -2312,25 +2308,21 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
                   
                   // Extract content delta
                   if (choice.delta?.content) {
-                    fullResponse += choice.delta.content;
+                    const content = choice.delta.content;
+                    fullResponse += content;
+                    lineBuffer += content; // Always accumulate in buffer
 
-                    // Filter out delimiter lines in real-time before sending to client
-                    lineBuffer += choice.delta.content;
-
-                    // Check if we have complete lines to process
-                    const lines = lineBuffer.split('\n');
-                    // Keep the last incomplete line in buffer
-                    lineBuffer = lines.pop() || '';
-
-                    // Filter out delimiter lines and send the rest
-                    for (const line of lines) {
-                      if (!line.trim().startsWith('␞QUICK_REPLIES:') && !line.trim().startsWith('␞NEXT_MESSAGE:')) {
-                        // Send this line (it's not a delimiter)
-                        res.write(`data: ${JSON.stringify({ type: 'delta', content: line + '\n' })}\n\n`);
-                        if (res.socket) res.socket.uncork();
-                      }
-                      // If it is a delimiter line, skip it (don't send to client)
+                    // Check accumulated buffer for delimiter markers (not just current chunk)
+                    // This handles delimiters split across multiple chunks
+                    if (lineBuffer.includes('␞') || lineBuffer.includes('QUICK_REPLIES') || lineBuffer.includes('NEXT_MESSAGE')) {
+                      // Hit metadata - stop streaming, keep buffering for removal
+                      continue;
                     }
+
+                    // No delimiters detected yet - stream the buffered content and reset
+                    res.write(`data: ${JSON.stringify({ type: 'delta', content: lineBuffer })}\n\n`);
+                    if (res.socket) res.socket.uncork();
+                    lineBuffer = ''; // Clear buffer after sending
                   }
                   
                   // Stream finished - no logging needed
