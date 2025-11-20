@@ -1698,7 +1698,7 @@ export class DatabaseStorage implements IStorage {
       return {
         questionsAsked: [],
         questionsAnswered: [],
-        currentStep: 1,
+        currentStep: 0,
         offTopicCount: 0
       };
     }

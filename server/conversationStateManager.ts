@@ -22,21 +22,22 @@ const SALES_SCRIPT_STEPS = {
 
 // Question patterns for each step
 const STEP_QUESTION_PATTERNS: Record<number, RegExp[]> = {
-  1: [/goal for next year/i, /how many shoots.*next year/i, /target.*next year/i],
-  2: [/happy with that/i, /satisfied with.*number/i, /is that enough/i],
-  3: [/how many hours.*working/i, /hours.*per week/i, /weekly.*hours/i],
-  4: [/how.*grow.*without/i, /plan.*increase.*without/i, /expand.*without/i],
-  5: [/current workflow/i, /existing.*process/i, /how.*doing.*now/i],
-  6: [/actual target/i, /specific.*goal/i, /what.*exactly.*want/i],
-  7: [/why.*goal/i, /what.*motivates/i, /reason.*target/i],
-  8: [/what changes/i, /impact.*life/i, /what.*different/i],
-  9: [/what.*kept you/i, /blocking.*you/i, /preventing.*from/i],
-  10: [/specialize in/i, /removing.*block/i, /this is what i do/i],
-  11: [/how committed/i, /1.{0,2}10/i, /rate.*commitment/i],
-  12: [/when.*want.*fixed/i, /timeline/i, /when.*need/i],
-  13: [/want.*price/i, /ready.*pricing/i, /see.*cost/i],
-  14: [/everyday price/i, /price is/i, /\$\d+/],
-  15: [/discount/i, /commit.*goal/i, /special.*offer/i]
+  0: [/mind if i ask/i, /ask you a few questions/i, /good fit/i, /worth your time/i],
+  1: [/is that accurate/i, /doing about.*shoots/i, /shoots a year/i, /goal for.*shoots.*next year/i],
+  2: [/goal for next year/i, /more shoots.*less/i, /more profitable/i, /walk me through/i],
+  3: [/how many hours/i, /working each week/i, /hours.*per week/i, /weekly.*hours/i],
+  4: [/grow.*without hiring/i, /without.*working more/i, /how.*grow.*without/i],
+  5: [/current workflow/i, /expect to do that/i, /with.*current workflow/i],
+  6: [/actual target/i, /target for annual/i, /revenue.*time off/i],
+  7: [/why.*specific goal/i, /why that/i, /what.*motivates/i],
+  8: [/what changes/i, /changes.*business.*life/i, /when you hit it/i],
+  9: [/kept you from hitting/i, /kept you from/i, /what.*blocking/i],
+  10: [/specialize in/i, /removing.*workflow/i, /workflow block/i],
+  11: [/how committed/i, /1.*10|1–10/i, /committed.*hitting/i],
+  12: [/when.*want.*fixed/i, /want this fixed/i, /hit those numbers/i],
+  13: [/want.*price/i, /ready.*price/i, /see.*cost/i],
+  14: [/everyday price/i, /price is/i, /\$\d+.*year/i, /solve exactly/i],
+  15: [/discount/i, /commit.*goal/i, /i'?ll discount/i]
 };
 
 // Answer patterns for common responses
@@ -207,8 +208,8 @@ export function updateStateAfterInteraction(
       timestamp: now
     });
 
-    // Advance to next step after answer
-    if (newState.currentStep < 15) {
+    // Advance to next step after answer (16 steps total: 0-15)
+    if (newState.currentStep <= 15) {
       newState.currentStep = detectedStep + 1;
     }
   }
@@ -222,7 +223,7 @@ export function updateStateAfterInteraction(
  *
  * @param userMessage - The user's latest message
  * @param assistantQuestion - The last question the assistant asked
- * @param currentStep - The current script step (1-15)
+ * @param currentStep - The current script step (0-15)
  * @returns true if should progress to next step
  */
 export function shouldProgressToNextStep(
@@ -236,6 +237,12 @@ export function shouldProgressToNextStep(
 
   const messageLower = userMessage.toLowerCase().trim();
   const wordCount = messageLower.split(/\s+/).length;
+
+  // Step 0: Permission granted
+  if (currentStep === 0) {
+    const grantsPermission = /\b(yes|yeah|sure|okay|ok|fine|go ahead|let'?s do it)\b/i.test(messageLower);
+    return grantsPermission || wordCount >= 2;
+  }
 
   // Step 1: User confirmed/denied annual shoots
   if (currentStep === 1) {
@@ -265,6 +272,7 @@ export function shouldProgressToNextStep(
  */
 export function getNextQuestion(step: number, calculatorData?: any): string {
   const questions: Record<number, string> = {
+    0: "do you mind if i ask you a few questions to figure out if you're a good fit for kull and it's worth your time/money? just 15 questions, a few minutes and we'll put together a special offer for you if you're a good fit.",
     1: calculatorData?.annualShoots
       ? `i see you're doing about ${calculatorData.annualShoots} shoots a year — is that accurate?`
       : "what's your goal for annual shoots next year?",
@@ -286,7 +294,7 @@ export function getNextQuestion(step: number, calculatorData?: any): string {
     15: "alright — if you'll commit to the goal you told me, i'll discount it."
   };
 
-  return questions[step] || questions[1];
+  return questions[step] || questions[0];
 }
 
 /**
@@ -351,7 +359,7 @@ export function generateStateContext(state: ConversationState): string {
   const unansweredCount = askedCount - answeredCount;
 
   let context = `\n\n## 📊 Conversation State\n`;
-  context += `- **Current Script Step:** ${state.currentStep}/15\n`;
+  context += `- **Current Script Step:** ${state.currentStep}/16\n`;
   context += `- **Questions Asked:** ${askedCount}\n`;
   context += `- **Questions Answered:** ${answeredCount}\n`;
   context += `- **Unanswered Questions:** ${unansweredCount}\n`;

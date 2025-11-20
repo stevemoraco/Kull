@@ -1115,7 +1115,7 @@ ${userActivity.map((event: any, idx: number) => {
       } : undefined;
 
       // Get current step from conversation state
-      const currentStep = conversationState?.currentStep || 1;
+      const currentStep = conversationState?.currentStep || 0;
 
       // Detect user activity type and inject activity template
       let activityPrompt = '';
@@ -1477,6 +1477,7 @@ Use this template or a natural variation that:
 
               // Determine step name based on step number
               const stepNames: Record<number, string> = {
+                0: 'get_permission',
                 1: 'current_reality',
                 2: 'validate_ambition',
                 3: 'current_workload',
@@ -1541,7 +1542,7 @@ Use this template or a natural variation that:
               const currentSession = sessions.find((s: any) => s.id === sessionId);
 
               if (currentSession) {
-                const currentScriptStep = currentSession.scriptStep || 1;
+                const currentScriptStep = currentSession.scriptStep ?? 0;
 
                 // Get the last assistant message (question AI asked before user responded)
                 const previousMessages = history.filter((m: any) => m.role === 'assistant');

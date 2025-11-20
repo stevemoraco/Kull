@@ -13,10 +13,22 @@ interface ScriptStepPattern {
 }
 
 /**
- * 15-step sales script patterns for detection
+ * 16-step sales script patterns for detection (steps 0-15)
  * Based on the script in server/chatService.ts lines 21-73
  */
 const SCRIPT_STEPS: ScriptStepPattern[] = [
+  {
+    step: 0,
+    description: "Get permission",
+    keywords: ["permission", "questions", "good fit", "worth your time"],
+    patterns: [
+      /mind if i ask/i,
+      /ask you a few questions/i,
+      /good fit for kull/i,
+      /worth your time/i,
+      /just 15 questions/i,
+    ],
+  },
   {
     step: 1,
     description: "Start with their current reality",
