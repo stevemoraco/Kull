@@ -394,7 +394,7 @@ function parseConversationState(messages: Message[], currentState?: Conversation
     questionsAsked,
     questionsAnswered,
     currentStep: questionsAnswered.length + 1,
-    totalSteps: currentState?.totalSteps || 15,
+    totalSteps: currentState?.totalSteps || 16,
   };
 }
 
@@ -977,6 +977,9 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
   const handleLinkClick = useCallback((url: string) => {
     console.log('[Chat] Link clicked:', url);
 
+    // Check if mobile device (screen width < 768px)
+    const isMobile = window.innerWidth < 768;
+
     // Hash-only links (#calculator, #features, etc.) - just scroll, don't navigate
     if (url.startsWith('#')) {
       const hash = url.substring(1); // Remove the #
@@ -984,6 +987,11 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
       const element = document.getElementById(hash);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Close chat on mobile so user can see where they scrolled to
+        if (isMobile) {
+          setIsOpen(false);
+          localStorage.setItem('kull-chat-open', 'false');
+        }
       } else {
         console.warn('[Chat] Element not found:', hash);
       }
@@ -1025,6 +1033,11 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
           const element = document.getElementById(hash);
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Close chat on mobile so user can see where they scrolled to
+            if (isMobile) {
+              setIsOpen(false);
+              localStorage.setItem('kull-chat-open', 'false');
+            }
           }
         } else {
           // Different page, navigate then scroll
@@ -1035,11 +1048,21 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
               element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
           }, 100);
+          // Close chat on mobile after navigation
+          if (isMobile) {
+            setIsOpen(false);
+            localStorage.setItem('kull-chat-open', 'false');
+          }
         }
       } else {
         setLocation(pathToNavigate);
+        // Close chat on mobile after navigation so user can see the page
+        if (isMobile) {
+          setIsOpen(false);
+          localStorage.setItem('kull-chat-open', 'false');
+        }
       }
-      // Keep chat open for internal navigation
+      // Keep chat open for internal navigation on desktop, close on mobile
     } else {
       // External link - open in new tab
       console.log('[Chat] External link, opening in new tab:', url);
@@ -1992,6 +2015,17 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
                   firstTokenReceived = true;
                   // Clear status messages when real content starts
                   fullContent = '';
+
+                  // CRITICAL: Also clear the message state to remove status emojis
+                  flushSync(() => {
+                    setMessages(prev =>
+                      prev.map(msg =>
+                        msg.id === assistantMessageId
+                          ? { ...msg, content: '' }
+                          : msg
+                      )
+                    );
+                  });
                 }
 
                 // If we already detected cutoff, ignore all further deltas
@@ -2104,6 +2138,16 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
               } else if (data.type === 'done') {
                 // Track when AI last responded
                 lastAiMessageTimeRef.current = Date.now();
+
+                // 🚨 CRITICAL: If stream ended with no real content (only status messages), clear the message
+                if (!fullContent || fullContent.trim().length === 0) {
+                  console.log('[Chat] Stream ended with no content - removing message');
+                  flushSync(() => {
+                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+                  });
+                  // Don't play ding for empty messages
+                  break;
+                }
 
                 // 🔊 PLAY CYBERPUNK DING - MESSAGE COMPLETE (only if tab is visible)
                 if (isTabVisibleRef.current) {
@@ -2844,13 +2888,7 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
                 >
                   <div className="text-sm">
                     {message.role === 'assistant' ? (
-                      message.content === '__GENERATING_GREETING__' ? (
-                        // Special rendering for greeting placeholder
-                        <div className="flex items-start gap-3 border-l-4 border-teal-400 pl-3 py-1 bg-teal-50/50 rounded-r">
-                          <Loader2 className="w-4 h-4 animate-spin text-teal-600 mt-0.5 flex-shrink-0" />
-                          <span className="text-teal-700 italic">Generating your personalized greeting...</span>
-                        </div>
-                      ) : message.content === '__THINKING__' ||
+                      message.content === '__THINKING__' ||
                           message.content.includes('📤') ||
                           message.content.includes('📊') ||
                           message.content.includes('📝') ||

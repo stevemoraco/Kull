@@ -18,11 +18,13 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showUpcoming, setShowUpcoming] = useState(false);
 
-  const progressPercentage = Math.round((questionsAnswered.length / totalSteps) * 100);
-  const upcomingCount = totalSteps - questionsAnswered.length - 1; // -1 for current question
+  // Calculate progress based on unique steps answered (not total messages)
+  const uniqueStepsAnswered = new Set(questionsAnswered.map(q => q.step)).size;
+  const progressPercentage = Math.round((uniqueStepsAnswered / totalSteps) * 100);
+  const upcomingCount = totalSteps - uniqueStepsAnswered - 1; // -1 for current question
 
-  // Find current question
-  const currentQuestion = questionsAsked.find(q => q.step === currentStep);
+  // Find current question (most recent with current step)
+  const currentQuestion = questionsAsked.filter(q => q.step === currentStep).pop();
 
   // Get ALL upcoming questions from the sales script (not just the ones asked)
   const allUpcomingQuestions = SALES_SCRIPT_QUESTIONS
@@ -96,32 +98,47 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
         } overflow-y-auto overflow-x-hidden bg-gray-100`}
       >
         <div className="px-4 pb-4 pt-2 space-y-1.5">
-          {/* Answered questions */}
+          {/* Answered questions - Show in actual order with step numbers */}
           {questionsAnswered.length > 0 && (
             <div className="space-y-1.5">
-              {questionsAnswered.map((qa, index) => (
-                <div
-                  key={`answered-${qa.step}`}
-                  className="group bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg p-2.5 transition-all duration-300 hover:shadow-md animate-slideIn"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
-                        <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+              {questionsAnswered.map((qa, index) => {
+                // Check if this is a retry (same step asked multiple times)
+                const previousSameStep = questionsAnswered.slice(0, index).filter(q => q.step === qa.step);
+                const isRetry = previousSameStep.length > 0;
+                const retryCount = previousSameStep.length + 1;
+
+                return (
+                  <div
+                    key={`answered-${qa.step}-${index}`}
+                    className="group bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg p-2.5 transition-all duration-300 hover:shadow-md animate-slideIn"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
+                          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-white/70">Q{qa.step}</span>
+                          {isRetry && (
+                            <span className="text-xs bg-white/20 text-white px-1.5 py-0.5 rounded">
+                              retry #{retryCount}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-medium text-white mb-1">
+                          {qa.question}
+                        </p>
+                        <p className="text-xs text-white/90 bg-white/10 rounded px-2 py-1 border-l-2 border-white/40">
+                          → {qa.answer}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-white mb-1">
-                        {qa.question}
-                      </p>
-                      <p className="text-xs text-white/90 bg-white/10 rounded px-2 py-1 border-l-2 border-white/40">
-                        → {qa.answer}
-                      </p>
-                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -136,6 +153,7 @@ export const ConversationProgress: React.FC<ConversationProgressProps> = ({
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-amber-900/70">Q{currentStep}</span>
                     <span className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                       You are here
                     </span>

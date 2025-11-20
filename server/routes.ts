@@ -43,6 +43,11 @@ import { telemetryStore } from "./services/batchTelemetry";
 import { emitShootCompletedNotification } from "./services/reportNotifications";
 import { createContentHash } from "@shared/utils/messageFingerprint";
 import { measureContextUsage } from "./contextUsageMetric";
+import { buildUnifiedContext, combineContextMarkdown } from './contextBuilder';
+import { analyzeEngagement, formatEngagementForContext } from './engagementAnalyzer';
+import { analyzeSectionTiming, formatSectionInsights } from './sectionTimingAnalyzer';
+import { detectActivityPatterns, formatPatternInsights } from './activityPatternDetector';
+import { analyzeLoginStatus, formatLoginStatusInsights } from './loginStatusAnalyzer';
 
 // 🔐 LAYER 2: Backend Deduplication - In-memory cache for recent message hashes
 const recentMessageCache = new Map<string, { timestamp: number; response: string }>();
@@ -796,187 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       else if (/firefox/i.test(userAgent)) browser = 'Firefox';
       else if (/edg/i.test(userAgent)) browser = 'Edge';
 
-      const { timezone, currentPath, visitedPages, recentActivity } = req.body;
-
-      // Get user authentication status
-      const userEmail = req.user?.claims?.email;
-      const userName = req.user?.claims?.name || req.user?.claims?.given_name;
-      const isLoggedIn = !!userId;
-
-      // Build user metadata context
-      const userMetadataMarkdown = `
-## 👤 User Session Metadata
-${userName ? `- **Name:** ${userName}` : ''}
-${userEmail ? `- **Email:** ${userEmail}` : ''}
-- **Login Status:** ${isLoggedIn ? '🟢 Logged In' : '🔴 Not Logged In'}
-- **Device:** ${device}
-- **Browser:** ${browser}
-- **IP Address:** ${ip}
-- **Timezone:** ${timezone || 'Unknown'}
-- **Current Page:** ${currentPath || '/'}
-${visitedPages && visitedPages.length > 0 ? `- **Visited Pages:** ${visitedPages.join(' → ')}` : ''}
-${recentActivity && recentActivity.length > 0 ? `- **Recent Activity (last ${Math.min(5, recentActivity.length)} actions):**
-${recentActivity.slice(-5).map((a: any) => `  - ${a.action}: ${a.target}`).join('\n')}` : ''}
-`;
-
-      // Build rich markdown context for user activity (same as welcome endpoint)
-      let userActivityMarkdown = userMetadataMarkdown;
-
-      // Add calculator data context
-      if (calculatorData) {
-        const { shootsPerWeek, hoursPerShoot, billableRate, hasManuallyAdjusted, hasClickedPreset } = calculatorData;
-        const annualShoots = shootsPerWeek * 44;
-        const annualHours = shootsPerWeek * hoursPerShoot * 44;
-        const annualCost = annualHours * billableRate;
-        const weeksSaved = annualHours / 40;
-
-        userActivityMarkdown += `\n\n## 💰 Calculator Data (Real-Time)
-
-User's current calculator inputs:
-- **Shoots per Week:** ${shootsPerWeek}
-- **Hours per Shoot (Culling):** ${hoursPerShoot}
-- **Billable Rate:** $${billableRate}/hour
-- **Has Manually Adjusted:** ${hasManuallyAdjusted ? 'Yes' : 'No'}
-- **Has Clicked Preset:** ${hasClickedPreset ? 'Yes' : 'No'}
-
-**Calculated Metrics:**
-- **Annual Shoots:** ${annualShoots} shoots/year
-- **Annual Hours Wasted on Culling:** ${Math.round(annualHours)} hours/year
-- **Annual Cost of Manual Culling:** $${Math.round(annualCost).toLocaleString()}/year
-- **Work Weeks Saved:** ${weeksSaved.toFixed(1)} weeks/year
-
-**IMPORTANT:** Use these numbers in your sales conversation! Reference their actual values when asking questions.
-`;
-      }
-
-      // Add section timing data
-      if (sectionHistory && sectionHistory.length > 0) {
-        // Sort sections by total time spent (descending)
-        const sortedSections = [...sectionHistory].sort((a, b) => b.totalTimeSpent - a.totalTimeSpent);
-
-        // Format time in minutes and seconds
-        const formatTime = (ms: number): string => {
-          const totalSeconds = Math.floor(ms / 1000);
-          const minutes = Math.floor(totalSeconds / 60);
-          const seconds = totalSeconds % 60;
-
-          if (minutes > 0) {
-            return `${minutes}m ${seconds}s`;
-          }
-          return `${seconds}s`;
-        };
-
-        // Get top 3 sections by time spent
-        const topSections = sortedSections.slice(0, 3);
-
-        // Build section timing markdown
-        userActivityMarkdown += `\n\n## ⏱️ Section Reading Time
-
-User has spent time reading these sections (sorted by time spent):
-`;
-
-        sortedSections.forEach((section: any, idx: number) => {
-          const timeStr = formatTime(section.totalTimeSpent);
-          const isTopSection = idx < 3;
-          const marker = idx === 0 ? ' (MOST INTERESTED)' : '';
-
-          userActivityMarkdown += `${idx + 1}. **${section.title}** - ${timeStr}${marker}\n`;
-        });
-
-        // Add insights based on top section
-        if (topSections.length > 0) {
-          const topSection = topSections[0];
-          const topicMap: Record<string, string> = {
-            'calculator': 'ROI calculation and cost savings',
-            'pricing': 'pricing plans and costs',
-            'features': 'product capabilities',
-            'hero': 'the landing page (just arrived)',
-            'problem': 'pain points and challenges',
-            'value': 'the value proposition',
-            'testimonials': 'customer reviews and success stories',
-            'faq': 'frequently asked questions',
-            'cta': 'taking action / getting started',
-          };
-
-          let topicInsight = topSection.title.toLowerCase();
-          for (const [key, value] of Object.entries(topicMap)) {
-            if (topSection.id.toLowerCase().includes(key) || topSection.title.toLowerCase().includes(key)) {
-              topicInsight = value;
-              break;
-            }
-          }
-
-          userActivityMarkdown += `
-**🎯 Key Insight:** User is most interested in ${topicInsight}
-
-**💡 Recommendation:** Frame your questions around what they were reading. Examples:
-`;
-
-          // Add contextual examples based on top section
-          if (topSection.id.toLowerCase().includes('calculator')) {
-            userActivityMarkdown += `- "i see you spent ${formatTime(topSection.totalTimeSpent)} playing with the calculator - did you find your numbers?"\n`;
-            userActivityMarkdown += `- "those calculator numbers accurate for your workflow?"\n`;
-          } else if (topSection.id.toLowerCase().includes('pricing')) {
-            userActivityMarkdown += `- "noticed you were reading pricing for a while - have questions about the cost?"\n`;
-            userActivityMarkdown += `- "you spent ${formatTime(topSection.totalTimeSpent)} on pricing - want to see how it compares to what you're wasting now?"\n`;
-          } else if (topSection.id.toLowerCase().includes('feature')) {
-            userActivityMarkdown += `- "you were checking out features - which one caught your eye?"\n`;
-            userActivityMarkdown += `- "spent ${formatTime(topSection.totalTimeSpent)} reading features - what stood out?"\n`;
-          } else if (topSection.id.toLowerCase().includes('problem')) {
-            userActivityMarkdown += `- "you spent time reading about pain points - which one hits hardest for you?"\n`;
-            userActivityMarkdown += `- "those problems resonate with your workflow?"\n`;
-          } else if (topSection.id.toLowerCase().includes('testimonial')) {
-            userActivityMarkdown += `- "saw you reading testimonials - any of those stories sound familiar?"\n`;
-            userActivityMarkdown += `- "you spent ${formatTime(topSection.totalTimeSpent)} on case studies - which one matched your situation?"\n`;
-          } else {
-            userActivityMarkdown += `- "noticed you spent ${formatTime(topSection.totalTimeSpent)} reading ${topSection.title} - what caught your attention?"\n`;
-          }
-
-          userActivityMarkdown += `
-**⚠️ CRITICAL:** Reference the section they spent the most time on in your FIRST response. Show you're paying attention to what they're reading.
-
-**🔗 If you want to scroll them to that section, use these EXACT links:**
-- Calculator: [text](#calculator)
-- Features/Demo: [text](#features)
-- Pricing/Download: [text](#download)
-- Testimonials/Reviews: [text](#referrals)
-- Sign in: [text](/api/login)
-`;
-        }
-      }
-
-      if (userActivity && userActivity.length > 0) {
-        userActivityMarkdown += `\n\n## 🖱️ User Activity History
-
-Recent interactions (last ${userActivity.length} events):
-
-${userActivity.map((event: any, idx: number) => {
-  const time = new Date(event.timestamp);
-  const timeStr = time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  if (event.type === 'click') {
-    const elementText = event.value ? ` - TEXT: "${event.value}"` : '';
-    return `${idx + 1}. **🖱️ CLICKED** \`${event.target}\`${elementText} at ${timeStr}`;
-  } else if (event.type === 'hover') {
-    return `${idx + 1}. **👆 HOVERED** \`${event.target}\` at ${timeStr}`;
-  } else if (event.type === 'input') {
-    const displayValue = event.value && event.value.length > 0
-      ? `"${event.value}"`
-      : '(empty)';
-    return `${idx + 1}. **⌨️ TYPED** in \`${event.target}\`: ${displayValue} at ${timeStr}`;
-  } else if (event.type === 'select') {
-    return `${idx + 1}. **✏️ HIGHLIGHTED TEXT**: "${event.value}" at ${timeStr}`;
-  }
-  return '';
-}).join('\n')}
-
-**Activity Insights:**
-- **Total Clicks:** ${userActivity.filter((e: any) => e.type === 'click').length}
-- **Elements Hovered:** ${userActivity.filter((e: any) => e.type === 'hover').length}
-- **Input Events:** ${userActivity.filter((e: any) => e.type === 'input').length}
-- **Text Selections:** ${userActivity.filter((e: any) => e.type === 'select').length}
-`;
-      }
+      const { timezone, currentPath, visitedPages, recentActivity, timeOnSite, currentTime, lastAiMessageTime, scrollY, scrollDepth } = req.body;
 
       // Set up Server-Sent Events headers
       res.setHeader('Content-Type', 'text/event-stream');
@@ -1038,13 +863,6 @@ ${userActivity.map((event: any, idx: number) => {
 
       // Load conversation state for this session
       const conversationState = await storage.getConversationState(sessionId);
-      const { generateStateContext } = await import('./conversationStateManager');
-      const stateContext = conversationState ? generateStateContext(conversationState) : '';
-
-      // Add state context to user activity markdown
-      if (stateContext) {
-        userActivityMarkdown += stateContext;
-      }
 
       // Load previous reasoning blocks from session for prompt caching
       let previousReasoningBlocks: string[] | undefined;
@@ -1062,48 +880,40 @@ ${userActivity.map((event: any, idx: number) => {
         }
       }
 
-      let loadedSteps: any[] = [];
-      // Load conversation memory from conversationSteps table
-      let conversationMemory = '';
-      if (sessionId) {
-        try {
-          loadedSteps = await db
-            .select()
-            .from(conversationSteps)
-            .where(eq(conversationSteps.sessionId, sessionId))
-            .orderBy(conversationSteps.stepNumber);
-
-          if (loadedSteps.length > 0) {
-            conversationMemory = '\n\n## 🧠 CONVERSATION MEMORY\n\n';
-            conversationMemory += 'Review what the user has ALREADY told you:\n\n';
-
-            loadedSteps.forEach((step: any) => {
-              conversationMemory += `**Step ${step.stepNumber} (${step.stepName}):**\n`;
-              if (step.aiQuestion) {
-                conversationMemory += `  You asked: "${step.aiQuestion.substring(0, 150)}${step.aiQuestion.length > 150 ? '...' : ''}"\n`;
-              }
-              if (step.userResponse) {
-                conversationMemory += `  They said: "${step.userResponse}"\n`;
-              }
-              conversationMemory += '\n';
-            });
-
-            conversationMemory += '\n**CRITICAL MEMORY USAGE RULES:**\n';
-            conversationMemory += '- DO NOT ask for information they already provided above\n';
-            conversationMemory += '- DO reference their previous answers in your new questions\n';
-            conversationMemory += '- Example: "to hit your 150-shoot goal..." NOT "what\'s your goal?"\n';
-            conversationMemory += '- If they said "I want 200 shoots", later say "your 200-shoot goal" not "how many shoots?"\n\n';
-
-            // Add memory to user activity markdown (will be included in prompt)
-            userActivityMarkdown += conversationMemory;
-
-            console.log(`[Chat Memory] Loaded ${loadedSteps.length} previous Q&A pairs for session ${sessionId}`);
-          }
-        } catch (memoryError) {
-          console.error('[Chat Memory] Failed to load conversation memory:', memoryError);
-          // Don't fail the request if memory loading fails
+      // Build unified context using centralized builder
+      const unifiedContext = await buildUnifiedContext(
+        req,
+        req.body,
+        sessionId,
+        calculatorData,
+        sectionHistory,
+        userActivity,
+        conversationState,
+        {
+          timeOnSite: timeOnSite || 0,
+          currentTime: currentTime || Date.now(),
+          lastAiMessageTime,
+          scrollY,
+          scrollDepth,
         }
-      }
+      );
+
+      // Add behavioral intelligence layers
+      const activityPatterns = detectActivityPatterns(userActivity || []);
+      const engagementAnalysis = analyzeEngagement(
+        sectionHistory || [],
+        userActivity || [],
+        calculatorData || undefined
+      );
+      const sectionInsights = analyzeSectionTiming(sectionHistory || []);
+      const sessionStartTime = timings.start;  // Use request start time as session start
+      const loginInsights = analyzeLoginStatus(
+        !!userId,
+        conversationState || {} as any,
+        engagementAnalysis.engagementLevel,
+        sessionStartTime,
+        conversationState?.currentStep || 0
+      );
 
       timings.contextCollected = Date.now() - timings.start;
 
@@ -1115,50 +925,103 @@ ${userActivity.map((event: any, idx: number) => {
       } : undefined;
 
       // Get current step from conversation state
-      const currentStep = conversationState?.currentStep || 0;
+      let currentStep = conversationState?.currentStep || 0;
 
-      // Detect user activity type and inject activity template
-      let activityPrompt = '';
-      if (userActivity && userActivity.length > 0 && enrichedCalculatorData) {
-        const { detectActivityType, getActivityDescription } = await import('./activityDetector');
-        const { getActivityTemplate, fillTemplateVariables } = await import('./activityTemplates');
+      // ===== DUAL VALIDATION SYSTEM =====
+      // Run both regex and AI validation to determine if we should advance to next step
+      // AI has final say: if AI says NO, don't advance (even if regex says YES)
+      let validationFeedback: string | undefined;
 
-        const activityType = detectActivityType(userActivity);
+      // Only run validation if this is NOT the first message (history exists)
+      if (history && history.length > 0) {
+        // Get the last AI message (question user is responding to)
+        const previousMessages = history.filter((m: any) => m.role === 'assistant');
+        const lastAIMessage = previousMessages.length > 0
+          ? previousMessages[previousMessages.length - 1].content
+          : '';
 
-        if (activityType) {
-          const template = getActivityTemplate(currentStep, activityType);
+        if (lastAIMessage) {
+          const currentStepBeforeValidation = currentStep;
 
-          if (template) {
-            // Fill template with calculator data
-            const filledTemplate = fillTemplateVariables(template, {
-              annualShoots: enrichedCalculatorData.annualShoots,
-              hoursPerShoot: enrichedCalculatorData.hoursPerShoot,
-              billableRate: enrichedCalculatorData.billableRate,
-              annualCost: enrichedCalculatorData.annualCost,
-            });
+          // METHOD A: Regex validation (existing pattern matching)
+          const { shouldProgressToNextStep } = await import('./conversationStateManager');
+          const regexSaysAdvance = shouldProgressToNextStep(message, lastAIMessage, currentStepBeforeValidation);
 
-            activityPrompt = `\n\n## 🎯 ACTIVITY-AWARE RESPONSE SUGGESTION
+          // METHOD B: AI validation (GPT-5-nano check with full conversation history)
+          const validationStart = Date.now();
+          const { validateStepAdvancement } = await import('./aiStepValidator');
+          const aiValidation = await validateStepAdvancement(
+            currentStepBeforeValidation,
+            lastAIMessage,
+            message,
+            history || [] // Pass full conversation history for context
+          );
+          const validationTime = Date.now() - validationStart;
+          console.log(`[Dual Validation] AI validation completed in ${validationTime}ms`);
 
-User is currently ${getActivityDescription(activityType)}.
+          // DECISION LOGIC (AI has final say and can jump to any step):
+          const shouldAdvance = aiValidation.shouldAdvance;
+          const action = aiValidation.action || 'NEXT';
+          const nextStep = aiValidation.nextStep || currentStepBeforeValidation + 1;
 
-**SUGGESTED RESPONSE (weaves activity into script):**
-"${filledTemplate}"
+          if (shouldAdvance) {
+            // Use the step recommended by the validator (can be +1, or a jump)
+            currentStep = Math.max(0, Math.min(15, nextStep)); // Clamp to 0-15
 
-Use this template or a natural variation that:
-1. Acknowledges their ${activityType} activity
-2. Transitions smoothly to the Step ${currentStep} script question
-3. Maintains your casual, friendly tone
+            const actionSymbol = action === 'JUMP' ? '⚡ JUMP' : '→';
+            console.log(`[Dual Validation] ✅ ${actionSymbol}: Step ${currentStepBeforeValidation} → ${currentStep} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: ${action})`);
+            if (action === 'JUMP') {
+              console.log(`[Dual Validation] 🎯 Jumped from step ${currentStepBeforeValidation} to step ${currentStep}: ${aiValidation.reasoning}`);
+            }
+          } else {
+            // Stay at current step, capture feedback for prompt injection
+            validationFeedback = aiValidation.feedback;
+            console.log(`[Dual Validation] 🔄 STAY: Step ${currentStepBeforeValidation} (Regex: ${regexSaysAdvance ? 'YES' : 'NO'}, AI: STAY)`);
+            console.log(`[Dual Validation] Feedback: ${aiValidation.reasoning}`);
+          }
 
-**CRITICAL:** If you mention their activity, you MUST also ask the script question. Don't just comment on activity alone.
-`;
+          // Update conversation state with new step BEFORE generating response
+          if (conversationState && shouldAdvance) {
+            conversationState.currentStep = currentStep;
+            await storage.updateConversationState(sessionId, conversationState);
+          }
 
-            // Add activity prompt to userActivityMarkdown
-            userActivityMarkdown += activityPrompt;
+          // Also update scriptStep in chatSession database
+          if (sessionId) {
+            try {
+              await db.update(chatSessions)
+                .set({
+                  scriptStep: currentStep,
+                  updatedAt: new Date(),
+                })
+                .where(eq(chatSessions.id, sessionId));
 
-            console.log(`[Activity Integration] Detected ${activityType} activity, suggesting template for Step ${currentStep}`);
+              console.log(`[Dual Validation] Updated scriptStep in database: ${currentStep}`);
+            } catch (dbError) {
+              console.error('[Dual Validation] Failed to update scriptStep:', dbError);
+            }
           }
         }
       }
+      // ===== END DUAL VALIDATION =====
+
+      // Combine unified context with intelligence layers into markdown
+      const baseContext = combineContextMarkdown(unifiedContext);
+      const intelligenceLayers = [
+        formatPatternInsights(activityPatterns),
+        formatEngagementForContext(engagementAnalysis),
+        sectionInsights ? formatSectionInsights(sectionInsights) : null,
+        formatLoginStatusInsights(loginInsights),
+      ].filter(Boolean).join('\n\n');
+
+      const dynamicContext = intelligenceLayers
+        ? `${baseContext}\n\n${intelligenceLayers}`
+        : baseContext;
+
+      // If validation feedback exists, inject it into context
+      const finalContext = validationFeedback
+        ? `${dynamicContext}\n\n## ⚠️ VALIDATION FEEDBACK\n\n${validationFeedback}`
+        : dynamicContext;
 
       // getChatResponseStream will send its own status updates:
       // - 🗂️ loading codebase...
@@ -1168,12 +1031,25 @@ Use this template or a natural variation that:
       // - ✅ api responded (Xms)
       // - ⏳ openai thinking...
       const apiStart = Date.now();
-      const stream = await getChatResponseStream(message, history || [], preferredModel, userActivityMarkdown, pageVisits, allSessions, sessionId, userId, (status: string, timing?: number) => {
-        // Callback for chatService to send status updates with timing
-        const msg = timing !== undefined ? `${status} (${timing}ms)` : status;
-        res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
-        if (res.socket) res.socket.uncork();
-      }, enrichedCalculatorData, currentStep, previousReasoningBlocks);
+      const stream = await getChatResponseStream(
+        message,
+        history || [],  // Fresh history captured from state
+        preferredModel,
+        finalContext,  // New unified context with intelligence layers
+        pageVisits,
+        allSessions,
+        sessionId,
+        userId,
+        (status: string, timing?: number) => {
+          // Callback for chatService to send status updates with timing
+          const msg = timing !== undefined ? `${status} (${timing}ms)` : status;
+          res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
+          if (res.socket) res.socket.uncork();
+        },
+        enrichedCalculatorData,
+        currentStep,
+        previousReasoningBlocks
+      );
       const apiTime = Date.now() - apiStart;
       timings.apiCalled = Date.now() - timings.start;
 
@@ -1187,6 +1063,7 @@ Use this template or a natural variation that:
       let cost = 0;
       let firstTokenReceived = false;
       let reasoningBlocks: string[] | undefined;
+      let lineBuffer = ''; // Buffer for filtering delimiter lines in real-time
 
       try {
         // Stream processing
@@ -1232,10 +1109,24 @@ Use this template or a natural variation that:
                     }
 
                     fullResponse += choice.delta.content;
-                    // Forward to client immediately
-                    res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
-                    // Force immediate transmission - bypass Node.js buffering
-                    if (res.socket) res.socket.uncork();
+
+                    // Filter out delimiter lines in real-time before sending to client
+                    lineBuffer += choice.delta.content;
+
+                    // Check if we have complete lines to process
+                    const lines = lineBuffer.split('\n');
+                    // Keep the last incomplete line in buffer
+                    lineBuffer = lines.pop() || '';
+
+                    // Filter out delimiter lines and send the rest
+                    for (const line of lines) {
+                      if (!line.trim().startsWith('␞QUICK_REPLIES:') && !line.trim().startsWith('␞NEXT_MESSAGE:')) {
+                        // Send this line (it's not a delimiter)
+                        res.write(`data: ${JSON.stringify({ type: 'delta', content: line + '\n' })}\n\n`);
+                        if (res.socket) res.socket.uncork();
+                      }
+                      // If it is a delimiter line, skip it (don't send to client)
+                    }
                   }
                   
                   // Check for finish_reason and usage data (silent)
@@ -1274,16 +1165,44 @@ Use this template or a natural variation that:
           }
         }
 
-        // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
-        const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
-        const hasUnicodeMarker = fullResponse.includes('␞');
+        // Parse and strip out metadata delimiters
+        let cleanResponse = fullResponse;
+        let quickReplies: string[] = [];
+        let nextMessageTiming = 30;
+
+        // Extract QUICK_REPLIES
+        const quickRepliesMatch = fullResponse.match(/␞QUICK_REPLIES:\s*(.+)/);
+        if (quickRepliesMatch) {
+          const repliesText = quickRepliesMatch[1].trim();
+          quickReplies = repliesText.split('|').map(r => r.trim());
+          console.log(`[Chat] Extracted ${quickReplies.length} quick replies`);
+        }
+
+        // Extract NEXT_MESSAGE timing
+        const nextMessageMatch = fullResponse.match(/␞NEXT_MESSAGE:\s*(\d+)/);
+        if (nextMessageMatch) {
+          nextMessageTiming = parseInt(nextMessageMatch[1], 10);
+          console.log(`[Chat] Next message timing: ${nextMessageTiming}s`);
+        }
+
+        // Strip out the delimiter lines from the response
+        cleanResponse = fullResponse
+          .split('\n')
+          .filter(line => !line.startsWith('␞QUICK_REPLIES:') && !line.startsWith('␞NEXT_MESSAGE:'))
+          .join('\n')
+          .trim();
+
+        // Replace fullResponse with cleaned version for saving/display
+        fullResponse = cleanResponse;
+
+        // Validate response format
+        const hasFollowUpQuestions = quickReplies.length > 0;
+        const hasNextMessage = nextMessageTiming > 0;
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
           console.error('[Chat] 🚨 CRITICAL ERROR: AI response missing required metadata!');
           console.error('[Chat]   - QUICK_REPLIES present:', hasFollowUpQuestions);
           console.error('[Chat]   - NEXT_MESSAGE present:', hasNextMessage);
-          console.error('[Chat]   - Unicode marker present:', hasUnicodeMarker);
           console.error('[Chat]   - Last 200 chars of response:', fullResponse.slice(-200));
           console.error('[Chat] ⚠️  User will see NO suggested replies for this message!');
         } else {
@@ -1318,22 +1237,6 @@ Use this template or a natural variation that:
           } catch (cacheError) {
             console.error('[QuestionCache] Error during post-response validation:', cacheError);
             // Don't fail the request if cache fails
-          }
-
-          // Validate activity integration
-          try {
-            const { validateActivityIntegration } = await import('./activityDetector');
-            const hadActivityDetected = activityPrompt.length > 0;
-
-            if (!validateActivityIntegration(fullResponse, hadActivityDetected)) {
-              console.warn(`[Activity Integration] ❌ Response mentioned activity without script question`);
-              // Log for monitoring but don't block response
-            } else if (hadActivityDetected) {
-              console.log(`[Activity Integration] ✅ Successfully integrated activity into script`);
-            }
-          } catch (validationError) {
-            console.error('[Activity Integration] Error during validation:', validationError);
-            // Don't fail the request if validation fails
           }
 
           // Comprehensive response validation
@@ -1496,7 +1399,7 @@ Use this template or a natural variation that:
               };
               const stepName = stepNames[currentStep] || 'unknown_step';
 
-              // Save to conversationSteps table
+              // Save to conversationSteps table (tracks actual flow including jumps/retries)
               await db.insert(conversationSteps).values({
                 sessionId: sessionId,
                 userId: userId || null,
@@ -1508,94 +1411,49 @@ Use this template or a natural variation that:
                 completedAt: new Date(),
               });
 
-              console.log(`[Chat Memory] Saved answer for step ${currentStep} (${stepName})`);
-              
-              // Track context usage metric
-              if (loadedSteps && loadedSteps.length > 0) {
-                try {
-                  const contextUsed = measureContextUsage(fullResponse, loadedSteps);
-                  console.log(`[Chat Memory] Context usage: ${contextUsed ? "YES ✅" : "NO ❌"} - AI ${contextUsed ? "referenced" : "did not reference"} previous answers`);
-                } catch (metricError) {
-                  // Silent fail on metric tracking
-                }
-              }
+              console.log(`[Chat Memory] Saved answer for step ${currentStep} (${stepName}) - Flow tracks jumps/retries`);
             } catch (memoryError) {
               console.error('[Chat Memory] Failed to save conversation step:', memoryError);
               // Don't fail the request if memory saving fails
             }
           }
 
-          // Update conversation state after response
+          // Update conversation state metadata after response (tracking questions/answers)
+          // NOTE: Step advancement happens BEFORE response via dual validation system (lines 1120-1187)
           if (conversationState && fullResponse) {
             const { updateStateAfterInteraction } = await import('./conversationStateManager');
             const updatedState = updateStateAfterInteraction(conversationState, message, fullResponse);
-            await storage.updateConversationState(sessionId, updatedState);
 
-            console.log(`[Chat State] Session ${sessionId} - Step: ${updatedState.currentStep}/15, Answered: ${updatedState.questionsAnswered.length}, Off-topic: ${updatedState.offTopicCount}`);
+            // Don't update currentStep here - it's already been set by dual validation
+            // Just update the questions asked/answered arrays
+            conversationState.questionsAsked = updatedState.questionsAsked;
+            conversationState.questionsAnswered = updatedState.questionsAnswered;
+            conversationState.offTopicCount = updatedState.offTopicCount;
+
+            await storage.updateConversationState(sessionId, conversationState);
+
+            console.log(`[Chat State] Session ${sessionId} - Step: ${conversationState.currentStep}/16, Asked: ${conversationState.questionsAsked.length}, Answered: ${conversationState.questionsAnswered.length}, Off-topic: ${conversationState.offTopicCount}`);
           }
 
-          // Check if we should progress to the next script step
+          // OLD POST-RESPONSE VALIDATION DISABLED - Now using dual validation system (lines 1120-1187)
+          // Step progression happens BEFORE AI generates response, not after
+          // Keeping this commented for reference:
+          /*
           if (sessionId && fullResponse) {
             try {
-              // Get current session data to check scriptStep
               const sessions = await storage.getChatSessions();
               const currentSession = sessions.find((s: any) => s.id === sessionId);
-
               if (currentSession) {
                 const currentScriptStep = currentSession.scriptStep ?? 0;
-
-                // Get the last assistant message (question AI asked before user responded)
-                const previousMessages = history.filter((m: any) => m.role === 'assistant');
-                const lastAssistantMessage = previousMessages.length > 0
-                  ? previousMessages[previousMessages.length - 1].content
-                  : '';
-
-                // Check if user answered the question and should progress
                 const { shouldProgressToNextStep, validateStepQuestion } = await import('./conversationStateManager');
                 const shouldProgress = shouldProgressToNextStep(message, lastAssistantMessage, currentScriptStep);
-
-                if (shouldProgress) {
-                  const newScriptStep = currentScriptStep < 15 ? currentScriptStep + 1 : 15;
-
-                  // Validate if AI response matches expected question for current step
-                  const validation = validateStepQuestion(fullResponse, currentScriptStep, calculatorData);
-
-                  if (!validation.isValid) {
-                    console.warn(`[Script Validation] AI off-script at step ${currentScriptStep}. Expected: "${validation.expectedQuestion}", Similarity: ${(validation.similarity * 100).toFixed(1)}%`);
-                  } else {
-                    console.log(`[Script Validation] AI on-script at step ${currentScriptStep} (${(validation.similarity * 100).toFixed(1)}% match)`);
-                  }
-
-                  // Update chatSession with new script step and reasoning blocks
-                  await db.update(chatSessions)
-                    .set({
-                      scriptStep: newScriptStep,
-                      questionAskedAtStep: fullResponse,
-                      answerGivenAtStep: message,
-                      reasoningBlocks: reasoningBlocks || previousReasoningBlocks || null,
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(chatSessions.id, sessionId));
-
-                  console.log(`[Script Progression] Session ${sessionId} progressed from step ${currentScriptStep} → ${newScriptStep}`);
-                } else {
-                  // Even if not progressing, save reasoning blocks for prompt caching
-                  if (reasoningBlocks || previousReasoningBlocks) {
-                    await db.update(chatSessions)
-                      .set({
-                        reasoningBlocks: reasoningBlocks || previousReasoningBlocks || null,
-                        updatedAt: new Date(),
-                      })
-                      .where(eq(chatSessions.id, sessionId));
-                  }
-                  console.log(`[Script Progression] Session ${sessionId} staying at step ${currentScriptStep} (user didn't answer)`);
-                }
+                // ... old validation logic ...
               }
             } catch (progressError) {
               console.error('[Script Progression] Failed to update script step:', progressError);
-              // Don't fail the request if progression tracking fails
             }
           }
+          */
 
           // Broadcast to admin panels for live updates
           const { getGlobalWsService } = await import('./websocket');
@@ -1656,6 +1514,15 @@ Use this template or a natural variation that:
     }
   });
 
+  // ============================================================================
+  // NOTE: All formatting functions now imported from their respective analyzer modules:
+  // - formatPatternInsights from ./activityPatternDetector
+  // - formatEngagementForContext from ./engagementAnalyzer
+  // - formatSectionInsights from ./sectionTimingAnalyzer
+  // - formatLoginStatusInsights from ./loginStatusAnalyzer
+  // Duplicate local implementations removed to prevent shadowing.
+  // ============================================================================
+
   // Generate personalized welcome greeting
   app.post('/api/chat/welcome', async (req: any, res) => {
     try {
@@ -1696,16 +1563,73 @@ Use this template or a natural variation that:
         console.error('[Welcome] Error fetching model preference:', err);
       }
 
-      // Fetch IP geolocation from multiple services
+      // Build unified context using new infrastructure
+      const sessionStartTime = Date.now() - (context.timeOnSite || 0);
+
+      // Format time on site
+      const minutes = Math.floor((context.timeOnSite || 0) / 60000);
+      const seconds = Math.floor(((context.timeOnSite || 0) % 60000) / 1000);
+      const timeOnSiteFormatted = minutes > 0
+        ? `${minutes}m ${seconds}s`
+        : `${seconds}s`;
+
+      // Load conversation state for behavioral analysis
+      const conversationState = await storage.getConversationState(sessionId);
+
+      // Get current step from conversation state
+      const currentStepNumber = conversationState?.currentStep || 1;
+
+      // Build unified context
+      const unifiedContext = await buildUnifiedContext(
+        req,
+        { ...context, userName: context.userName, userEmail: context.userEmail },
+        sessionId,
+        calculatorData,
+        sectionHistory,
+        context.userActivity,
+        conversationState,
+        {
+          timeOnSite: context.timeOnSite,
+          scrollDepth: context.scrollDepth,
+          scrollY: context.scrollY,
+          currentTime,
+          lastAiMessageTime
+        }
+      );
+
+      // Add behavioral intelligence
+      const activityPatterns = detectActivityPatterns(context.userActivity || []);
+      const engagementAnalysis = analyzeEngagement(sectionHistory || [], context.userActivity || [], calculatorData);
+      const sectionInsights = analyzeSectionTiming(sectionHistory || []);
+      const loginInsights = analyzeLoginStatus(
+        !!userId,
+        conversationState || { currentStep: 1, questionsAnswered: [], questionsAsked: [], offTopicCount: 0 },
+        engagementAnalysis.engagementLevel,
+        sessionStartTime,
+        currentStepNumber
+      );
+
+      // Combine into markdown
+      let contextMarkdown = combineContextMarkdown(unifiedContext);
+
+      // Add behavioral intelligence sections (all imported from analyzer modules)
+      contextMarkdown += formatPatternInsights(activityPatterns);
+      contextMarkdown += formatEngagementForContext(engagementAnalysis);
+      if (sectionInsights) {
+        contextMarkdown += formatSectionInsights(sectionInsights);
+      }
+      contextMarkdown += formatLoginStatusInsights(loginInsights);
+
+      // Add IP geolocation (preserve existing functionality)
+      // ip variable already declared earlier in function (line 1673)
+
       let ipGeoData = {
         ipAddress: ip,
-        ipify: null as any,
         ipapi: null as any,
         ipwhois: null as any,
       };
 
       try {
-        // Service 1: ipapi.co (free, good accuracy)
         const ipapiRes = await fetch(`https://ipapi.co/${ip}/json/`);
         if (ipapiRes.ok) {
           ipGeoData.ipapi = await ipapiRes.json();
@@ -1715,7 +1639,6 @@ Use this template or a natural variation that:
       }
 
       try {
-        // Service 2: ip-api.com (free, comprehensive)
         const ipwhoisRes = await fetch(`http://ip-api.com/json/${ip}`);
         if (ipwhoisRes.ok) {
           ipGeoData.ipwhois = await ipwhoisRes.json();
@@ -1724,15 +1647,48 @@ Use this template or a natural variation that:
         console.error('[IP Geo] ip-api.com failed:', e);
       }
 
-      // Format time on site
-      const minutes = Math.floor(context.timeOnSite / 60000);
-      const seconds = Math.floor((context.timeOnSite % 60000) / 1000);
-      const timeOnSiteFormatted = minutes > 0
-        ? `${minutes}m ${seconds}s`
-        : `${seconds}s`;
+      // Add IP geolocation to context
+      let geoMarkdown = `\n## 🌍 Location & Network\n- **IP Address:** ${ipGeoData.ipAddress}\n\n`;
 
-      // Build comprehensive context as markdown document
-      const contextMarkdown = `# User Session Context
+      if (ipGeoData.ipapi) {
+        geoMarkdown += `### 📍 Location Data (ipapi.co)\n`;
+        geoMarkdown += `- **City:** ${ipGeoData.ipapi.city || 'Unknown'}\n`;
+        geoMarkdown += `- **Region:** ${ipGeoData.ipapi.region || 'Unknown'}\n`;
+        geoMarkdown += `- **Country:** ${ipGeoData.ipapi.country_name || 'Unknown'} (${ipGeoData.ipapi.country_code || '??'})\n`;
+        geoMarkdown += `- **Timezone:** ${ipGeoData.ipapi.timezone || 'Unknown'}\n`;
+        geoMarkdown += `- **ISP:** ${ipGeoData.ipapi.org || 'Unknown'}\n\n`;
+      }
+
+      if (ipGeoData.ipwhois) {
+        geoMarkdown += `### 📍 Location Data (ip-api.com)\n`;
+        geoMarkdown += `- **City:** ${ipGeoData.ipwhois.city || 'Unknown'}\n`;
+        geoMarkdown += `- **Region:** ${ipGeoData.ipwhois.regionName || 'Unknown'}\n`;
+        geoMarkdown += `- **Country:** ${ipGeoData.ipwhois.country || 'Unknown'} (${ipGeoData.ipwhois.countryCode || '??'})\n`;
+        geoMarkdown += `- **Timezone:** ${ipGeoData.ipwhois.timezone || 'Unknown'}\n`;
+        geoMarkdown += `- **ISP:** ${ipGeoData.ipwhois.isp || 'Unknown'}\n\n`;
+      }
+
+      contextMarkdown = geoMarkdown + contextMarkdown;
+
+      // Add conversation history
+      let historyMarkdown = `\n\n## 🗨️ CONVERSATION HISTORY\n`;
+      if (history && Array.isArray(history) && history.length > 0) {
+        historyMarkdown += `${history.map((msg: any, idx: number) => {
+          const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+          return `${idx + 1}. **${msg.role.toUpperCase()}** (${timestamp}): ${msg.content}`;
+        }).join('\n\n')}
+
+**⚠️ CRITICAL:** You have sent ${history.filter((m: any) => m.role === 'assistant').length} messages already.
+DO NOT repeat yourself - vary your angle with EVERY message.
+`;
+      } else {
+        historyMarkdown += `No conversation yet - this is your opening message.\n`;
+      }
+
+      contextMarkdown += historyMarkdown;
+
+      // Add welcome-specific prompt instructions
+      contextMarkdown += `\n\n---\n\n# Welcome Message Instructions
 
 ## 👤 User Information
 ${context.userName ? `- **Name:** ${context.userName}` : ''}
@@ -2033,7 +1989,7 @@ You're Kull AI support - act like a smart, playful consultant who helps photogra
 - Help them calculate the real cost:
   - "If you're doing 4 shoots/week at 2 hours culling each, that's 8 hours/week = 32 hours/month = 384 hours/year"
   - "At $200/shoot, that's $50/hour. You're spending $19,200/year in time just culling."
-  - "Kull is $99/month = $1,188/year. You'd save $18,012/year."
+  - "Kull is $499/month billed annually = $5,988/year. You'd save $13,212/year."
 - Be conversational and curious, not pushy
 - Include links when they add value, but don't force them
 
@@ -2228,8 +2184,8 @@ Now respond to their most recent activity (check the user activity log above) an
       const { getChatResponseStream } = await import('./chatService');
       const { getRepoContent } = await import('./fetchRepo');
 
-      // Load conversation state for this session (if it exists from previous messages)
-      const conversationState = await storage.getConversationState(sessionId);
+      // conversationState was already loaded earlier (line 1721) for behavioral analysis
+      // const conversationState = await storage.getConversationState(sessionId);
       const { generateStateContext } = await import('./conversationStateManager');
       const stateContext = conversationState ? generateStateContext(conversationState) : '';
 
@@ -2280,14 +2236,14 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         annualCost: Math.round(calculatorData.shootsPerWeek * calculatorData.hoursPerShoot * 44 * calculatorData.billableRate)
       } : undefined;
 
-      // Get current step from conversation state
-      const currentStepNumber = conversationState?.currentStep || 1;
+      // currentStepNumber was already computed earlier (line 1724)
+      // const currentStepNumber = conversationState?.currentStep || 1;
 
       const stream = await getChatResponseStream(
         fullContextMarkdown,
         formattedHistory, // FIXED: Pass actual history, not empty array
         preferredModel,
-        undefined, // userActivityMarkdown
+        '', // userActivityMarkdown - not needed for this endpoint
         undefined, // pageVisits
         undefined, // allSessions
         sessionId,
@@ -2311,16 +2267,13 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         res.socket.setNoDelay(true);
       }
 
-      // Status updates for welcome message
-      res.write(`data: ${JSON.stringify({ type: 'status', message: '👋 generating personalized greeting...' })}\n\n`);
-      if (res.socket) res.socket.uncork();
-
       // Track the full response for analytics
       let fullResponse = '';
       let tokensIn = 0;
       let tokensOut = 0;
       let cachedTokensIn = 0;
       let reasoningBlocks: string[] | undefined;
+      let lineBuffer = ''; // Buffer for filtering delimiter lines in real-time
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -2360,9 +2313,24 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
                   // Extract content delta
                   if (choice.delta?.content) {
                     fullResponse += choice.delta.content;
-                    res.write(`data: ${JSON.stringify({ type: 'delta', content: choice.delta.content })}\n\n`);
-                    // Force immediate transmission - bypass Node.js buffering
-                    if (res.socket) res.socket.uncork();
+
+                    // Filter out delimiter lines in real-time before sending to client
+                    lineBuffer += choice.delta.content;
+
+                    // Check if we have complete lines to process
+                    const lines = lineBuffer.split('\n');
+                    // Keep the last incomplete line in buffer
+                    lineBuffer = lines.pop() || '';
+
+                    // Filter out delimiter lines and send the rest
+                    for (const line of lines) {
+                      if (!line.trim().startsWith('␞QUICK_REPLIES:') && !line.trim().startsWith('␞NEXT_MESSAGE:')) {
+                        // Send this line (it's not a delimiter)
+                        res.write(`data: ${JSON.stringify({ type: 'delta', content: line + '\n' })}\n\n`);
+                        if (res.socket) res.socket.uncork();
+                      }
+                      // If it is a delimiter line, skip it (don't send to client)
+                    }
                   }
                   
                   // Stream finished - no logging needed
@@ -2396,16 +2364,44 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
           }
         }
 
-        // Validate response format before completing
-        const hasFollowUpQuestions = fullResponse.includes('QUICK_REPLIES:');
-        const hasNextMessage = fullResponse.includes('NEXT_MESSAGE:');
-        const hasUnicodeMarker = fullResponse.includes('␞');
+        // Parse and strip out metadata delimiters
+        let cleanResponse = fullResponse;
+        let quickReplies: string[] = [];
+        let nextMessageTiming = 30;
+
+        // Extract QUICK_REPLIES
+        const quickRepliesMatch = fullResponse.match(/␞QUICK_REPLIES:\s*(.+)/);
+        if (quickRepliesMatch) {
+          const repliesText = quickRepliesMatch[1].trim();
+          quickReplies = repliesText.split('|').map(r => r.trim());
+          console.log(`[Welcome] Extracted ${quickReplies.length} quick replies`);
+        }
+
+        // Extract NEXT_MESSAGE timing
+        const nextMessageMatch = fullResponse.match(/␞NEXT_MESSAGE:\s*(\d+)/);
+        if (nextMessageMatch) {
+          nextMessageTiming = parseInt(nextMessageMatch[1], 10);
+          console.log(`[Welcome] Next message timing: ${nextMessageTiming}s`);
+        }
+
+        // Strip out the delimiter lines from the response
+        cleanResponse = fullResponse
+          .split('\n')
+          .filter(line => !line.startsWith('␞QUICK_REPLIES:') && !line.startsWith('␞NEXT_MESSAGE:'))
+          .join('\n')
+          .trim();
+
+        // Replace fullResponse with cleaned version for saving/display
+        fullResponse = cleanResponse;
+
+        // Validate response format
+        const hasFollowUpQuestions = quickReplies.length > 0;
+        const hasNextMessage = nextMessageTiming > 0;
 
         if (!hasFollowUpQuestions || !hasNextMessage) {
           console.error('[Welcome] 🚨 CRITICAL ERROR: AI response missing required metadata!');
           console.error('[Welcome]   - QUICK_REPLIES present:', hasFollowUpQuestions);
           console.error('[Welcome]   - NEXT_MESSAGE present:', hasNextMessage);
-          console.error('[Welcome]   - Unicode marker present:', hasUnicodeMarker);
           console.error('[Welcome]   - Last 200 chars of response:', fullResponse.slice(-200));
           console.error('[Welcome] ⚠️  User will see NO suggested replies for this message!');
         } else {
@@ -2764,6 +2760,113 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
     } catch (error: any) {
       console.error("Error in debug endpoint:", error);
       res.status(500).json({ message: "Failed: " + error.message });
+    }
+  });
+
+  // Knowledge Base Cache Status Endpoint (Admin only)
+  app.get('/api/admin/cache-status', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getCacheStatus } = await import('./knowledge/repoCache');
+      const status = getCacheStatus();
+      res.json({
+        success: true,
+        cache: status,
+        description: status.isCached
+          ? `Knowledge base cached in memory (${status.sizeKB}KB), loaded at ${status.timestamp}`
+          : 'Knowledge base not yet cached - will be loaded on first chat request'
+      });
+    } catch (error: any) {
+      console.error("Error checking cache status:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to check cache status: " + error.message
+      });
+    }
+  });
+
+  // Admin endpoint for detailed cache metrics
+  app.get('/api/admin/prompt-cache-metrics', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getCacheMetrics, getCacheStatus } = await import('./knowledge/repoCache');
+      const cacheMetrics = getCacheMetrics();
+      const cacheStatus = getCacheStatus();
+
+      const hitRate = cacheMetrics.totalRetrievals > 0
+        ? ((cacheMetrics.hits / cacheMetrics.totalRetrievals) * 100).toFixed(2)
+        : '0.00';
+
+      res.json({
+        success: true,
+        cache: {
+          status: cacheStatus,
+          metrics: cacheMetrics,
+          hitRate: hitRate + '%',
+          avgRetrievalTime: cacheMetrics.averageRetrievalTime.toFixed(2) + 'ms',
+          lastHit: cacheMetrics.lastHitTime
+            ? new Date(cacheMetrics.lastHitTime).toISOString()
+            : null,
+          lastMiss: cacheMetrics.lastMissTime
+            ? new Date(cacheMetrics.lastMissTime).toISOString()
+            : null,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error getting cache metrics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get cache metrics: " + error.message
+      });
+    }
+  });
+
+  // Admin endpoint for prompt caching cost savings
+  app.get('/api/admin/prompt-caching-savings', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getPromptCachingMetrics } = await import('./chatService');
+      const metrics = getPromptCachingMetrics();
+
+      const cachedPercentage = metrics.totalRequests > 0
+        ? ((metrics.cachedRequests / metrics.totalRequests) * 100).toFixed(2)
+        : '0.00';
+
+      const avgCachedTokensPerRequest = metrics.cachedRequests > 0
+        ? Math.round(metrics.cachedInputTokens / metrics.cachedRequests)
+        : 0;
+
+      const totalCostWithoutCaching = metrics.totalInputTokens > 0
+        ? (metrics.totalInputTokens / 1_000_000) * 0.05 // Assuming gpt-5-nano pricing
+        : 0;
+
+      const actualCost = totalCostWithoutCaching - metrics.costSaved;
+
+      res.json({
+        success: true,
+        promptCaching: {
+          totalRequests: metrics.totalRequests,
+          cachedRequests: metrics.cachedRequests,
+          nonCachedRequests: metrics.nonCachedRequests,
+          cachedPercentage: cachedPercentage + '%',
+          totalInputTokens: metrics.totalInputTokens.toLocaleString(),
+          cachedInputTokens: metrics.cachedInputTokens.toLocaleString(),
+          totalOutputTokens: metrics.totalOutputTokens.toLocaleString(),
+          tokensSaved: metrics.tokensSaved.toLocaleString(),
+          avgCachedTokensPerRequest,
+          costSaved: '$' + metrics.costSaved.toFixed(4),
+          totalCostWithoutCaching: '$' + totalCostWithoutCaching.toFixed(4),
+          actualCost: '$' + actualCost.toFixed(4),
+          savingsPercentage: totalCostWithoutCaching > 0
+            ? ((metrics.costSaved / totalCostWithoutCaching) * 100).toFixed(2) + '%'
+            : '0.00%',
+          averageResponseTime: metrics.averageResponseTime.toFixed(0) + 'ms',
+          lastUpdated: new Date(metrics.lastUpdated).toISOString(),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error getting prompt caching savings:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to get prompt caching savings: " + error.message
+      });
     }
   });
 

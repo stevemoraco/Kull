@@ -157,7 +157,7 @@ export class OpenAIAdapter extends BaseProviderAdapter {
           strict: true
         }
       },
-      max_tokens: 2000
+      max_completion_tokens: 2000
     };
 
     const response = await fetch(`${this.baseURL}/chat/completions`, {
@@ -310,7 +310,7 @@ export class OpenAIAdapter extends BaseProviderAdapter {
             strict: true
           }
         },
-        max_tokens: 2000
+        max_completion_tokens: 2000
       }
     }));
 

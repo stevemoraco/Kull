@@ -14,6 +14,8 @@ import transcribeRouter from "./routes/transcribe";
 import notificationsRouter from "./routes/notifications";
 import xmpExportRouter from "./routes/xmp-export";
 import { runMigrations } from "./migrate";
+import { warmPromptCache, startCacheWarmerInterval } from "./cacheWarmer";
+import { initializeKnowledgeBase } from "./knowledge/repoCache";
 
 const app = express();
 
@@ -141,6 +143,12 @@ app.use((req, res, next) => {
     // Start email processor (runs every minute)
     startEmailProcessor();
 
+    // Initialize knowledge base cache immediately on startup (Layer 2 prompt caching)
+    log('[Knowledge Base] Initializing knowledge base cache on startup...');
+    initializeKnowledgeBase().catch(err => {
+      log(`[Knowledge Base] Initial cache load failed: ${err.message}`);
+    });
+
     // Initialize GitHub repo cache immediately on startup
     log('[Repo Cache] Initializing GitHub repository cache on startup...');
     refreshRepoCache().catch(err => {
@@ -156,5 +164,14 @@ app.use((req, res, next) => {
     }, 60 * 60 * 1000); // 1 hour
 
     log('[Repo Cache] Hourly cache refresh scheduled');
+
+    // Warm OpenAI prompt cache immediately on startup
+    log('[Cache Warmer] Warming OpenAI prompt cache on startup...');
+    warmPromptCache().catch(err => {
+      log(`[Cache Warmer] Initial cache warming failed: ${err.message}`);
+    });
+
+    // Start cache warming interval (every 4 minutes to keep cache hot)
+    startCacheWarmerInterval();
   });
 })();

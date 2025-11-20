@@ -1,5 +1,10 @@
 // Activity templates for each script step
 // These templates weave user activity into script questions naturally
+//
+// ⚠️ NOTE: This file is currently NOT used in production.
+// It was an experimental feature for activity-aware templating.
+// The placeholders like {annualShoots} are never substituted in production code.
+// If you want to use this, you MUST call fillTemplateVariables() before sending to AI.
 
 export interface ActivityTemplate {
   pricing: string;

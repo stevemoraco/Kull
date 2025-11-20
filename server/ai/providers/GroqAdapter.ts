@@ -151,7 +151,7 @@ CRITICAL RAW IMAGE REMINDER: These are RAW images. Exposure and white balance ar
           schema: responseSchema
         }
       },
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
       temperature: 0.7
     };
 

@@ -947,7 +947,7 @@ describe('GrokAdapter', () => {
       expect(body.response_format.json_schema.name).toBe('photo_rating');
       expect(body.response_format.json_schema.strict).toBe(true);
       expect(body.response_format.json_schema.schema).toBeDefined();
-      expect(body.max_tokens).toBe(2000);
+      expect(body.max_completion_tokens).toBe(2000);
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe('system');
       expect(body.messages[1].role).toBe('user');

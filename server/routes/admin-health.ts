@@ -90,14 +90,27 @@ router.post('/health/broadcast', (req: Request, res: Response) => {
   });
 });
 
+// Track if we've logged the "not available" warning to avoid spam during startup
+let wsNotAvailableLogged = false;
+
 /**
  * Broadcast provider health update via WebSocket
  */
 export function broadcastHealthUpdate() {
   const wsService = getGlobalWsService();
   if (!wsService) {
-    console.warn('[Admin Health] WebSocket service not available');
+    // Only log once to avoid spam during startup
+    if (!wsNotAvailableLogged) {
+      console.warn('[Admin Health] WebSocket service not available (will retry silently)');
+      wsNotAvailableLogged = true;
+    }
     return;
+  }
+
+  // Reset flag once WebSocket is available
+  if (wsNotAvailableLogged) {
+    console.log('[Admin Health] WebSocket service now available');
+    wsNotAvailableLogged = false;
   }
 
   const metrics = getAllProviderMetrics();

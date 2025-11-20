@@ -272,7 +272,7 @@ export function shouldProgressToNextStep(
  */
 export function getNextQuestion(step: number, calculatorData?: any): string {
   const questions: Record<number, string> = {
-    0: "do you mind if i ask you a few questions to figure out if you're a good fit for kull and it's worth your time/money? just 15 questions, a few minutes and we'll put together a special offer for you if you're a good fit.",
+    0: "let me ask you a few questions to see if you're a good fit - 15 questions, takes a few minutes. we'll put together a special offer if this makes sense. sound good?",
     1: calculatorData?.annualShoots
       ? `i see you're doing about ${calculatorData.annualShoots} shoots a year — is that accurate?`
       : "what's your goal for annual shoots next year?",
@@ -359,7 +359,7 @@ export function generateStateContext(state: ConversationState): string {
   const unansweredCount = askedCount - answeredCount;
 
   let context = `\n\n## 📊 Conversation State\n`;
-  context += `- **Current Script Step:** ${state.currentStep}/16\n`;
+  context += `- **Current Script Position:** ${state.currentStep}/16\n`;
   context += `- **Questions Asked:** ${askedCount}\n`;
   context += `- **Questions Answered:** ${answeredCount}\n`;
   context += `- **Unanswered Questions:** ${unansweredCount}\n`;
@@ -372,7 +372,7 @@ export function generateStateContext(state: ConversationState): string {
   if (state.questionsAnswered.length > 0) {
     context += `\n### Answers Collected So Far:\n`;
     state.questionsAnswered.forEach((answer, idx) => {
-      context += `${idx + 1}. **Step ${answer.step}**: "${answer.question}" → "${answer.answer}"\n`;
+      context += `${idx + 1}. "${answer.question}" → "${answer.answer}"\n`;
     });
   }
 
@@ -380,7 +380,7 @@ export function generateStateContext(state: ConversationState): string {
     context += `\n### Pending Answers:\n`;
     const unanswered = state.questionsAsked.slice(-unansweredCount);
     unanswered.forEach((q, idx) => {
-      context += `${idx + 1}. **Step ${q.step}**: "${q.question}"\n`;
+      context += `${idx + 1}. "${q.question}"\n`;
     });
   }
 

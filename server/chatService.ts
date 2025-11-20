@@ -4,17 +4,146 @@
 import OpenAI from 'openai';
 import { getRepoContent as fetchRepoContent } from './fetchRepo';
 import { chatResponseJsonSchema } from './chatSchema';
+import { MASTER_SALES_PROMPT } from './prompts/staticContent';
+import { getStaticKnowledgeBase } from './knowledge/repoCache';
 
 // Re-export for use in routes
 export { fetchRepoContent as getRepoContent };
+
+/**
+ * Prompt Caching Cost Tracking
+ *
+ * Tracks cost savings from OpenAI's prompt caching feature.
+ * Monitors cached tokens vs. non-cached tokens to calculate ROI.
+ */
+interface PromptCachingMetrics {
+  totalRequests: number;
+  cachedRequests: number;
+  nonCachedRequests: number;
+  totalInputTokens: number;
+  cachedInputTokens: number;
+  totalOutputTokens: number;
+  tokensSaved: number; // Cached tokens that didn't count against usage
+  costSaved: number; // Estimated cost saved in dollars
+  averageResponseTime: number;
+  responseTimes: number[];
+  lastUpdated: number;
+}
+
+const promptCachingMetrics: PromptCachingMetrics = {
+  totalRequests: 0,
+  cachedRequests: 0,
+  nonCachedRequests: 0,
+  totalInputTokens: 0,
+  cachedInputTokens: 0,
+  totalOutputTokens: 0,
+  tokensSaved: 0,
+  costSaved: 0,
+  averageResponseTime: 0,
+  responseTimes: [],
+  lastUpdated: Date.now(),
+};
+
+/**
+ * Calculate cost saved from cached tokens
+ * Based on OpenAI pricing: https://openai.com/api/pricing/
+ *
+ * gpt-5-nano: $0.05/1M input tokens, $0.40/1M output tokens
+ * Cached tokens are FREE (50% discount on input tokens)
+ */
+function calculateCachedTokenSavings(
+  model: string,
+  cachedTokens: number
+): number {
+  const pricingPerMillion: Record<string, { input: number; output: number }> = {
+    'gpt-5-nano': { input: 0.05, output: 0.40 },
+    'gpt-5-mini': { input: 0.15, output: 1.00 },
+    'gpt-5': { input: 1.25, output: 10.00 },
+  };
+
+  const pricing = pricingPerMillion[model] || pricingPerMillion['gpt-5-nano'];
+  return (cachedTokens / 1_000_000) * pricing.input;
+}
+
+/**
+ * Update prompt caching metrics after each request
+ */
+function updatePromptCachingMetrics(
+  model: string,
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    prompt_tokens_details?: {
+      cached_tokens?: number;
+    };
+  },
+  responseTime: number
+): void {
+  const cachedTokens = usage.prompt_tokens_details?.cached_tokens || 0;
+
+  promptCachingMetrics.totalRequests++;
+  promptCachingMetrics.totalInputTokens += usage.prompt_tokens;
+  promptCachingMetrics.totalOutputTokens += usage.completion_tokens;
+  promptCachingMetrics.cachedInputTokens += cachedTokens;
+
+  if (cachedTokens > 0) {
+    promptCachingMetrics.cachedRequests++;
+    promptCachingMetrics.tokensSaved += cachedTokens;
+    promptCachingMetrics.costSaved += calculateCachedTokenSavings(model, cachedTokens);
+  } else {
+    promptCachingMetrics.nonCachedRequests++;
+  }
+
+  // Track response time (rolling window of last 100)
+  promptCachingMetrics.responseTimes.push(responseTime);
+  if (promptCachingMetrics.responseTimes.length > 100) {
+    promptCachingMetrics.responseTimes.shift();
+  }
+
+  promptCachingMetrics.averageResponseTime =
+    promptCachingMetrics.responseTimes.reduce((a, b) => a + b, 0) /
+    promptCachingMetrics.responseTimes.length;
+
+  promptCachingMetrics.lastUpdated = Date.now();
+}
+
+/**
+ * Get current prompt caching metrics
+ */
+export function getPromptCachingMetrics(): PromptCachingMetrics {
+  return { ...promptCachingMetrics };
+}
+
+/**
+ * Reset prompt caching metrics
+ */
+export function resetPromptCachingMetrics(): void {
+  promptCachingMetrics.totalRequests = 0;
+  promptCachingMetrics.cachedRequests = 0;
+  promptCachingMetrics.nonCachedRequests = 0;
+  promptCachingMetrics.totalInputTokens = 0;
+  promptCachingMetrics.cachedInputTokens = 0;
+  promptCachingMetrics.totalOutputTokens = 0;
+  promptCachingMetrics.tokensSaved = 0;
+  promptCachingMetrics.costSaved = 0;
+  promptCachingMetrics.averageResponseTime = 0;
+  promptCachingMetrics.responseTimes = [];
+  promptCachingMetrics.lastUpdated = Date.now();
+  console.log('[Prompt Cache] Metrics reset');
+}
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
   content: string;
 }
 
+// NOTE: Old PROMPT_PREFIX and PROMPT_SUFFIX have been removed.
+// Now using unified MASTER_SALES_PROMPT from staticContent.ts
+// and getStaticKnowledgeBase() from repoCache.ts for cache-aware architecture.
+
+// Legacy PROMPT_PREFIX for reference (now replaced by MASTER_SALES_PROMPT):
 // Instructions before repo content
-const PROMPT_PREFIX = `You are Kull's sales assistant, following a specific conversational sales script to guide users through discovering their workflow bottleneck.
+const LEGACY_PROMPT_PREFIX = `You are Kull's sales assistant, following a specific conversational sales script to guide users through discovering their workflow bottleneck.
 
 **YOUR ROLE:**
 You are NOT a traditional support bot. You are a sales consultant who helps photographers identify their workflow bottleneck and shows them how Kull solves it. You have access to all their calculator inputs and page activity.
@@ -32,8 +161,8 @@ WAIT for response. If yes/sure/ok → move to step 1
 If hesitate → "totally get it - just want to make sure we're not wasting your time. sound fair?"
 
 **Step 1: Current reality**
-EXACT QUESTION: "i see you're doing about {annualShoots} shoots a year — is that accurate?"
-(Use the actual calculatorData.annualShoots value)
+EXACT QUESTION: "i see you're doing about [NUMBER] shoots a year — is that accurate?"
+(You will receive the calculated annual shoots value in the dynamic context below - use that actual number, not a placeholder)
 If no calculator data: "what's your goal for annual shoots next year?"
 WAIT for confirmation before step 2
 
@@ -100,16 +229,23 @@ Then immediately: [start your free trial here](#download)
 - Use "you" and "your" - make it personal
 - No corporate speak, no fluff
 - Think: iMessage, not email
+- **NEVER mention step numbers** (don't say "step 0", "step 1", "we're in step 2", etc.)
+- Just ask the question naturally without referencing what step you're on
 
-**🚨 CRITICAL: ALWAYS REDIRECT BACK TO SCRIPT QUESTIONS 🚨**
+**🚨 CRITICAL: SMART SCRIPT NAVIGATION 🚨**
 
-No matter what the user asks or says, you MUST:
-1. Answer their question briefly (1 sentence max)
-2. IMMEDIATELY redirect using the EXACT scripted question for your current step
-3. NEVER let the conversation drift off-script
-4. EVERY response MUST end with the scripted question
+**IF USER ALREADY ANSWERED MULTIPLE QUESTIONS:**
+- DON'T re-ask! If they said "$200k, 2 months off, travel" - they answered steps 2, 6, 7, 8 at once
+- Acknowledge what they said: "got it - $200k, 2 months off, family travel"
+- Skip to the NEXT UNANSWERED question (e.g., step 3: "how many hours are you working each week?")
+- NEVER ask for information they already provided
 
-**THE RULE: Answer → Transition → EXACT SCRIPTED QUESTION**
+**IF USER ASKS OFF-TOPIC:**
+1. Answer briefly (1 sentence max)
+2. Redirect to current unanswered script question
+3. Example: "we'll get to pricing in a sec — first, how many hours are you working per week?"
+
+**THE RULE: Check History → Skip Answered Questions → Ask Next Unanswered Question**
 
 Examples based on current step:
 - User: "how does the AI work?" → "it analyzes focus, composition, lighting - super accurate. anyway, back to you - **i see you're doing about 88 shoots a year — is that accurate?**" (Step 1)
@@ -139,10 +275,10 @@ You have access to the user's real-time calculator values:
 
 **CALCULATOR-AWARE CONVERSATION:**
 - The first question ALWAYS references their calculator values
-- Use the ACTUAL calculated annualShoots value in your question
+- Use the ACTUAL calculated annual shoots number provided in the dynamic context
 - If they say the number is wrong, direct them to scroll down to the calculator
 - After they adjust the calculator, a new message will be triggered automatically
-- Acknowledge their new values: "Got it! Updated to {newValue} shoots/year..."
+- Acknowledge their new values using the actual number (e.g., "Got it! Updated to 176 shoots/year...")
 
 **PRICING STRATEGY:**
 - ALWAYS sell the Studio plan: $499/month billed annually upfront ($5,988/year)
@@ -268,8 +404,9 @@ You can see if the user is logged in or not in the User Session Metadata section
 <GITHUB_SOURCE_CODE>
 Below is the complete codebase from github.com/stevemoraco/kull which is deployed at https://kullai.com:`;
 
+// Legacy PROMPT_SUFFIX for reference (now replaced by MASTER_SALES_PROMPT):
 // Instructions after repo content
-const PROMPT_SUFFIX = `
+const LEGACY_PROMPT_SUFFIX = `
 </GITHUB_SOURCE_CODE>
 
 ---
@@ -503,14 +640,17 @@ If they've already answered something similar, skip to the next step.
 ---
 
 **REMEMBER:**
-- Read the conversation history BEFORE every response
-- Count which step you're on (1-15) based on what you've already asked
+- Read the FULL conversation history BEFORE every response
+- If the user already answered a question, DON'T ask it again - move to the next unanswered one
+- Know which step you're on internally, but NEVER mention step numbers to the user
 - Talk like you're texting a friend
 - ONE question at a time
 - Use their real calculator numbers and activity data to personalize
-- Follow the script step-by-step sequentially
+- Follow the script but SKIP questions they already answered
 - NEVER repeat questions you've already asked
 - Keep it casual and conversational
+- **Don't say "step 0", "step 1", "we're in step X" - just ask the question**
+- **If user gives multiple answers at once ($200k, 2 months off, travel) - acknowledge it and skip ahead to the next unanswered question**
 - **BE PERSISTENT - NEVER GIVE UP**
   - If commitment is low: ask what would make it a 10, what's their biggest time blocker, where they need help
   - If culling isn't their pain: explore editing, client management, booking, delivery, workflow, etc.
@@ -537,9 +677,11 @@ your message text here (1-2 sentences, casual, lowercase)
   - Natural, brief responses (2-8 words) they might actually type
   - Put them on a SEPARATE LINE with the ␞ delimiter
 
-**FOR FIRST MESSAGE ONLY:** Begin at step 1 of the script.
+**FOR FIRST MESSAGE:** Begin at the current step of the script (step {{CURRENT_STEP}}).
 **FOR ALL SUBSEQUENT MESSAGES:** Review conversation history, identify current step, move to NEXT step.
 **EVERY RESPONSE MUST INCLUDE:** The delimiter lines ␞QUICK_REPLIES: and ␞NEXT_MESSAGE: on SEPARATE LINES after your message
+
+**IMPORTANT:** If this is a returning user (currentStep > 0), continue the conversation naturally from where they left off. Don't restart or re-ask questions they've already answered.
 
 ---
 
@@ -573,11 +715,36 @@ You can add context before the question, but THE QUESTION ITSELF MUST BE WORD-FO
 // Helper to build full prompt markdown for debugging
 export async function buildFullPromptMarkdown(
   userMessage: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  currentStep: number = 1,
+  calculatorData?: any
 ): Promise<string> {
-  const repoContent = await fetchRepoContent();
-  const instructions = `${PROMPT_PREFIX}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
-  
+  // Build the new unified prompt structure
+  const { extractQuestions } = await import('./questionCache');
+  const questionsAlreadyAsked = history
+    .filter(msg => msg.role === 'assistant')
+    .flatMap(msg => extractQuestions(msg.content))
+    .filter((q, i, arr) => arr.indexOf(q) === i);
+
+  const { getNextQuestion } = await import('./conversationStateManager');
+  const expectedNextQuestion = getNextQuestion(currentStep, calculatorData);
+
+  const questionListText = questionsAlreadyAsked.length > 0
+    ? questionsAlreadyAsked.map((q, i) => `${i + 1}. "${q}"`).join('\n')
+    : '(none yet - this is the first message)';
+
+  // Layer 1: Sales prompt
+  const salesPrompt = MASTER_SALES_PROMPT
+    .replace('{{QUESTIONS_ALREADY_ASKED}}', questionListText)
+    .replace('{{CURRENT_STEP}}', String(currentStep))
+    .replace('{{EXPECTED_NEXT_QUESTION}}', expectedNextQuestion);
+
+  // Layer 2: Knowledge base
+  const knowledgeBase = await getStaticKnowledgeBase();
+
+  // Combine layers
+  const instructions = `${salesPrompt}\n\n${knowledgeBase}`;
+
   const input = [
     ...history.slice(-10).map(msg => ({
       role: msg.role === 'system' || msg.role === 'developer' ? 'developer' : msg.role,
@@ -600,16 +767,16 @@ export async function buildFullPromptMarkdown(
     api_endpoint: 'https://api.openai.com/v1/responses'
   }, null, 2);
   markdown += '\n```\n\n';
-  
-  markdown += '## Instructions (System Prompt)\n\n';
+
+  markdown += '## Instructions (System Prompt - Cached Layers)\n\n';
   markdown += '```\n' + instructions + '\n```\n\n';
-  
+
   markdown += '## Conversation History + Current Message\n\n';
   input.forEach((msg, idx) => {
     markdown += `### Message ${idx + 1} - Role: ${msg.role}\n\n`;
     markdown += '```\n' + msg.content + '\n```\n\n';
   });
-  
+
   return markdown;
 }
 
@@ -617,7 +784,7 @@ export async function getChatResponseStream(
   userMessage: string,
   history: ChatMessage[],
   model: 'gpt-5-nano' | 'gpt-5-mini' | 'gpt-5' = 'gpt-5-nano',
-  userActivityMarkdown?: string,
+  dynamicContext: string, // User activity markdown (Layer 3 - NOT cached)
   pageVisits?: any[],
   allSessions?: any[],
   sessionId?: string,
@@ -625,7 +792,8 @@ export async function getChatResponseStream(
   statusCallback?: (status: string, timing?: number) => void,
   calculatorData?: any,
   currentStep?: number,
-  previousReasoningBlocks?: string[] // Encrypted reasoning blocks from previous turns
+  previousReasoningBlocks?: string[], // Encrypted reasoning blocks from previous turns
+  validationFeedback?: string // Feedback from dual validation system if step not advanced
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -636,13 +804,6 @@ export async function getChatResponseStream(
   }
 
   try {
-    // Fetch repo content (STATIC - highly cacheable)
-    const repoStart = Date.now();
-    statusCallback?.('🗂️ loading codebase (150k+ lines of context)...');
-    const repoContent = await fetchRepoContent();
-    const repoTime = Date.now() - repoStart;
-    statusCallback?.(`✅ codebase loaded in ${repoTime}ms`, repoTime);
-
     // Extract all questions asked so far from conversation history
     const { extractQuestions } = await import('./questionCache');
     const questionsAlreadyAsked = history
@@ -660,37 +821,36 @@ export async function getChatResponseStream(
       ? questionsAlreadyAsked.map((q, i) => `${i + 1}. "${q}"`).join('\n')
       : '(none yet - this is the first message)';
 
-    // Build STATIC system message (repo content + instructions) - goes first for caching
-    // Replace placeholders with actual values
-    let promptWithQuestions = PROMPT_PREFIX
+    // Layer 1: Static system prompt (CACHED)
+    const salesPrompt = MASTER_SALES_PROMPT
       .replace('{{QUESTIONS_ALREADY_ASKED}}', questionListText)
       .replace('{{CURRENT_STEP}}', String(step))
       .replace('{{EXPECTED_NEXT_QUESTION}}', expectedNextQuestion);
 
-    const staticInstructions = `${promptWithQuestions}\n\n${repoContent}\n\n${PROMPT_SUFFIX}`;
+    // Layer 2: Static knowledge base (CACHED)
+    const knowledgeStart = Date.now();
+    statusCallback?.('🗂️ loading knowledge base (codebase + intelligence)...');
+    const knowledgeBase = await getStaticKnowledgeBase();
+    const knowledgeTime = Date.now() - knowledgeStart;
+    statusCallback?.(`✅ knowledge base loaded in ${knowledgeTime}ms`, knowledgeTime);
 
-    // Build DYNAMIC context (user-specific data) - goes at end, not cached
-    let dynamicContext = '';
+    // Combine Layers 1 & 2 (both cacheable)
+    const staticInstructions = `${salesPrompt}\n\n${knowledgeBase}`;
 
-    if (userActivityMarkdown) {
-      dynamicContext += `\n\n## 🎯 User Activity Context\n${userActivityMarkdown}`;
-    }
+    // Layer 3: Dynamic context (NOT CACHED)
+    // This is passed as the dynamicContext parameter and already includes:
+    // - User activity markdown
+    // - Page visits
+    // - Previous sessions
+    // - Calculator data
+    // - Section timing
 
-    if (pageVisits && pageVisits.length > 0) {
-      dynamicContext += `\n\n## 🧭 Page Visit History\n\nUser has visited ${pageVisits.length} pages:\n${JSON.stringify(pageVisits, null, 2)}`;
-    }
+    // Inject validation feedback if step was not advanced (AI needs to try again)
+    let finalDynamicContext = dynamicContext;
+    if (validationFeedback) {
+      finalDynamicContext += `\n\n## ⚠️ CRITICAL VALIDATION FEEDBACK\n\n${validationFeedback}\n\nThe user's previous response did not qualify for advancing to the next step. You should ask the same question again, but:\n- Rephrase it for clarity\n- Provide more context or examples\n- Make it easier for the user to give a substantive answer\n- Stay friendly and conversational - don't be pushy\n\nRemember: You're trying to help them, not interrogate them.`;
 
-    if (allSessions && allSessions.length > 0) {
-      dynamicContext += `\n\n## 💬 Previous Chat Sessions\n\nUser's previous chat sessions (${allSessions.length} total):\n`;
-      allSessions.forEach((session, idx) => {
-        dynamicContext += `\n### Session ${idx + 1}: ${session.title}\n`;
-        if (session.messages) {
-          const msgs = typeof session.messages === 'string' ? JSON.parse(session.messages) : session.messages;
-          msgs.forEach((msg: any) => {
-            dynamicContext += `- **${msg.role}**: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}\n`;
-          });
-        }
-      });
+      console.log(`[Chat] 🔄 Injecting validation feedback into prompt (step not advanced)`);
     }
 
     // Show what we're building the prompt with
@@ -701,16 +861,16 @@ export async function getChatResponseStream(
     const promptSize = Math.round(staticInstructions.length / 1000);
     statusCallback?.(`📝 building ${promptSize}k char prompt with ${history.length} messages...`);
 
-    // Build messages array - static first (cacheable), then dynamic, then conversation
+    // Build messages array - Layer 1+2 (static, cacheable), then Layer 3 (dynamic), then conversation
     const messages = [
       {
         role: 'system',
-        content: staticInstructions, // CACHEABLE: repo + instructions (~150k tokens)
+        content: staticInstructions, // Layers 1+2 (CACHEABLE): sales prompt + knowledge base (~150k tokens)
       },
       // Add dynamic context as separate system message if present
-      ...(dynamicContext ? [{
+      ...(finalDynamicContext ? [{
         role: 'system' as const,
-        content: dynamicContext, // NOT CACHED: user-specific data
+        content: finalDynamicContext, // Layer 3 (NOT CACHED): user-specific data
       }] : []),
       // Conversation history
       ...history.map(msg => ({
@@ -848,6 +1008,7 @@ export async function getChatResponseStream(
 
               // Add usage data
               if (chunkData.response.usage) {
+                const totalResponseTime = Date.now() - fetchStart;
                 convertedChunk.usage = {
                   prompt_tokens: chunkData.response.usage.input_tokens || 0,
                   completion_tokens: chunkData.response.usage.output_tokens || 0,
@@ -855,6 +1016,27 @@ export async function getChatResponseStream(
                     cached_tokens: chunkData.response.usage.input_tokens_cached || 0
                   }
                 };
+
+                // Track prompt caching metrics
+                updatePromptCachingMetrics(model, convertedChunk.usage, totalResponseTime);
+
+                const cachedTokens = convertedChunk.usage.prompt_tokens_details?.cached_tokens || 0;
+                const cacheHitRate = cachedTokens > 0
+                  ? ((cachedTokens / convertedChunk.usage.prompt_tokens) * 100).toFixed(1) + '%'
+                  : '0%';
+                const estimatedSavings = calculateCachedTokenSavings(model, cachedTokens);
+
+                console.log('[Prompt Cache] Request completed:', {
+                  model,
+                  totalTokens: convertedChunk.usage.prompt_tokens + convertedChunk.usage.completion_tokens,
+                  inputTokens: convertedChunk.usage.prompt_tokens,
+                  cachedTokens,
+                  outputTokens: convertedChunk.usage.completion_tokens,
+                  cacheHitRate,
+                  estimatedSavings: '$' + estimatedSavings.toFixed(6),
+                  responseTime: totalResponseTime + 'ms',
+                });
+
                 console.log('[Chat] 💰 Usage:', convertedChunk.usage);
               }
 

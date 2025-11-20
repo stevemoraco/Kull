@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useProviderHealth, type ProviderMetrics } from '../hooks/useProviderHealth';
+import { useCacheMetrics } from '../hooks/useCacheMetrics';
 import {
   LineChart,
   Line,
@@ -23,8 +24,9 @@ import AdminAnalytics from '../components/AdminAnalytics';
 
 export default function AdminDashboard() {
   const { data, loading, error } = useProviderHealth();
+  const cacheMetrics = useCacheMetrics();
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'providers' | 'analytics'>('providers');
+  const [activeTab, setActiveTab] = useState<'providers' | 'analytics' | 'cache'>('providers');
 
   if (loading && !data) {
     return (
@@ -86,6 +88,16 @@ export default function AdminDashboard() {
               Provider Health
             </button>
             <button
+              onClick={() => setActiveTab('cache')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'cache'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Prompt Cache
+            </button>
+            <button
               onClick={() => setActiveTab('analytics')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === 'analytics'
@@ -101,6 +113,8 @@ export default function AdminDashboard() {
         {/* Conditional Content */}
         {activeTab === 'analytics' ? (
           <AdminAnalytics />
+        ) : activeTab === 'cache' ? (
+          <CacheMonitoring cacheMetrics={cacheMetrics} />
         ) : (
           <div>
 
@@ -480,4 +494,240 @@ function getHealthColor(score: number): 'green' | 'yellow' | 'red' {
   if (score >= 90) return 'green';
   if (score >= 70) return 'yellow';
   return 'red';
+}
+
+interface CacheMonitoringProps {
+  cacheMetrics: ReturnType<typeof useCacheMetrics>;
+}
+
+function CacheMonitoring({ cacheMetrics }: CacheMonitoringProps) {
+  const { cache, promptCaching, loading, error } = cacheMetrics;
+
+  if (loading && !cache && !promptCaching) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+        <p className="ml-4 text-gray-600">Loading cache metrics...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Cache Metrics</h3>
+        <p className="text-sm text-red-700">{error.message}</p>
+      </div>
+    );
+  }
+
+  if (!cache || !promptCaching) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Knowledge Base Cache Status */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Knowledge Base Cache</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            title="Cache Status"
+            value={cache.status.isCached ? 'Cached' : 'Not Cached'}
+            color={cache.status.isCached ? 'green' : 'red'}
+            subtitle={cache.status.isCached ? 'In memory' : 'Needs initialization'}
+          />
+          <StatCard
+            title="Cache Size"
+            value={cache.status.sizeKB ? `${cache.status.sizeKB} KB` : 'N/A'}
+            color="blue"
+            subtitle="Knowledge base size"
+          />
+          <StatCard
+            title="Hit Rate"
+            value={cache.hitRate}
+            color={parseFloat(cache.hitRate) >= 90 ? 'green' : parseFloat(cache.hitRate) >= 70 ? 'yellow' : 'red'}
+            subtitle={`${cache.metrics.hits} hits / ${cache.metrics.totalRetrievals} total`}
+          />
+          <StatCard
+            title="Avg Retrieval Time"
+            value={cache.avgRetrievalTime}
+            color={parseFloat(cache.avgRetrievalTime) < 1 ? 'green' : parseFloat(cache.avgRetrievalTime) < 5 ? 'yellow' : 'red'}
+            subtitle="Cache access speed"
+          />
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 p-4 rounded border border-gray-200">
+            <p className="text-xs text-gray-500 mb-1">Total Retrievals</p>
+            <p className="text-2xl font-bold text-gray-900">{cache.metrics.totalRetrievals}</p>
+          </div>
+          <div className="bg-green-50 p-4 rounded border border-green-200">
+            <p className="text-xs text-green-600 mb-1">Cache Hits</p>
+            <p className="text-2xl font-bold text-green-700">{cache.metrics.hits}</p>
+          </div>
+          <div className="bg-red-50 p-4 rounded border border-red-200">
+            <p className="text-xs text-red-600 mb-1">Cache Misses</p>
+            <p className="text-2xl font-bold text-red-700">{cache.metrics.misses}</p>
+          </div>
+        </div>
+
+        {cache.lastHit && (
+          <div className="mt-4 text-sm text-gray-600">
+            Last cache hit: {format(new Date(cache.lastHit), 'PPpp')}
+          </div>
+        )}
+      </div>
+
+      {/* Prompt Caching Cost Savings */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Prompt Caching Cost Savings</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <StatCard
+            title="Total Requests"
+            value={promptCaching.totalRequests.toString()}
+            color="blue"
+            subtitle="All chat requests"
+          />
+          <StatCard
+            title="Cached Requests"
+            value={promptCaching.cachedPercentage}
+            color={parseFloat(promptCaching.cachedPercentage) >= 80 ? 'green' : parseFloat(promptCaching.cachedPercentage) >= 50 ? 'yellow' : 'red'}
+            subtitle={`${promptCaching.cachedRequests} of ${promptCaching.totalRequests}`}
+          />
+          <StatCard
+            title="Cost Saved"
+            value={promptCaching.costSaved}
+            color="green"
+            subtitle={`${promptCaching.savingsPercentage} savings`}
+          />
+          <StatCard
+            title="Avg Response Time"
+            value={promptCaching.averageResponseTime}
+            color={parseFloat(promptCaching.averageResponseTime) < 1000 ? 'green' : parseFloat(promptCaching.averageResponseTime) < 2000 ? 'yellow' : 'red'}
+            subtitle="API response time"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-blue-50 p-6 rounded border border-blue-200">
+            <h3 className="text-sm font-medium text-blue-900 mb-2">Token Usage</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-xs text-blue-700">Input Tokens:</span>
+                <span className="text-sm font-semibold text-blue-900">{promptCaching.totalInputTokens}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-blue-700">Cached Tokens:</span>
+                <span className="text-sm font-semibold text-blue-900">{promptCaching.cachedInputTokens}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-blue-700">Output Tokens:</span>
+                <span className="text-sm font-semibold text-blue-900">{promptCaching.totalOutputTokens}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-green-50 p-6 rounded border border-green-200">
+            <h3 className="text-sm font-medium text-green-900 mb-2">Cost Analysis</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-xs text-green-700">Without Caching:</span>
+                <span className="text-sm font-semibold text-green-900">{promptCaching.totalCostWithoutCaching}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-green-700">Actual Cost:</span>
+                <span className="text-sm font-semibold text-green-900">{promptCaching.actualCost}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-green-700">Saved:</span>
+                <span className="text-sm font-semibold text-green-900">{promptCaching.costSaved}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 p-6 rounded border border-purple-200">
+            <h3 className="text-sm font-medium text-purple-900 mb-2">Efficiency</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-xs text-purple-700">Tokens Saved:</span>
+                <span className="text-sm font-semibold text-purple-900">{promptCaching.tokensSaved}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-purple-700">Avg Cached/Request:</span>
+                <span className="text-sm font-semibold text-purple-900">{promptCaching.avgCachedTokensPerRequest.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-purple-700">Savings Rate:</span>
+                <span className="text-sm font-semibold text-purple-900">{promptCaching.savingsPercentage}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border border-green-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Prompt Caching ROI</h3>
+          <p className="text-3xl font-bold text-green-600 mb-2">{promptCaching.savingsPercentage}</p>
+          <p className="text-sm text-gray-700">
+            You're saving <strong>{promptCaching.costSaved}</strong> by using prompt caching.
+            Out of {promptCaching.totalRequests} requests, {promptCaching.cachedRequests} ({promptCaching.cachedPercentage})
+            benefited from cached prompts.
+          </p>
+        </div>
+
+        <div className="mt-4 text-sm text-gray-600">
+          Last updated: {format(new Date(promptCaching.lastUpdated), 'PPpp')}
+        </div>
+      </div>
+
+      {/* Performance Insights */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Performance Insights</h2>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div>
+              <h3 className="font-semibold text-blue-900">Cache Hit Rate</h3>
+              <p className="text-sm text-blue-700">
+                {parseFloat(cache.hitRate) >= 90
+                  ? 'Excellent! Cache is performing optimally.'
+                  : parseFloat(cache.hitRate) >= 70
+                  ? 'Good performance. Most requests hitting cache.'
+                  : 'Cache may need warmup or has high invalidation rate.'}
+              </p>
+            </div>
+            <div className="text-3xl font-bold text-blue-600">{cache.hitRate}</div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
+            <div>
+              <h3 className="font-semibold text-green-900">Prompt Caching Efficiency</h3>
+              <p className="text-sm text-green-700">
+                {parseFloat(promptCaching.cachedPercentage) >= 80
+                  ? 'Outstanding! Most requests benefit from prompt caching.'
+                  : parseFloat(promptCaching.cachedPercentage) >= 50
+                  ? 'Good adoption. Prompt caching is working well.'
+                  : 'Low cache utilization. Check if prompts are consistent.'}
+              </p>
+            </div>
+            <div className="text-3xl font-bold text-green-600">{promptCaching.cachedPercentage}</div>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div>
+              <h3 className="font-semibold text-purple-900">Average Response Time</h3>
+              <p className="text-sm text-purple-700">
+                {parseFloat(promptCaching.averageResponseTime) < 1000
+                  ? 'Fast responses! Users experiencing minimal latency.'
+                  : parseFloat(promptCaching.averageResponseTime) < 2000
+                  ? 'Acceptable response times. Consider optimization.'
+                  : 'Slow responses detected. Investigate bottlenecks.'}
+              </p>
+            </div>
+            <div className="text-3xl font-bold text-purple-600">{promptCaching.averageResponseTime}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

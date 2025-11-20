@@ -18,114 +18,114 @@ export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
   {
     step: 0,
     shortLabel: "Permission",
-    question: "do you mind if i ask you a few questions to figure out if you're a good fit for kull and it's worth your time/money? just 15 questions, a few minutes and we'll put together a special offer for you if you're a good fit.",
+    question: "let me ask you a few questions to see if you're a good fit - 15 questions, takes a few minutes. we'll put together a special offer if this makes sense. sound good?",
     category: "permission",
     required: true,
     interpolate: false
   },
   {
     step: 1,
-    shortLabel: "Your goal",
-    question: "i see you're doing about [shootsPerWeek × 44] shoots a year — what's your goal for next year?",
+    shortLabel: "Current reality",
+    question: "i see you're doing about [shootsPerWeek × 44] shoots a year — is that accurate?",
     category: "discovery",
     required: true,
     interpolate: true
   },
   {
     step: 2,
-    shortLabel: "Happy with goal?",
-    question: "are you happy with that number?",
+    shortLabel: "Goal for next year",
+    question: "what's your goal for next year? more shoots? less? more profitable? walk me through it.",
     category: "discovery",
     required: true
   },
   {
     step: 3,
     shortLabel: "Hours per week",
-    question: "how many hours are you working each week right now to sustain it?",
+    question: "how many hours are you working each week right now?",
     category: "discovery",
     required: true
   },
   {
     step: 4,
     shortLabel: "Growth plan",
-    question: "so if you want to grow, how are you planning to do that?",
+    question: "do you know how you'll grow those numbers without hiring or working more?",
     category: "pain",
     required: true
   },
   {
     step: 5,
     shortLabel: "Current workflow",
-    question: "do you expect to be able to do that with your current workflow?",
+    question: "how do you expect to do that with your current workflow?",
     category: "pain",
     required: true
   },
   {
     step: 6,
     shortLabel: "Annual target",
-    question: "what's your actual target for annual shoots next year?",
+    question: "what's your most important goal for next year? (or repeat it back to them if they've already said it, and ask why that one more than everything else they want to do)",
     category: "pain",
     required: true
   },
   {
     step: 7,
     shortLabel: "Why that goal?",
-    question: "why that specific number? what drives that goal?",
+    question: "why that specific goal?",
     category: "pain",
     required: true
   },
   {
     step: 8,
     shortLabel: "Outcome vision",
-    question: "what changes in your life when you hit that number? paint me a picture.",
+    question: "what changes in your business or life when you hit it?",
     category: "pain",
     required: true
   },
   {
     step: 9,
     shortLabel: "The bottleneck",
-    question: "so what's kept you from hitting that goal so far? what's the real bottleneck?",
+    question: "what's kept you from hitting that already?",
     category: "pain",
     required: true
   },
   {
     step: 10,
     shortLabel: "Position solution",
-    question: "that's exactly what i specialize in solving. would you be open to hearing how?",
+    question: "this is exactly what i specialize in: removing the workflow block that's keeping you from those numbers. (then pause answering questions for a bit to tell them ALL about the service relative to their goals and how you think it'll help them most, be very direct based on our codebase how it actually works and help them imagine what success looks like, paint the vision of Kull integrated into their life)",
     category: "commitment",
     required: true
   },
   {
     step: 11,
     shortLabel: "Commitment level",
-    question: "on a scale of 1-10, how committed are you to fixing this in the next 30 days?",
+    question: "how committed are you to hitting that? 1–10. (make sure you've finished telling them all about what life will be like after they start using Kull and they're amazed first)",
     category: "commitment",
     required: true
   },
   {
     step: 12,
     shortLabel: "Timeline urgency",
-    question: "when do you want this fixed? like, actually fixed — not just thinking about it.",
+    question: "when do you want this fixed so you can hit those numbers?",
     category: "commitment",
     required: true
   },
   {
     step: 13,
     shortLabel: "Price reveal",
-    question: "cool. so do you want to hear the price, or should we keep talking about the bottleneck?",
+    question: "want the price?",
     category: "close",
     required: true
   },
   {
     step: 14,
     shortLabel: "State price",
-    question: "the everyday price is $997/year. that's about $83/month to process unlimited shoots.",
+    question: "everyday price is $5,988/year to solve exactly the problem you just described.",
     category: "close",
     required: true
   },
   {
     step: 15,
     shortLabel: "Discount close",
-    question: "but if you'll commit right now, i'll give you founder pricing at $697/year. that's $300 off, but only if you decide today. what do you think?",
+    question: "alright — if you'll commit to the goal you told me, i'll discount it.",
     category: "close",
     required: true
   }
@@ -215,3 +215,59 @@ export const getInterpolatedQuestion = (
 
   return question.question;
 };
+
+/**
+ * Full sales script text for AI validation
+ * Used by aiStepValidator.ts to show context
+ */
+export const SALES_SCRIPT_TEXT = `
+KULL SALES SCRIPT (16 Steps):
+
+Step 0: Get Permission
+"do you mind if i ask you a few questions to figure out if you're a good fit for kull and it's worth your time/money? just 15 questions, a few minutes and we'll put together a special offer for you if you're a good fit."
+
+Step 1: Current Reality (Your Goal)
+"i see you're doing about [shootsPerWeek × 44] shoots a year — what's your goal for next year?"
+
+Step 2: Happy with Goal?
+"are you happy with that number?"
+
+Step 3: Hours per Week
+"how many hours are you working each week right now to sustain it?"
+
+Step 4: Growth Plan
+"so if you want to grow, how are you planning to do that?"
+
+Step 5: Current Workflow
+"do you expect to be able to do that with your current workflow?"
+
+Step 6: Annual Target
+"what's your actual target for annual shoots next year?"
+
+Step 7: Why That Goal?
+"why that specific number? what drives that goal?"
+
+Step 8: Outcome Vision
+"what changes in your life when you hit that number? paint me a picture."
+
+Step 9: The Bottleneck
+"so what's kept you from hitting that goal so far? what's the real bottleneck?"
+
+Step 10: Position Solution
+"that's exactly what i specialize in solving. would you be open to hearing how?"
+
+Step 11: Commitment Level
+"on a scale of 1-10, how committed are you to fixing this in the next 30 days?"
+
+Step 12: Timeline Urgency
+"when do you want this fixed? like, actually fixed — not just thinking about it."
+
+Step 13: Price Reveal
+"cool. so do you want to hear the price, or should we keep talking about the bottleneck?"
+
+Step 14: State Price
+"everyday price is $5,988/year to solve exactly the problem you just described. that's $499/month billed annually for unlimited processing."
+
+Step 15: Discount Close
+"alright — if you'll commit to the goal you told me, i'll discount it. [start your free trial here](#download)"
+`.trim();

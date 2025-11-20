@@ -27,6 +27,10 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  // On Replit, always use HTTPS even in dev, so we need secure cookies
+  const isReplit = !!process.env.REPL_ID;
+  const useSecureCookies = process.env.NODE_ENV === 'production' || isReplit;
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -34,7 +38,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Only require HTTPS in production
+      secure: useSecureCookies,
+      sameSite: 'lax', // Required for OAuth redirects
       maxAge: sessionTtl,
     },
   });
@@ -182,7 +187,29 @@ export async function setupAuth(app: Express) {
   app.get("/api/login", (req, res, next) => {
     // Check if already authenticated
     if (req.isAuthenticated && req.isAuthenticated()) {
-      console.log("[Auth] User already authenticated, redirecting to /");
+      const user = req.user as any;
+      console.log("[Auth] User already authenticated:", {
+        hasExpires: !!user?.expires_at,
+        hasClaims: !!user?.claims,
+        sub: user?.claims?.sub
+      });
+
+      // If user object looks incomplete, force re-authentication
+      if (!user?.expires_at || !user?.claims) {
+        console.log("[Auth] User object incomplete, forcing re-authentication");
+        req.logout(() => {
+          // Continue to authentication flow below
+          console.log("[Auth] Starting login flow after logout");
+          ensureStrategy(req.hostname);
+          passport.authenticate(`replitauth:${req.hostname}`, {
+            prompt: "login consent",
+            scope: ["openid", "email", "profile", "offline_access"],
+          })(req, res, next);
+        });
+        return;
+      }
+
+      console.log("[Auth] User fully authenticated, redirecting to /");
       return res.redirect("/");
     }
 
@@ -198,7 +225,9 @@ export async function setupAuth(app: Express) {
     console.log("[Auth] Callback received:", {
       hostname: req.hostname,
       query: req.query,
-      hasSession: !!req.session
+      hasSession: !!req.session,
+      sessionID: req.session?.id,
+      cookies: req.headers.cookie
     });
 
     try {
@@ -206,7 +235,11 @@ export async function setupAuth(app: Express) {
       console.log("[Auth] Strategy ensured");
 
       passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
-        console.log("[Auth] Passport authenticate callback triggered");
+        console.log("[Auth] Passport authenticate callback triggered", {
+          hasError: !!err,
+          hasUser: !!user,
+          info
+        });
 
         if (err) {
           console.error("[Auth] Callback error:", err);
@@ -214,16 +247,18 @@ export async function setupAuth(app: Express) {
         }
 
         if (!user) {
-          console.log("[Auth] No user returned:", info);
+          console.log("[Auth] No user returned, redirecting to login. Info:", info);
           return res.redirect("/api/login");
         }
 
-        console.log("[Auth] User received, calling logIn");
+        console.log("[Auth] User received, calling logIn. User claims:", user?.claims?.sub);
         req.logIn(user, (loginErr) => {
           if (loginErr) {
             console.error("[Auth] Login error:", loginErr);
             return res.status(500).send("Login failed. Please try again.");
           }
+
+          console.log("[Auth] logIn successful, session ID:", req.session?.id);
 
           // Explicitly save the session before redirecting
           req.session.save((saveErr) => {
@@ -232,7 +267,7 @@ export async function setupAuth(app: Express) {
               return res.status(500).send("Failed to save session. Please try again.");
             }
 
-            console.log("[Auth] Session saved, login successful, redirecting to /");
+            console.log("[Auth] Session saved successfully, redirecting to /. Session ID:", req.session?.id);
             return res.redirect("/");
           });
         });
@@ -258,28 +293,43 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
+  console.log("[Auth] isAuthenticated check:", {
+    hasSession: !!req.session,
+    sessionID: req.session?.id,
+    isAuthenticated: req.isAuthenticated?.(),
+    hasUser: !!user,
+    userSub: user?.claims?.sub,
+    path: req.path
+  });
+
   if (!req.isAuthenticated()) {
+    console.log("[Auth] req.isAuthenticated() returned false");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   if (user?.deviceSession) {
     if (!user?.claims?.sub) {
+      console.log("[Auth] Device session missing claims.sub");
       return res.status(401).json({ message: "Unauthorized" });
     }
+    console.log("[Auth] Device session authenticated");
     return next();
   }
 
   if (!user.expires_at) {
+    console.log("[Auth] No expires_at in user. Full user object:", JSON.stringify(user, null, 2));
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
+    console.log("[Auth] Token still valid, authenticated");
     return next();
   }
 
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    console.log("[Auth] Token expired and no refresh token");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
