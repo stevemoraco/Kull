@@ -78,7 +78,14 @@ export async function generateNarrative(input: GenerateReportInput, apiKey?: str
           ],
         },
       ],
-      response_format: { type: "text" },
+      text: {
+        format: { type: "text" },
+        verbosity: "low" // Low verbosity
+      },
+      reasoning: {
+        effort: "minimal", // Minimal reasoning for speed
+        summary: "auto"
+      },
     } as any;
     const resp = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",

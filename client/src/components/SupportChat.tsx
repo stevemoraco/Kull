@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
 import { useCalculator } from '@/contexts/CalculatorContext';
 import { ConversationProgress } from '@/components/ConversationProgress';
+import { ThinkingProgress } from '@/components/ThinkingProgress';
 
 // 🔊 CYBERPUNK NOTIFICATION SOUND - Web Audio API
 function playCyberpunkDing() {
@@ -974,6 +975,21 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
   // Define handleLinkClick early so it can be used in effects
   // Memoize to prevent recreation on every render
   const handleLinkClick = useCallback((url: string) => {
+    console.log('[Chat] Link clicked:', url);
+
+    // Hash-only links (#calculator, #features, etc.) - just scroll, don't navigate
+    if (url.startsWith('#')) {
+      const hash = url.substring(1); // Remove the #
+      console.log('[Chat] Hash-only link, scrolling to:', hash);
+      const element = document.getElementById(hash);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        console.warn('[Chat] Element not found:', hash);
+      }
+      return; // Don't open new tab
+    }
+
     // Determine if URL is internal or external
     let isInternal = false;
     let pathToNavigate = url;
@@ -1002,21 +1018,31 @@ export function SupportChat({ sectionTiming = {} }: SupportChatProps = {}) {
       // Internal navigation - same tab
       if (pathToNavigate.includes('#')) {
         const [path, hash] = pathToNavigate.split('#');
-        setLocation(path || '/');
 
-        // Scroll to element after navigation
-        setTimeout(() => {
+        // If no path or same path, just scroll
+        if (!path || path === '/' || path === window.location.pathname) {
+          console.log('[Chat] Same page hash link, scrolling to:', hash);
           const element = document.getElementById(hash);
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
-        }, 100);
+        } else {
+          // Different page, navigate then scroll
+          setLocation(path || '/');
+          setTimeout(() => {
+            const element = document.getElementById(hash);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 100);
+        }
       } else {
         setLocation(pathToNavigate);
       }
       // Keep chat open for internal navigation
     } else {
       // External link - open in new tab
+      console.log('[Chat] External link, opening in new tab:', url);
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   }, [setLocation]);
@@ -2835,20 +2861,12 @@ Please acknowledge this change naturally in 1-2 sentences and relate it to our c
                           message.content.includes('⚙️') ||
                           message.content.includes('✨') ||
                           message.content.includes('⚠️') ? (
-                        // Special rendering for status messages - LARGE, PROMINENT display
-                        <div className="flex flex-col gap-2 border-l-4 border-teal-500 pl-4 py-3 bg-gradient-to-r from-teal-50 to-transparent rounded-r shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <Loader2 className="w-5 h-5 animate-spin text-teal-600 flex-shrink-0" />
-                            <span className="text-sm font-semibold text-teal-800">
-                              {message.content === '__THINKING__' ? 'Preparing your response...' : 'Processing...'}
-                            </span>
-                          </div>
-                          <div className="text-xs font-mono text-teal-700 whitespace-pre-wrap leading-relaxed pl-8">
-                            {message.content === '__THINKING__'
-                              ? 'Loading context from repository and building AI prompt...'
-                              : message.content}
-                          </div>
-                        </div>
+                        // Special rendering with smooth progress bar and collapsible logs
+                        <ThinkingProgress
+                          statusLogs={message.content === '__THINKING__'
+                            ? 'Loading context from repository and building AI prompt...'
+                            : message.content}
+                        />
                       ) : message.content.length === 0 ? (
                         // Waiting for first token
                         <div className="flex items-start gap-3 border-l-4 border-blue-400 pl-3 py-1 bg-blue-50/50 rounded-r">

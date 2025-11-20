@@ -1046,6 +1046,22 @@ ${userActivity.map((event: any, idx: number) => {
         userActivityMarkdown += stateContext;
       }
 
+      // Load previous reasoning blocks from session for prompt caching
+      let previousReasoningBlocks: string[] | undefined;
+      if (sessionId) {
+        try {
+          const sessions = await storage.getChatSessions();
+          const currentSession = sessions.find((s: any) => s.id === sessionId);
+          if (currentSession?.reasoningBlocks) {
+            previousReasoningBlocks = currentSession.reasoningBlocks as string[];
+            console.log(`[Chat] 🧠 Loaded ${previousReasoningBlocks.length} reasoning blocks from previous turn`);
+          }
+        } catch (err) {
+          console.error('[Chat] Error loading reasoning blocks:', err);
+          // Continue without reasoning blocks if loading fails
+        }
+      }
+
       let loadedSteps: any[] = [];
       // Load conversation memory from conversationSteps table
       let conversationMemory = '';
@@ -1157,7 +1173,7 @@ Use this template or a natural variation that:
         const msg = timing !== undefined ? `${status} (${timing}ms)` : status;
         res.write(`data: ${JSON.stringify({ type: 'status', message: msg })}\n\n`);
         if (res.socket) res.socket.uncork();
-      }, enrichedCalculatorData, currentStep);
+      }, enrichedCalculatorData, currentStep, previousReasoningBlocks);
       const apiTime = Date.now() - apiStart;
       timings.apiCalled = Date.now() - timings.start;
 
@@ -1170,6 +1186,7 @@ Use this template or a natural variation that:
       let cachedTokensIn = 0;
       let cost = 0;
       let firstTokenReceived = false;
+      let reasoningBlocks: string[] | undefined;
 
       try {
         // Stream processing
@@ -1235,6 +1252,12 @@ Use this template or a natural variation that:
                   cost = calculateChatCost(preferredModel, tokensIn, tokensOut);
 
                   // Usage data received (logged after stream completes)
+                }
+
+                // Capture reasoning blocks from chatService
+                if (data.reasoning_blocks) {
+                  reasoningBlocks = data.reasoning_blocks;
+                  console.log(`[Chat] 🧠 Captured ${reasoningBlocks?.length || 0} reasoning blocks for caching`);
                 }
 
                 // Handle error
@@ -1542,18 +1565,28 @@ Use this template or a natural variation that:
                     console.log(`[Script Validation] AI on-script at step ${currentScriptStep} (${(validation.similarity * 100).toFixed(1)}% match)`);
                   }
 
-                  // Update chatSession with new script step
+                  // Update chatSession with new script step and reasoning blocks
                   await db.update(chatSessions)
                     .set({
                       scriptStep: newScriptStep,
                       questionAskedAtStep: fullResponse,
                       answerGivenAtStep: message,
+                      reasoningBlocks: reasoningBlocks || previousReasoningBlocks || null,
                       updatedAt: new Date(),
                     })
                     .where(eq(chatSessions.id, sessionId));
 
                   console.log(`[Script Progression] Session ${sessionId} progressed from step ${currentScriptStep} → ${newScriptStep}`);
                 } else {
+                  // Even if not progressing, save reasoning blocks for prompt caching
+                  if (reasoningBlocks || previousReasoningBlocks) {
+                    await db.update(chatSessions)
+                      .set({
+                        reasoningBlocks: reasoningBlocks || previousReasoningBlocks || null,
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(chatSessions.id, sessionId));
+                  }
                   console.log(`[Script Progression] Session ${sessionId} staying at step ${currentScriptStep} (user didn't answer)`);
                 }
               }
@@ -2199,6 +2232,22 @@ Now respond to their most recent activity (check the user activity log above) an
       const { generateStateContext } = await import('./conversationStateManager');
       const stateContext = conversationState ? generateStateContext(conversationState) : '';
 
+      // Load previous reasoning blocks from session for prompt caching
+      let previousReasoningBlocks: string[] | undefined;
+      if (sessionId) {
+        try {
+          const sessions = await storage.getChatSessions();
+          const currentSession = sessions.find((s: any) => s.id === sessionId);
+          if (currentSession?.reasoningBlocks) {
+            previousReasoningBlocks = currentSession.reasoningBlocks as string[];
+            console.log(`[Welcome] 🧠 Loaded ${previousReasoningBlocks.length} reasoning blocks from previous turn`);
+          }
+        } catch (err) {
+          console.error('[Welcome] Error loading reasoning blocks:', err);
+          // Continue without reasoning blocks if loading fails
+        }
+      }
+
       // Build full context with repo + session data + conversation history
       const repoContent = await getRepoContent();
 
@@ -2244,7 +2293,8 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
         userId,
         undefined, // statusCallback
         enrichedCalculatorData,
-        currentStepNumber
+        currentStepNumber,
+        previousReasoningBlocks
       );
 
       res.setHeader('Content-Type', 'text/event-stream');
@@ -2269,6 +2319,7 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
       let tokensIn = 0;
       let tokensOut = 0;
       let cachedTokensIn = 0;
+      let reasoningBlocks: string[] | undefined;
 
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -2322,7 +2373,13 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
                   tokensOut = data.usage.completion_tokens || 0;
                   cachedTokensIn = data.usage.prompt_tokens_details?.cached_tokens || 0;
                 }
-                
+
+                // Capture reasoning blocks from chatService
+                if (data.reasoning_blocks) {
+                  reasoningBlocks = data.reasoning_blocks;
+                  console.log(`[Welcome] 🧠 Captured ${reasoningBlocks?.length || 0} reasoning blocks for caching`);
+                }
+
                 // Handle error
                 if (data.error) {
                   console.error('[Welcome] OpenAI error:', data.error);
@@ -2445,6 +2502,22 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
             await storage.updateConversationState(sessionId, updatedState);
 
             console.log(`[Welcome State] Session ${sessionId} - Step: ${updatedState.currentStep}/15, Questions asked: ${updatedState.questionsAsked.length}`);
+
+            // Save reasoning blocks to session if available
+            if (reasoningBlocks || previousReasoningBlocks) {
+              try {
+                await db.update(chatSessions)
+                  .set({
+                    reasoningBlocks: reasoningBlocks || previousReasoningBlocks || null,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(chatSessions.id, sessionId));
+                console.log(`[Welcome] 🧠 Saved ${(reasoningBlocks || previousReasoningBlocks)?.length} reasoning blocks to session ${sessionId}`);
+              } catch (err) {
+                console.error('[Welcome] Error saving reasoning blocks:', err);
+                // Don't fail the request if saving reasoning blocks fails
+              }
+            }
           }
 
           // Broadcast to admin panels for live updates

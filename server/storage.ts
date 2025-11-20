@@ -1008,6 +1008,7 @@ export class DatabaseStorage implements IStorage {
           scriptStep: scriptStep,
           lastQuickReplies: session.lastQuickReplies,
           lastNextMessageSeconds: session.lastNextMessageSeconds,
+          reasoningBlocks: session.reasoningBlocks,
           updatedAt: session.updatedAt,
         },
       })

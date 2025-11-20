@@ -406,14 +406,37 @@ If they've already answered something similar, skip to the next step.
    - Reference their previous answers when asking new questions
    - Example: If they said "I want 150 shoots", later say "to hit your 150-shoot goal..." not "what's your goal?"
 
-4. **RESPONSE FORMAT:**
-   ONE short question or statement at a time.
-   Keep it to 1-2 sentences MAX.
-   lowercase, casual, friendly tone.
+4. **RESPONSE FORMAT (CRITICAL - READ CAREFULLY):**
 
-   **CRITICAL: EVERY SINGLE RESPONSE MUST END WITH THESE TWO LINES (NO EXCEPTIONS):**
+   Your response has TWO parts - the VISIBLE MESSAGE and the METADATA:
+
+   **PART 1: VISIBLE MESSAGE (what user sees)**
+   - ONE short question or statement at a time
+   - Keep it to 1-2 sentences MAX
+   - lowercase, casual, friendly tone
+   - DO NOT include answer options in the visible message
+   - End with a question mark if asking a question
+
+   **PART 2: METADATA (on separate lines, NOT visible to user)**
+   After your message, you MUST add these TWO lines:
    ␞QUICK_REPLIES: answer1 | answer2 | answer3 | answer4
    ␞NEXT_MESSAGE: 30
+
+   **🚨 CRITICAL FORMAT EXAMPLE:**
+
+   ✅ CORRECT FORMAT:
+   which target works best to start fixing this?
+
+   ␞QUICK_REPLIES: this quarter (12 weeks) | 60 days | 90 days | not sure yet
+   ␞NEXT_MESSAGE: 30
+
+   ❌ WRONG FORMAT (DO NOT DO THIS):
+   which target works best: this quarter (12 weeks) | 60 days | 90 days | not sure yet
+
+   ❌ WRONG FORMAT (DO NOT DO THIS):
+   which target works best to start fixing this and hit those numbers: this quarter (12 weeks) | 60 days | 90 days | not sure yet
+
+   **THE ANSWERS GO ON A SEPARATE LINE WITH THE DELIMITER - NOT IN YOUR MESSAGE!**
 
    **WHAT QUICK_REPLIES SHOULD BE:**
    - These are ANSWERS the user can give to the question YOU JUST ASKED
@@ -488,15 +511,29 @@ If they've already answered something similar, skip to the next step.
   - You can say "we can end early" but ALWAYS follow up with more probing questions
   - If needed, restart the script with their actual pain point
   - Every photographer has problems - keep digging until you find what they really need
-- **ALWAYS END WITH ␞QUICK_REPLIES: and ␞NEXT_MESSAGE: - NO EXCEPTIONS!**
-- **QUICK_REPLIES = SHORT ANSWERS to YOUR question, customized to this specific user's context**
+
+**🚨 CRITICAL FORMAT REQUIREMENTS:**
+
+Your response MUST have this EXACT structure:
+
+your message text here (1-2 sentences, casual, lowercase)
+
+␞QUICK_REPLIES: answer1 | answer2 | answer3 | answer4
+␞NEXT_MESSAGE: 30
+
+**DO NOT PUT THE ANSWERS IN YOUR MESSAGE!**
+- ❌ WRONG: "which target works best: 12 weeks | 60 days | 90 days"
+- ✅ RIGHT: "which target works best?" (then metadata on separate lines)
+
+**QUICK_REPLIES = SHORT ANSWERS to YOUR question, customized to this specific user's context**
   - Base them on their calculator inputs, page sections they've read, and what they've clicked
   - NOT generic questions they could ask you - that's backwards!
   - Natural, brief responses (2-8 words) they might actually type
+  - Put them on a SEPARATE LINE with the ␞ delimiter
 
 **FOR FIRST MESSAGE ONLY:** Begin at step 1 of the script.
 **FOR ALL SUBSEQUENT MESSAGES:** Review conversation history, identify current step, move to NEXT step.
-**EVERY RESPONSE MUST INCLUDE:** ␞QUICK_REPLIES: (4 contextual answer suggestions) | ␞NEXT_MESSAGE: (5-500 seconds)`;
+**EVERY RESPONSE MUST INCLUDE:** The delimiter lines ␞QUICK_REPLIES: and ␞NEXT_MESSAGE: on SEPARATE LINES after your message`;
 
 
 // Helper to build full prompt markdown for debugging
@@ -553,7 +590,8 @@ export async function getChatResponseStream(
   userId?: string,
   statusCallback?: (status: string, timing?: number) => void,
   calculatorData?: any,
-  currentStep?: number
+  currentStep?: number,
+  previousReasoningBlocks?: string[] // Encrypted reasoning blocks from previous turns
 ): Promise<ReadableStream> {
   const openaiApiKey = process.env.OPENAI_API_KEY;
 
@@ -676,6 +714,18 @@ export async function getChatResponseStream(
       }
     }
 
+    // Include previous reasoning blocks for caching/resumption
+    if (previousReasoningBlocks && previousReasoningBlocks.length > 0) {
+      console.log(`[Chat] 🧠 Including ${previousReasoningBlocks.length} previous reasoning blocks for prompt caching`);
+      // Add reasoning blocks as special input items (they get cached for faster responses)
+      for (const block of previousReasoningBlocks) {
+        input.push({
+          role: 'assistant',
+          content: [{ type: 'reasoning', encrypted_content: block }]
+        });
+      }
+    }
+
     console.log(`[Chat] 🤖 Sending ${promptSize}k chars to OpenAI ${model} with MINIMAL reasoning...`);
     statusCallback?.(`🤖 sending ${promptSize}k chars to OpenAI ${model}...`);
     const fetchStart = Date.now();
@@ -705,17 +755,100 @@ export async function getChatResponseStream(
     statusCallback?.('⏳ waiting for AI to start streaming...');
 
     // Convert OpenAI SDK's async iterable to ReadableStream
+    // Convert Responses API format to Chat Completions API format that routes.ts expects
     return new ReadableStream({
       async start(controller) {
         try {
+          let chunkCount = 0;
+          let textChunks = 0;
+          let fullText = '';
+          let reasoningBlocks: any[] = [];
+
           for await (const chunk of response) {
-            // Convert chunk to SSE format that routes.ts expects
-            const sseData = `data: ${JSON.stringify(chunk)}\n\n`;
-            controller.enqueue(new TextEncoder().encode(sseData));
+            chunkCount++;
+
+            // Responses API chunks have different structure than Chat Completions
+            // Convert to Chat Completions format: { choices: [{ delta: { content } }], usage }
+            let convertedChunk: any = null;
+
+            // Type assertion for chunks
+            const chunkData = chunk as any;
+            console.log(`[Chat] Received chunk type: ${chunkData.type}`);
+
+            // Handle text delta chunks (Responses API uses response.output_text.delta)
+            // output_index 0 = reasoning, output_index 1 = text (we want the text)
+            if (chunkData.type === 'response.output_text.delta' && chunkData.delta) {
+              textChunks++;
+              fullText += chunkData.delta;
+
+              if (textChunks === 1) {
+                console.log('[Chat] 🎉 First token received, streaming started');
+              }
+
+              // Send all text chunks, regardless of output_index
+              convertedChunk = {
+                choices: [{
+                  delta: { content: chunkData.delta }
+                }]
+              };
+            }
+            // Handle output_text.done (contains full text for this output item)
+            else if (chunkData.type === 'response.output_text.done' && chunkData.text) {
+              console.log(`[Chat] 📝 Output item ${chunkData.output_index} complete: ${chunkData.text.length} chars`);
+              // Don't send - we already streamed the deltas
+            }
+            // Handle reasoning content (encrypted blocks)
+            else if (chunkData.type === 'response.content_part.done' &&
+                     chunkData.part?.type === 'reasoning' &&
+                     chunkData.part?.encrypted_content) {
+              console.log('[Chat] 🧠 Reasoning block captured (encrypted)');
+              reasoningBlocks.push(chunkData.part.encrypted_content);
+              // Don't stream reasoning to client
+            }
+            // Handle completion chunks
+            else if (chunkData.type === 'response.completed' && chunkData.response) {
+              console.log('[Chat] ✅ Response completed, extracting usage');
+              convertedChunk = {
+                choices: [{ delta: {}, finish_reason: 'stop' }]
+              };
+
+              // Add usage data
+              if (chunkData.response.usage) {
+                convertedChunk.usage = {
+                  prompt_tokens: chunkData.response.usage.input_tokens || 0,
+                  completion_tokens: chunkData.response.usage.output_tokens || 0,
+                  prompt_tokens_details: {
+                    cached_tokens: chunkData.response.usage.input_tokens_cached || 0
+                  }
+                };
+                console.log('[Chat] 💰 Usage:', convertedChunk.usage);
+              }
+
+              // Send reasoning blocks as metadata for routes.ts to store
+              if (reasoningBlocks.length > 0) {
+                console.log(`[Chat] 🧠 ${reasoningBlocks.length} reasoning blocks ready for caching`);
+                // Send special metadata event with reasoning blocks
+                convertedChunk.reasoning_blocks = reasoningBlocks;
+              }
+            }
+            // Ignore other chunk types
+            else {
+              // Don't log every skip, too verbose
+              continue; // Don't send empty chunks
+            }
+
+            // Only send chunks that have actual content
+            if (convertedChunk) {
+              const sseData = `data: ${JSON.stringify(convertedChunk)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(sseData));
+            }
           }
+
+          console.log(`[Chat] 🏁 Stream completed: ${textChunks} text chunks sent (${chunkCount} total chunks)`);
+          console.log(`[Chat] 📊 Full response: ${fullText.length} chars`);
           controller.close();
         } catch (error) {
-          console.error('[Chat] Stream error:', error);
+          console.error('[Chat] ❌ Stream error:', error);
           controller.error(error);
         }
       }

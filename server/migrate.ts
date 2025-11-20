@@ -9,6 +9,12 @@ export async function runMigrations() {
     console.log('[Migration]   ✓ Enabling pgcrypto extension...');
     await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
 
+    console.log('[Migration]   ✓ Adding reasoning_blocks column to chat_sessions...');
+    await db.execute(sql`
+      ALTER TABLE chat_sessions 
+      ADD COLUMN IF NOT EXISTS reasoning_blocks jsonb;
+    `);
+
     console.log('[Migration]   ✓ Creating message_hash trigger...');
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION generate_message_hash()
