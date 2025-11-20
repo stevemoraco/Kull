@@ -1,20 +1,28 @@
 /**
  * Centralized Sales Script Question Definitions
  *
- * This file contains all 15 sales script questions used throughout the Kull platform.
- * These questions follow a proven sales methodology: discover pain, build urgency, close.
+ * This file contains all 16 sales script questions (0-15) used throughout the Kull platform.
+ * These questions follow a proven sales methodology: get permission, discover pain, build urgency, close.
  */
 
 export interface SalesScriptQuestion {
   step: number;
   shortLabel: string;
   question: string;
-  category: 'discovery' | 'pain' | 'commitment' | 'close';
+  category: 'permission' | 'discovery' | 'pain' | 'commitment' | 'close';
   required: boolean;
   interpolate?: boolean; // Whether this question uses dynamic values
 }
 
 export const SALES_SCRIPT_QUESTIONS: SalesScriptQuestion[] = [
+  {
+    step: 0,
+    shortLabel: "Permission",
+    question: "do you mind if i ask you a few questions to figure out if you're a good fit for kull and it's worth your time/money? just 15 questions, a few minutes and we'll put together a special offer for you if you're a good fit.",
+    category: "permission",
+    required: true,
+    interpolate: false
+  },
   {
     step: 1,
     shortLabel: "Your goal",
