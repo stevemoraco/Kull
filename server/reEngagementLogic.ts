@@ -104,7 +104,7 @@ function generateActivityNudge(activity: UserActivityEvent[]): string {
 
   if (lastAction.type === 'hover') {
     const element = extractElement(lastAction.target);
-    return `you were looking at ${element} - curious about something?`;
+    return `you were hovering over ${element} - curious about something?`;
   }
 
   if (lastAction.type === 'scroll') {

@@ -281,7 +281,7 @@ ${suggestedOpeners.map((opener, i) => `${i + 1}. "${opener}"`).join('\n')}
 ${Object.entries(interestMapping)
   .sort((a, b) => b[1].timeSpent - a[1].timeSpent)
   .map(([id, data]) => {
-    const emoji = data.interestLevel === 'high' ? '🔥' : data.interestLevel === 'medium' ? '💡' : '📊';
+    const emoji = data.interestLevel === 'high' ? '🔥' : data.interestLevel === 'medium' ? '👀' : '👁️';
     return `${emoji} **${data.topic}**: ${formatTime(data.timeSpent)} (${data.interestLevel} interest)`;
   })
   .join('\n')}
