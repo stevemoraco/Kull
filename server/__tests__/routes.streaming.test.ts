@@ -139,8 +139,21 @@ describe('Routes Streaming Tests', () => {
                                       lineBuffer.includes('NEXT_MESSAGE');
 
                   if (hasDelimiter) {
-                    // Stop streaming
-                    continue;
+                    // Extract content before delimiter and stream it
+                    const delimiterIndex = Math.min(
+                      ...['␞', 'QUICK_REPLIES', 'NEXT_MESSAGE']
+                        .map(d => lineBuffer.indexOf(d))
+                        .filter(i => i !== -1)
+                    );
+                    if (delimiterIndex > 0) {
+                      const contentBeforeDelimiter = lineBuffer.substring(0, delimiterIndex);
+                      if (contentBeforeDelimiter.trim()) {
+                        res.write(`data: ${JSON.stringify({ type: 'delta', content: contentBeforeDelimiter })}\n\n`);
+                        if (res.socket) res.socket.uncork();
+                      }
+                    }
+                    // Stop streaming after delimiter
+                    break;
                   }
 
                   // Stream immediately
