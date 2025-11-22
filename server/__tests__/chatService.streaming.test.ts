@@ -13,22 +13,23 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getChatResponseStream } from '../chatService';
 
-// Create a mock OpenAI instance that will be reused
+// Mock OpenAI SDK first (must be before imports)
 const mockResponsesCreate = vi.fn();
-const mockOpenAIInstance = {
-  responses: {
-    create: mockResponsesCreate
-  }
-};
-
-// Mock OpenAI SDK
 vi.mock('openai', () => {
   return {
-    default: vi.fn().mockImplementation(() => mockOpenAIInstance)
+    default: class MockOpenAI {
+      responses = {
+        create: mockResponsesCreate
+      };
+      constructor() {
+        // Mock constructor
+      }
+    }
   };
 });
+
+import { getChatResponseStream } from '../chatService';
 
 // Mock other dependencies
 vi.mock('../fetchRepo', () => ({

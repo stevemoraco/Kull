@@ -17,15 +17,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConversationState } from '../storage';
 
-// Mock OpenAI at the top level
+// Mock OpenAI at the top level - using Responses API (not Chat Completions)
 const mockCreate = vi.fn();
 vi.mock('openai', () => {
   return {
     default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockCreate
-        }
+      responses = {
+        create: mockCreate
       };
     }
   };
@@ -54,10 +52,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const userMessage = '40 hours';
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User provided specific hours'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User provided specific hours'
         }]
       });
 
@@ -81,10 +78,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const userMessage = 'yes that sounds right';
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: User confirmed accuracy'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: User confirmed accuracy'
         }]
       });
 
@@ -114,10 +110,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       ];
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 6\nREASONING: User admitted no plan'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 6\nREASONING: User admitted no plan'
         }]
       });
 
@@ -140,10 +135,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
   describe('Output Compatibility', () => {
     it('should return shouldAdvance boolean for state updates', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good answer'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good answer'
         }]
       });
 
@@ -156,10 +150,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should return feedback string for prompt injection when staying', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: User gave vague response'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: User gave vague response'
         }]
       });
 
@@ -173,10 +166,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should return empty feedback when advancing', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User answered'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User answered'
         }]
       });
 
@@ -188,10 +180,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should return nextStep for jump navigation', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: User ready to buy'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: User ready to buy'
         }]
       });
 
@@ -222,10 +213,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       };
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Advancing'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Advancing'
         }]
       });
 
@@ -255,10 +245,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       };
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: No answer given'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: No answer given'
         }]
       });
 
@@ -295,10 +284,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const userMessage = '45 hours';
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
         }]
       });
 
@@ -329,10 +317,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const userMessage = 'yes that looks right';
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Confirmed'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Confirmed'
         }]
       });
 
@@ -348,10 +335,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should handle validationFeedback injection flow', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: STAY\nNEXT_STEP: 5\nREASONING: User deflected'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: STAY\nNEXT_STEP: 5\nREASONING: User deflected'
         }]
       });
 
@@ -418,10 +404,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       ];
 
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good'
         }]
       });
 
@@ -442,10 +427,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should work with empty conversation history', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: First interaction'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: First interaction'
         }]
       });
 
@@ -461,10 +445,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should handle undefined conversation history', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Good'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Good'
         }]
       });
 
@@ -482,10 +465,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
   describe('Action Types', () => {
     it('should support NEXT action', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: Advance'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: Advance'
         }]
       });
 
@@ -498,10 +480,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should support STAY action', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: Stay'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: Stay'
         }]
       });
 
@@ -513,10 +494,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should support JUMP action', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: Ready to buy'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: Ready to buy'
         }]
       });
 
@@ -531,10 +511,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
   describe('Step Boundary Cases', () => {
     it('should handle step 0 (permission)', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Permission granted'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Permission granted'
         }]
       });
 
@@ -550,10 +529,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should handle step 15 (final step)', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 16\nREASONING: Completed'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 16\nREASONING: Completed'
         }]
       });
 
@@ -569,10 +547,9 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
     it('should handle mid-script steps', async () => {
       mockCreate.mockResolvedValue({
-        choices: [{
-          message: {
-            content: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Good answer'
-          }
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Good answer'
         }]
       });
 
@@ -624,12 +601,11 @@ describe('Step Validator End-to-End Compatibility', () => {
 
     // 5. Mock validator response
     mockCreate.mockResolvedValue({
-      choices: [{
-        message: {
-          content: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
-        }
-      }]
-    });
+        output: [{
+          type: 'output_text',
+          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
+        }]
+      });
 
     // 6. Run validation
     const result = await validateStepAdvancement(
