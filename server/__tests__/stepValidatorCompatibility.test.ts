@@ -69,7 +69,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
       // Verify OpenAI was called with the correct step
       const callArg = mockCreate.mock.calls[0][0];
-      expect(callArg.messages[0].content).toContain('CURRENT STEP: 3');
+      expect(callArg.input[0].content[0].text).toContain('CURRENT STEP: 3');
     });
 
     it('should accept lastAIMessage from conversation history', async () => {
@@ -94,7 +94,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
       // Verify the AI message was passed correctly
       const callArg = mockCreate.mock.calls[0][0];
-      expect(callArg.messages[0].content).toContain(lastAIMessage);
+      expect(callArg.input[0].content[0].text).toContain(lastAIMessage);
     });
 
     it('should handle conversation history from unified context', async () => {
@@ -127,8 +127,8 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
       // Verify history was passed
       const callArg = mockCreate.mock.calls[0][0];
-      expect(callArg.messages[0].content).toContain('CONVERSATION HISTORY');
-      expect(callArg.messages[0].content).toContain('88 shoots a year');
+      expect(callArg.input[0].content[0].text).toContain('CONVERSATION HISTORY');
+      expect(callArg.input[0].content[0].text).toContain('88 shoots a year');
     });
   });
 
@@ -421,8 +421,8 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
       // Verify history was processed correctly
       const callArg = mockCreate.mock.calls[0][0];
-      expect(callArg.messages[0].content).toContain('message 1');
-      expect(callArg.messages[0].content).toContain('response 2');
+      expect(callArg.input[0].content[0].text).toContain('message 1');
+      expect(callArg.input[0].content[0].text).toContain('response 2');
     });
 
     it('should work with empty conversation history', async () => {
@@ -542,7 +542,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       );
 
       expect(result.shouldAdvance).toBe(true);
-      expect(result.nextStep).toBe(16);
+      expect(result.nextStep).toBe(15); // Step 15 is final, stays at 15
     });
 
     it('should handle mid-script steps', async () => {
