@@ -232,9 +232,11 @@ router.get('/status/:code', async (req: Request, res: Response) => {
 /**
  * POST /api/device-auth/approve
  * Browser endpoint: User approves device after logging in
- * Requires authentication via session (not device token) and paid access
+ * Requires authentication via session (not device token)
+ * Note: No paid access required - all authenticated users can link devices
+ * Payment checks happen at photo processing time, not device linking
  */
-router.post('/approve', isAuthenticated, hasPaidAccessMiddleware, async (req: any, res: Response) => {
+router.post('/approve', isAuthenticated, async (req: any, res: Response) => {
   try {
     // Check if user is authenticated via session
     if (!req.user?.claims?.sub) {
