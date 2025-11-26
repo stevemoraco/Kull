@@ -22,6 +22,9 @@ final class RunController: ObservableObject {
     ) async throws {
         logger.info("Starting culling: provider=\(provider.rawValue), mode=\(mode.rawValue)")
 
+        // Ensure the target folder exists before doing any work
+        try validateFolderExists(at: folderURL)
+
         isRunning = true
         processed = 0
         total = 0
@@ -39,6 +42,18 @@ final class RunController: ObservableObject {
         #endif
 
         logger.info("Culling completed: processed=\(self.processed), cost=$\(String(format: "%.2f", self.currentCost))")
+    }
+
+    private func validateFolderExists(at url: URL) throws {
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        guard exists, isDirectory.boolValue else {
+            throw NSError(
+                domain: "RunController",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Folder does not exist at \(url.path)"]
+            )
+        }
     }
 
     // MARK: - macOS Processing

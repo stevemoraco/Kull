@@ -89,7 +89,7 @@ extension RunController {
         logger.info("iOS processing complete: \(allXMPURLs.count) XMP files generated")
 
         // Present share sheet for user to save XMP files
-        await presentShareSheet(files: allXMPURLs, sandboxFolder: sandboxFolder)
+        presentShareSheet(files: allXMPURLs, sandboxFolder: sandboxFolder)
     }
 
     // MARK: - iOS Helper Methods
@@ -172,10 +172,10 @@ extension RunController {
                     // Convert local rating format to PhotoRating
                     let photoRating = PhotoRating(
                         starRating: rating.star,
-                        colorLabel: rating.color,
+                        colorLabel: rating.color ?? "",
                         keepReject: rating.star >= 3 ? "keep" : "reject",
-                        tags: rating.tags,
-                        description: rating.description,
+                        tags: rating.tags ?? [],
+                        description: rating.description ?? "",
                         technicalQuality: TechnicalQuality(
                             sharpness: 800.0, // Placeholder, local doesn't provide detailed metrics
                             exposure: 800.0,
@@ -183,7 +183,7 @@ extension RunController {
                             overallScore: Double(rating.star) * 200.0
                         ),
                         subjectAnalysis: SubjectAnalysis(
-                            primarySubject: rating.title,
+                            primarySubject: rating.title ?? "Unknown",
                             emotion: "neutral",
                             eyesOpen: true,
                             smiling: false,

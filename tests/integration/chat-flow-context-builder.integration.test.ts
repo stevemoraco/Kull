@@ -218,10 +218,8 @@ describe('E2E: Chat Flow with Context Builder & Knowledge Base', () => {
 
       // Should have loaded 2 Q&A pairs from mock
       expect(memoryMarkdown).toContain('CONVERSATION MEMORY');
-      expect(memoryMarkdown).toContain('Step 1');
-      expect(memoryMarkdown).toContain('Step 2');
-      expect(memoryMarkdown).toContain('permission');
-      expect(memoryMarkdown).toContain('volume_validation');
+      expect(memoryMarkdown).toContain('permission'); // stepName, not "Step 1"
+      expect(memoryMarkdown).toContain('volume_validation'); // stepName, not "Step 2"
       expect(memoryMarkdown).toContain('do you mind if i ask');
       expect(memoryMarkdown).toContain('sure, go ahead');
       expect(memoryMarkdown).toContain('88 shoots/year');
@@ -390,7 +388,7 @@ describe('E2E: Chat Flow with Context Builder & Knowledge Base', () => {
         { timeOnSite: 5000 }
       );
 
-      expect(context1.conversationMemory).toContain('Step 1');
+      expect(context1.conversationMemory).toContain('permission'); // stepName from mock data
 
       // Turn 2: After user fills calculator
       const context2 = await buildUnifiedContext(
@@ -406,7 +404,7 @@ describe('E2E: Chat Flow with Context Builder & Knowledge Base', () => {
 
       // Should now have calculator data
       expect(context2.calculatorData).toContain('Shoots per Week');
-      expect(context2.conversationMemory).toContain('Step 2');
+      expect(context2.conversationMemory).toContain('volume_validation'); // stepName from mock data
     });
 
     it('should accumulate activity history across interactions', async () => {

@@ -21,11 +21,12 @@ final class SettingsViewTests: XCTestCase {
         try await super.setUp()
         authViewModel = AuthViewModel()
         envConfig = EnvironmentConfig.shared
+        envConfig.current = EnvironmentConfig.defaultEnvironment
     }
 
     override func tearDown() async throws {
         // Reset to default environment
-        envConfig.current = .development
+        envConfig.current = EnvironmentConfig.defaultEnvironment
         try await super.tearDown()
     }
 
@@ -174,6 +175,12 @@ final class SettingsViewTests: XCTestCase {
     // MARK: - Cache Management Tests
 
     func testClearURLCache() {
+        // Use a dedicated cache instance to avoid interference from other network calls during tests
+        let originalCache = URLCache.shared
+        let testCache = URLCache(memoryCapacity: originalCache.memoryCapacity, diskCapacity: originalCache.diskCapacity, directory: nil)
+        URLCache.shared = testCache
+        defer { URLCache.shared = originalCache }
+
         // Add something to cache
         let url = URL(string: "https://test.com")!
         let response = URLResponse(url: url, mimeType: "text/html", expectedContentLength: 0, textEncodingName: nil)
@@ -187,6 +194,8 @@ final class SettingsViewTests: XCTestCase {
 
         // Clear cache
         URLCache.shared.removeAllCachedResponses()
+        URLCache.shared.removeCachedResponse(for: URLRequest(url: url))
+        URLCache.shared = URLCache(memoryCapacity: testCache.memoryCapacity, diskCapacity: testCache.diskCapacity, directory: nil)
 
         // Verify cache is cleared
         XCTAssertNil(URLCache.shared.cachedResponse(for: URLRequest(url: url)))

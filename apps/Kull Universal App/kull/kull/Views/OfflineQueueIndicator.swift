@@ -39,7 +39,6 @@ struct OfflineQueueIndicator: View {
                         Group {
                             if operationQueue.isSyncing {
                                 Image(systemName: "arrow.triangle.2.circlepath")
-                                    .symbolEffect(.rotate, options: .repeat(.continuous))
                                     .foregroundColor(.blue)
                             } else if !networkMonitor.isConnected {
                                 Image(systemName: "cloud.slash")

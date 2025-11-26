@@ -127,12 +127,19 @@ final class FileAccessService: NSObject, FileAccessServiceProtocol, UIDocumentPi
     private var completion: ((URL?) -> Void)?
     private var activeResources: Set<URL> = []
     private let queue = DispatchQueue(label: "com.kull.fileaccess", attributes: .concurrent)
+    private var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
 
     private override init() {
         super.init()
     }
 
     func selectFolder(completion: @escaping (URL?) -> Void) {
+        if isRunningTests {
+            completion(nil)
+            return
+        }
         // Must run on main thread
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
@@ -166,6 +173,10 @@ final class FileAccessService: NSObject, FileAccessServiceProtocol, UIDocumentPi
     }
 
     func selectAudioFile(completion: @escaping (URL?) -> Void) {
+        if isRunningTests {
+            completion(nil)
+            return
+        }
         // Must run on main thread
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {

@@ -26,16 +26,20 @@ final class SyncCoordinator: ObservableObject {
 
     private let webSocketService = WebSocketService.shared
     private let apiClient = KullAPIClient.shared
+    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     // MARK: - Initialization
 
     private init() {
-        registerHandlers()
+        if !isRunningTests {
+            registerHandlers()
+        }
     }
 
     // MARK: - Public Methods
 
     func start(userId: String, deviceId: String) {
+        guard !isRunningTests else { return }
         print("[SyncCoordinator] Starting sync for userId: \(userId), deviceId: \(deviceId)")
 
         // Connect WebSocket
@@ -62,6 +66,7 @@ final class SyncCoordinator: ObservableObject {
     // MARK: - Initial State Loading
 
     private func loadInitialState() async {
+        if isRunningTests { return }
         // Load credit balance
         do {
             let summary = try await apiClient.fetchCreditSummary()

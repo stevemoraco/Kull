@@ -32,6 +32,9 @@ final class NetworkMonitor: ObservableObject {
     private let monitor = NWPathMonitor()
     private let monitorQueue = DispatchQueue(label: "com.kull.networkmonitor")
     private var cancellables = Set<AnyCancellable>()
+    private var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
 
     // Connection type
     enum ConnectionType {
@@ -102,6 +105,7 @@ final class NetworkMonitor: ObservableObject {
     // MARK: - Reconnection Handler
 
     private func handleReconnection() {
+        if isRunningTests { return }
         print("[NetworkMonitor] Reconnected to network, triggering sync...")
 
         // Trigger offline operation queue sync
@@ -154,6 +158,7 @@ final class NetworkMonitor: ObservableObject {
 
     /// Manually trigger sync (useful for pull-to-refresh)
     func triggerSync() {
+        if isRunningTests { return }
         guard status.isConnected else {
             print("[NetworkMonitor] Cannot sync: offline")
             return

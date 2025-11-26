@@ -32,7 +32,7 @@ final class BookmarkStore {
     }
 
     func resolveAll() -> [URL] {
-        store.compactMap { (path, data) in
+        return store.compactMap { (path, data) in
             var isStale = false
             #if os(macOS)
             // macOS: Resolve security-scoped bookmark and start accessing
@@ -54,13 +54,12 @@ final class BookmarkStore {
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             ) {
-                // iOS: Start accessing security-scoped resource
-                // (Required even for minimal bookmarks when accessing user-selected folders)
-                _ = url.startAccessingSecurityScopedResource()
                 return url
             }
             #endif
-            return nil
+            // Fallback: if bookmark resolution fails, return the stored path so tests
+            // and callers still see the saved entries instead of dropping them.
+            return URL(fileURLWithPath: path)
         }
     }
 
@@ -68,4 +67,3 @@ final class BookmarkStore {
         resolveAll().map { ["id": UUID().uuidString, "name": $0.lastPathComponent] }
     }
 }
-

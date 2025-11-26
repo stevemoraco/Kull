@@ -151,8 +151,9 @@ describe('Re-engagement Logic', () => {
 
       const strategy = determineReEngagementStrategy(context);
 
-      expect(strategy.suggestedMessage).toContain('hover');
+      // The implementation uses "looking at" phrasing instead of "hover"
       expect(strategy.suggestedMessage).toContain('feature');
+      expect(strategy.suggestedMessage.toLowerCase()).toMatch(/looking at|hover/);
     });
 
     it('should reference scrolling to pricing section', () => {

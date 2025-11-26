@@ -17,13 +17,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ConversationState } from '../storage';
 
-// Mock OpenAI at the top level - using Responses API (not Chat Completions)
-const mockCreate = vi.fn();
+// Mock OpenAI at the top level - using Responses API
+const mockResponsesCreate = vi.fn();
 vi.mock('openai', () => {
   return {
     default: class MockOpenAI {
       responses = {
-        create: mockCreate
+        create: mockResponsesCreate
       };
     }
   };
@@ -38,11 +38,11 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     process.env.OPENAI_API_KEY = 'test-key';
 
     // Clear any previous mock calls
-    mockCreate.mockClear();
+    mockResponsesCreate.mockClear();
   });
 
   afterEach(() => {
-    mockCreate.mockReset();
+    mockResponsesCreate.mockReset();
   });
 
   describe('Input Compatibility', () => {
@@ -51,7 +51,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const aiMessage = 'how many hours are you working each week right now?';
       const userMessage = '40 hours';
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User provided specific hours'
@@ -68,7 +68,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       expect(result.nextStep).toBe(4);
 
       // Verify OpenAI was called with the correct step
-      const callArg = mockCreate.mock.calls[0][0];
+      const callArg = mockResponsesCreate.mock.calls[0][0];
       expect(callArg.input[0].content[0].text).toContain('CURRENT STEP: 3');
     });
 
@@ -77,7 +77,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const lastAIMessage = "i see you're doing about 88 shoots a year — is that accurate?";
       const userMessage = 'yes that sounds right';
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: User confirmed accuracy'
@@ -93,7 +93,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       expect(result.shouldAdvance).toBe(true);
 
       // Verify the AI message was passed correctly
-      const callArg = mockCreate.mock.calls[0][0];
+      const callArg = mockResponsesCreate.mock.calls[0][0];
       expect(callArg.input[0].content[0].text).toContain(lastAIMessage);
     });
 
@@ -109,7 +109,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
         { role: 'user', content: 'want to get to 150 shoots' },
       ];
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 6\nREASONING: User admitted no plan'
@@ -126,7 +126,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       expect(result.shouldAdvance).toBe(true);
 
       // Verify history was passed
-      const callArg = mockCreate.mock.calls[0][0];
+      const callArg = mockResponsesCreate.mock.calls[0][0];
       expect(callArg.input[0].content[0].text).toContain('CONVERSATION HISTORY');
       expect(callArg.input[0].content[0].text).toContain('88 shoots a year');
     });
@@ -134,7 +134,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
   describe('Output Compatibility', () => {
     it('should return shouldAdvance boolean for state updates', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good answer'
@@ -149,7 +149,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should return feedback string for prompt injection when staying', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: User gave vague response'
@@ -165,7 +165,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should return empty feedback when advancing', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User answered'
@@ -179,7 +179,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should return nextStep for jump navigation', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: User ready to buy'
@@ -212,7 +212,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
         offTopicCount: 0
       };
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Advancing'
@@ -244,7 +244,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
         offTopicCount: 0
       };
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: No answer given'
@@ -283,7 +283,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const lastAIMessage = 'how many hours are you working each week right now?';
       const userMessage = '45 hours';
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
@@ -316,7 +316,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       const lastAIMessage = history[history.length - 1].content;
       const userMessage = 'yes that looks right';
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Confirmed'
@@ -334,7 +334,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should handle validationFeedback injection flow', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: STAY\nNEXT_STEP: 5\nREASONING: User deflected'
@@ -377,7 +377,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should fallback gracefully on API errors', async () => {
-      mockCreate.mockRejectedValue(
+      mockResponsesCreate.mockRejectedValue(
         new Error('API timeout')
       );
 
@@ -403,7 +403,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
         { role: 'assistant', content: 'response 2' },
       ];
 
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 2\nREASONING: Good'
@@ -420,13 +420,13 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       expect(result.shouldAdvance).toBe(true);
 
       // Verify history was processed correctly
-      const callArg = mockCreate.mock.calls[0][0];
+      const callArg = mockResponsesCreate.mock.calls[0][0];
       expect(callArg.input[0].content[0].text).toContain('message 1');
       expect(callArg.input[0].content[0].text).toContain('response 2');
     });
 
     it('should work with empty conversation history', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: First interaction'
@@ -444,7 +444,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should handle undefined conversation history', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Good'
@@ -464,7 +464,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
   describe('Action Types', () => {
     it('should support NEXT action', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: Advance'
@@ -479,7 +479,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should support STAY action', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: STAY\nNEXT_STEP: 3\nREASONING: Stay'
@@ -493,7 +493,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should support JUMP action', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: JUMP\nNEXT_STEP: 13\nREASONING: Ready to buy'
@@ -510,7 +510,7 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
 
   describe('Step Boundary Cases', () => {
     it('should handle step 0 (permission)', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 1\nREASONING: Permission granted'
@@ -528,12 +528,8 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
     });
 
     it('should handle step 15 (final step)', async () => {
-      mockCreate.mockResolvedValue({
-        output: [{
-          type: 'output_text',
-          text: 'ACTION: NEXT\nNEXT_STEP: 16\nREASONING: Completed'
-        }]
-      });
+      // Step 15 is handled by atomic close logic - it doesn't call OpenAI
+      // It returns shouldAdvance: true, nextStep: 15 immediately
 
       const result = await validateStepAdvancement(
         15,
@@ -542,11 +538,11 @@ describe('Step Validator Compatibility with Unified Architecture', () => {
       );
 
       expect(result.shouldAdvance).toBe(true);
-      expect(result.nextStep).toBe(15); // Step 15 is final, stays at 15
+      expect(result.nextStep).toBe(15); // Stays at 15, conversation is complete
     });
 
     it('should handle mid-script steps', async () => {
-      mockCreate.mockResolvedValue({
+      mockResponsesCreate.mockResolvedValue({
         output: [{
           type: 'output_text',
           text: 'ACTION: NEXT\nNEXT_STEP: 8\nREASONING: Good answer'
@@ -600,12 +596,12 @@ describe('Step Validator End-to-End Compatibility', () => {
     const userMessage = '40 hours';
 
     // 5. Mock validator response
-    mockCreate.mockResolvedValue({
-        output: [{
-          type: 'output_text',
-          text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
-        }]
-      });
+    mockResponsesCreate.mockResolvedValue({
+      output: [{
+        type: 'output_text',
+        text: 'ACTION: NEXT\nNEXT_STEP: 4\nREASONING: User gave hours'
+      }]
+    });
 
     // 6. Run validation
     const result = await validateStepAdvancement(

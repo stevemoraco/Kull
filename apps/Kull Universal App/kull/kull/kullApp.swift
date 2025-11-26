@@ -281,19 +281,19 @@ struct MainWindow: View {
     }
 
     private func chooseFolder() {
-        FileAccessService.shared.selectFolder { [weak self] url in
-            guard let self = self, let url = url else { return }
+        FileAccessService.shared.selectFolder { url in
+            guard let url = url else { return }
 
-            self.selectedFolder = url
+            selectedFolder = url
 
             do {
                 try FileAccessService.shared.persistAccess(to: url)
                 Task {
                     await FolderSyncService().sync(
-                        deviceName: self.getDeviceName()
+                        deviceName: getDeviceName()
                     )
                 }
-                self.showingRunSheet = true
+                showingRunSheet = true
             } catch {
                 Logger.errors.error("Failed to persist folder access: \(error)")
                 ErrorPresenter.shared.present(error)
@@ -319,7 +319,7 @@ struct MainWindow: View {
             return "Connected"
         case .reconnecting(let attempt):
             return "Reconnecting (\(attempt))..."
-        case .failed(let error):
+        case .failed:
             return "Failed"
         }
     }

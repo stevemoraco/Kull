@@ -8,11 +8,13 @@ final class EnvironmentConfigTests: XCTestCase {
         try await super.setUp()
         // Clear UserDefaults before each test
         UserDefaults.standard.removeObject(forKey: "selectedEnvironment")
+        EnvironmentConfig.shared.current = EnvironmentConfig.defaultEnvironment
     }
 
     override func tearDown() async throws {
         // Clean up UserDefaults after each test
         UserDefaults.standard.removeObject(forKey: "selectedEnvironment")
+        EnvironmentConfig.shared.current = EnvironmentConfig.defaultEnvironment
         try await super.tearDown()
     }
 
@@ -67,12 +69,9 @@ final class EnvironmentConfigTests: XCTestCase {
 
     // MARK: - EnvironmentConfig
 
-    func testDefaultEnvironmentInDebugMode() {
-        // In debug builds, should default to development
-        #if DEBUG
+    func testDefaultEnvironmentIsProduction() {
         let config = EnvironmentConfig.shared
-        XCTAssertEqual(config.current, Environment.development)
-        #endif
+        XCTAssertEqual(config.current, Environment.production)
     }
 
     func testAPIBaseURLFromConfig() {
@@ -159,7 +158,7 @@ final class EnvironmentConfigTests: XCTestCase {
         // Set invalid value in UserDefaults
         UserDefaults.standard.set("InvalidEnvironment", forKey: "selectedEnvironment")
 
-        // Should fall back to default (development in debug, production in release)
+        // Should fall back to default (production)
         let saved = UserDefaults.standard.string(forKey: "selectedEnvironment")
         let env = Environment(rawValue: saved ?? "")
 

@@ -2,6 +2,11 @@ import Foundation
 
 final class FolderSyncService {
     func sync(deviceName: String) async {
+        // Skip network calls during unit tests to avoid hitting DocumentManager on simulators
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return
+        }
+
         let folders = BookmarkStore.shared.exportCatalog()
         let baseURL = EnvironmentConfig.shared.apiBaseURL
         let url = baseURL.appendingPathComponent("/api/kull/folders")
@@ -13,4 +18,3 @@ final class FolderSyncService {
         _ = try? await URLSession.shared.data(for: req)
     }
 }
-

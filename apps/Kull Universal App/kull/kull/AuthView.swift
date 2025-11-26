@@ -61,7 +61,7 @@ struct AuthView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Approve on the Web")
                 .font(.title2)
-            Text("Enter this code in the browser window that just opened, or visit kullai.com/device.")
+            Text("Enter this code in the browser window that just opened, or visit kullai.com/device-auth.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             HStack(spacing: 12) {

@@ -5,10 +5,9 @@
 //  Created by Agent 22 on 11/18/25.
 //
 
+#if canImport(UIKit)
 import SwiftUI
 import UIKit
-
-#if os(iOS)
 import OSLog
 
 /// UIHostingController subclass that handles keyboard shortcuts

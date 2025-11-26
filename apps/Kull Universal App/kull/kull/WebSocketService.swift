@@ -68,30 +68,29 @@ final class WebSocketService: ObservableObject {
     // MARK: - Public Methods
 
     func connect(userId: String, deviceId: String) {
-        Task { @MainActor in
-            // Store connection parameters
-            currentUserId = userId
-            currentDeviceId = deviceId
-            shouldReconnect = true
-            reconnectAttempts = 0
+        // Store connection parameters synchronously so state is predictable in tests
+        currentUserId = userId
+        currentDeviceId = deviceId
+        shouldReconnect = true
+        reconnectAttempts = 0
 
-            // Start connection
+        // Kick off the async connection workflow
+        Task { @MainActor in
             await performConnect()
         }
     }
 
     func disconnect() {
-        Task { @MainActor in
-            shouldReconnect = false
-            stopPingTimer()
-            stopReconnectTimer()
+        shouldReconnect = false
+        stopPingTimer()
+        stopReconnectTimer()
 
-            webSocketTask?.cancel(with: .goingAway, reason: nil)
-            webSocketTask = nil
+        webSocketTask?.cancel(with: .goingAway, reason: nil)
+        webSocketTask = nil
 
-            connectionState = .disconnected
-            isConnected = false
-        }
+        // Immediately reset state so subsequent tests/clients see a clean slate
+        connectionState = .disconnected
+        isConnected = false
     }
 
     func registerHandler<T: Codable>(for type: SyncMessageType, handler: @escaping (T) -> Void) {
@@ -273,12 +272,10 @@ final class WebSocketService: ObservableObject {
     }
 
     @objc private func environmentDidChange() {
-        Task { @MainActor in
-            // Reconnect with new environment
-            if let userId = currentUserId, let deviceId = currentDeviceId {
-                disconnect()
-                connect(userId: userId, deviceId: deviceId)
-            }
+        // Reconnect with new environment
+        if let userId = currentUserId, let deviceId = currentDeviceId {
+            disconnect()
+            connect(userId: userId, deviceId: deviceId)
         }
     }
 

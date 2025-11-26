@@ -1,6 +1,33 @@
 import Foundation
 import OSLog
 
+enum DevicePlatform: String {
+    case macos
+    case ios
+    case ipados
+}
+
+struct DeviceAuthRequestResponse: Decodable {
+    let code: String
+    let expiresAt: Date
+    let verificationUrl: String?
+}
+
+struct DeviceAuthStatusResponse: Decodable {
+    let status: String
+    let deviceId: String?
+    let userId: String?
+    let tokens: DeviceAuthTokens?
+}
+
+/// Device auth flow tokens (distinct from APNs device token response).
+struct DeviceAuthTokens: Decodable {
+    let accessToken: String
+    let refreshToken: String
+    let expiresIn: Int
+    let user: RemoteUser
+}
+
 struct DeviceLinkInitiateResponse: Decodable {
     let code: String
     let pollToken: String
@@ -8,7 +35,7 @@ struct DeviceLinkInitiateResponse: Decodable {
 }
 
 struct DeviceLinkStatusResponse: Decodable {
-    struct LinkedUser: Decodable {
+    struct LinkedUser: Codable {
         let id: String
         let email: String?
         let firstName: String?
@@ -16,15 +43,15 @@ struct DeviceLinkStatusResponse: Decodable {
         let profileImageUrl: String?
     }
 
-    struct DeviceTokens: Decodable {
+    struct DeviceTokens: Codable {
         let accessToken: String
         let refreshToken: String
         let expiresIn: Int
     }
 
     let status: String
-    let expiresAt: Date?
-    let deviceName: String?
+    let expiresAt: Date
+    let deviceName: String
     let user: LinkedUser?
     let tokens: DeviceTokens?
 }
@@ -63,6 +90,7 @@ enum APIError: Error {
     case refreshFailed
 }
 
+@MainActor
 final class KullAPIClient {
     static let shared = KullAPIClient()
 
@@ -132,45 +160,46 @@ final class KullAPIClient {
         }
     }
 
-    func initiateDeviceLink(deviceName: String?) async throws -> DeviceLinkInitiateResponse {
-        Logger.auth.info("Initiating device link for device: \(deviceName ?? "unknown")")
-        let payload = try JSONSerialization.data(withJSONObject: ["deviceName": deviceName as Any?].compactMapValues { $0 }, options: [])
-        let request = makeRequest(path: "/api/device/link/initiate", method: "POST", body: payload)
-        let response: DeviceLinkInitiateResponse = try await perform(request)
-        Logger.auth.notice("Device link initiated successfully, code: \(response.code)")
+    func requestDeviceAuth(deviceId: String, deviceName: String, platform: DevicePlatform, appVersion: String) async throws -> DeviceAuthRequestResponse {
+        Logger.auth.info("Requesting device auth for device: \(deviceName)")
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "deviceId": deviceId,
+            "platform": platform.rawValue,
+            "deviceName": deviceName,
+            "appVersion": appVersion
+        ], options: [])
+        let request = makeRequest(path: "/api/device-auth/request", method: "POST", body: payload)
+        let response: DeviceAuthRequestResponse = try await perform(request)
+        Logger.auth.notice("Device auth request created, code: \(response.code)")
         return response
     }
 
-    func approveDeviceLink(code: String, deviceName: String?) async throws {
-        let payload = try JSONSerialization.data(withJSONObject: ["code": code, "deviceName": deviceName as Any?].compactMapValues { $0 }, options: [])
-        let request = makeRequest(path: "/api/device/link/approve", method: "POST", body: payload)
-        _ = try await session.data(for: request)
+    func pollDeviceAuthStatus(code: String) async throws -> DeviceAuthStatusResponse {
+        Logger.auth.debug("Polling device auth status")
+        let request = makeRequest(path: "/api/device-auth/status/\(code.uppercased())", method: "GET")
+        let response: DeviceAuthStatusResponse = try await perform(request)
+        Logger.auth.info("Device auth status: \(response.status)")
+        return response
+    }
+
+    func initiateDeviceLink(deviceName: String) async throws -> DeviceLinkInitiateResponse {
+        Logger.auth.info("Initiating device link for device: \(deviceName)")
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "deviceName": deviceName
+        ], options: [])
+        // Server route is /api/device/link/initiate (not /api/device-link/)
+        let request = makeRequest(path: "/api/device/link/initiate", method: "POST", body: payload)
+        return try await perform(request)
     }
 
     func pollDeviceLink(pollToken: String) async throws -> DeviceLinkStatusResponse {
         Logger.auth.debug("Polling device link status")
-        let payload = try JSONSerialization.data(withJSONObject: ["pollToken": pollToken], options: [])
+        // Server route expects POST with pollToken in body (not GET with URL param)
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "pollToken": pollToken
+        ], options: [])
         let request = makeRequest(path: "/api/device/link/status", method: "POST", body: payload)
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            Logger.auth.error("Invalid HTTP response while polling device link")
-            throw APIError.requestFailed(status: -1)
-        }
-        if http.statusCode == 200 {
-            let decoded = try jsonDecoder.decode(DeviceLinkStatusResponse.self, from: data)
-            Logger.auth.info("Device link status: \(decoded.status)")
-            return decoded
-        }
-        if let decoded = try? jsonDecoder.decode(DeviceLinkStatusResponse.self, from: data) {
-            Logger.auth.info("Device link status: \(decoded.status)")
-            return decoded
-        }
-        if http.statusCode == 410 {
-            Logger.auth.warning("Device link expired")
-            return DeviceLinkStatusResponse(status: "expired", expiresAt: nil, deviceName: nil, user: nil, tokens: nil)
-        }
-        Logger.auth.warning("Device link invalid")
-        return DeviceLinkStatusResponse(status: "invalid", expiresAt: nil, deviceName: nil, user: nil, tokens: nil)
+        return try await perform(request)
     }
 
     func fetchCurrentUser() async throws -> RemoteUser? {
@@ -280,7 +309,7 @@ final class KullAPIClient {
         return expiring
     }
 
-    private func refreshAccessToken() async throws {
+    func refreshAccessToken() async throws {
         let deviceId = DeviceIDManager.shared.deviceID
 
         Logger.auth.info("Refreshing access token")

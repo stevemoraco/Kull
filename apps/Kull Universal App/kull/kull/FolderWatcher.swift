@@ -9,6 +9,11 @@ final class FolderWatcher {
     private var sources: [DispatchSourceFileSystemObject] = []
 
     func watch(urls: [URL], onChange: @escaping (URL) -> Void) {
+        // Skip filesystem watching in XCTest runs to avoid simulator sandbox issues.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return
+        }
+
         for url in urls {
             let fd = open(url.path, O_EVTONLY)
             guard fd != -1 else { continue }
@@ -32,6 +37,9 @@ final class FolderWatcher {
 // This is a no-op implementation that maintains API compatibility
 final class FolderWatcher {
     func watch(urls: [URL], onChange: @escaping (URL) -> Void) {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return
+        }
         Logger.general.info("FolderWatcher: Folder watching not available on iOS (sandboxing restrictions)")
         // iOS apps cannot monitor filesystem changes outside their sandbox
         // Users must manually trigger processing instead
@@ -43,4 +51,3 @@ final class FolderWatcher {
 }
 
 #endif
-

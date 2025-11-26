@@ -109,16 +109,48 @@ class NotificationService: NSObject, ObservableObject {
     /// Update app badge with active shoot count
     func updateBadge(count: Int) {
         #if os(iOS)
-        Task { @MainActor in
-            UIApplication.shared.applicationIconBadgeNumber = count
-            Logger.general.info("App badge updated to \(count)")
-        }
+        UIApplication.shared.applicationIconBadgeNumber = count
+        Logger.general.info("App badge updated to \(count)")
         #endif
     }
 
     /// Clear app badge
     func clearBadge() {
         updateBadge(count: 0)
+    }
+
+    // MARK: - Processing Notifications
+
+    func notifyProcessingStarted(shootId: String, imageCount: Int) {
+        #if os(iOS)
+        let title = "Processing started"
+        let body = "Shoot \(shootId) started with \(imageCount) images"
+        scheduleLocalNotification(title: title, body: body)
+        #endif
+    }
+
+    func notifyProcessingProgress(shootId: String, processed: Int, total: Int) {
+        #if os(iOS)
+        let title = "Processing progress"
+        let body = "Shoot \(shootId): \(processed)/\(total) images processed"
+        scheduleLocalNotification(title: title, body: body)
+        #endif
+    }
+
+    func notifyProcessingCompleted(shootId: String, imageCount: Int, duration: Double) {
+        #if os(iOS)
+        let title = "Processing completed"
+        let body = "Shoot \(shootId) finished (\(imageCount) images) in \(Int(duration))s"
+        scheduleLocalNotification(title: title, body: body)
+        #endif
+    }
+
+    func notifyProcessingFailed(shootId: String, error: Error) {
+        #if os(iOS)
+        let title = "Processing failed"
+        let body = "Shoot \(shootId) failed: \(error.localizedDescription)"
+        scheduleLocalNotification(title: title, body: body)
+        #endif
     }
 
     /// Handle received notification

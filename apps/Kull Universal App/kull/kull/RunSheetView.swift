@@ -15,6 +15,23 @@ struct RunSheetView: View {
     @StateObject private var runner = RunController()
     @StateObject private var cloudService = CloudAIService.shared
     @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
+    
+    // Cross-platform background colors; UIKit colors are unavailable on macOS builds.
+    private var primaryBackground: Color {
+        #if os(macOS)
+        return Color(nsColor: .windowBackgroundColor)
+        #else
+        return Color(.systemBackground)
+        #endif
+    }
+    
+    private var groupedBackground: Color {
+        #if os(macOS)
+        return Color(nsColor: .controlBackgroundColor)
+        #else
+        return Color(.systemGroupedBackground)
+        #endif
+    }
 
     var body: some View {
         if horizontalSizeClass == .regular {
@@ -63,7 +80,7 @@ struct RunSheetView: View {
             }
             .padding(.vertical)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(groupedBackground)
         .task {
             await loadProviders()
             updateCostEstimate()
@@ -266,7 +283,7 @@ struct RunSheetView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(primaryBackground)
         .cornerRadius(12)
     }
 
@@ -318,7 +335,7 @@ struct RunSheetView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(primaryBackground)
         .cornerRadius(12)
     }
 
@@ -342,7 +359,7 @@ struct RunSheetView: View {
                 .frame(minHeight: 44)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(primaryBackground)
         .cornerRadius(12)
     }
 
@@ -373,7 +390,7 @@ struct RunSheetView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(primaryBackground)
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
@@ -397,7 +414,7 @@ struct RunSheetView: View {
                 .border(.quaternary)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(primaryBackground)
         .cornerRadius(12)
     }
 
@@ -418,7 +435,7 @@ struct RunSheetView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemBackground))
+                .background(primaryBackground)
                 .cornerRadius(12)
             } else if runner.processed > 0 && runner.processed == runner.total {
                 VStack(alignment: .leading, spacing: 8) {

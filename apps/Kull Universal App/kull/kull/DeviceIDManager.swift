@@ -1,25 +1,36 @@
 import Foundation
 
-class DeviceIDManager {
+final class DeviceIDManager {
     static let shared = DeviceIDManager()
 
     private let userDefaultsKey = "kull_device_id"
+    private let queue = DispatchQueue(label: "com.kull.deviceid", attributes: .concurrent)
+    private var cachedID: String?
 
     private init() {}
 
     var deviceID: String {
-        // Check if device ID already exists
-        if let existing = UserDefaults.standard.string(forKey: userDefaultsKey) {
-            return existing
-        }
+        queue.sync(flags: .barrier) {
+            if let cachedID {
+                return cachedID
+            }
 
-        // Generate new device ID
-        let newID = UUID().uuidString
-        UserDefaults.standard.set(newID, forKey: userDefaultsKey)
-        return newID
+            if let stored = UserDefaults.standard.string(forKey: userDefaultsKey) {
+                cachedID = stored
+                return stored
+            }
+
+            let newID = UUID().uuidString.uppercased()
+            cachedID = newID
+            UserDefaults.standard.set(newID, forKey: userDefaultsKey)
+            return newID
+        }
     }
 
     func reset() {
-        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        queue.sync(flags: .barrier) {
+            cachedID = nil
+            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        }
     }
 }

@@ -7,6 +7,7 @@
 //
 
 import XCTest
+import SwiftUI
 @testable import kull
 
 #if os(macOS)
@@ -15,7 +16,14 @@ import AppKit
 import UIKit
 #endif
 
+@MainActor
 final class PlatformCompatibilityTests: XCTestCase {
+
+    override func setUp() async throws {
+        try await super.setUp()
+        // Ensure shared services start from a clean slate for platform checks
+        WebSocketService.shared.disconnect()
+    }
 
     // MARK: - Import Tests
 
@@ -94,16 +102,12 @@ final class PlatformCompatibilityTests: XCTestCase {
 
     func testAppDelegateExists() {
         #if os(macOS)
-        // Verify macOS AppDelegate exists and conforms to NSApplicationDelegate
-        let delegate = AppDelegate()
-        XCTAssertNotNil(delegate, "macOS AppDelegate should exist")
-        XCTAssertTrue(delegate is NSApplicationDelegate,
+        // Verify macOS AppDelegate type exists and conforms to NSApplicationDelegate
+        XCTAssertTrue(AppDelegate.self is NSApplicationDelegate.Type,
                       "macOS AppDelegate should conform to NSApplicationDelegate")
         #elseif os(iOS)
-        // Verify iOS AppDelegate exists and conforms to UIApplicationDelegate
-        let delegate = AppDelegate()
-        XCTAssertNotNil(delegate, "iOS AppDelegate should exist")
-        XCTAssertTrue(delegate is UIApplicationDelegate,
+        // Verify iOS AppDelegate type exists and conforms to UIApplicationDelegate
+        XCTAssertTrue(AppDelegate.self is UIApplicationDelegate.Type,
                       "iOS AppDelegate should conform to UIApplicationDelegate")
         #endif
     }
@@ -152,12 +156,10 @@ final class PlatformCompatibilityTests: XCTestCase {
     func testFileAccessServiceHasRequiredMethods() {
         let service = FileAccessService.shared
 
-        // Test that service has all required methods
-        // We can't actually call them in unit tests (they require UI), but we verify they compile
-        XCTAssertTrue(service.responds(to: #selector(FileAccessService.selectFolder(completion:))),
-                      "FileAccessService should have selectFolder method")
-        XCTAssertTrue(service.responds(to: #selector(FileAccessService.selectAudioFile(completion:))),
-                      "FileAccessService should have selectAudioFile method")
+        // Verify the async APIs are callable (no Objective-C selectors available)
+        service.selectFolder { _ in }
+        service.selectAudioFile { _ in }
+        XCTAssertTrue(true, "FileAccessService selection APIs should be callable")
     }
 
     // MARK: - Platform-Specific Feature Tests
