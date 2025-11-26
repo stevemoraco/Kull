@@ -7,10 +7,10 @@ const router = Router();
 const LATEST_VERSIONS = {
   macos: {
     version: "1.0.0",
-    downloadUrl: "https://cdn.kull.ai/releases/macos/Kull-1.0.0.dmg",
+    downloadUrl: "/downloads/Kull-1.0.0.dmg",
     releaseNotes: "Initial release with AI-powered photo culling and rating",
-    releaseDate: "2025-01-15",
-    fileSize: "45.2 MB",
+    releaseDate: "2025-11-26",
+    fileSize: "1.2 MB",
     minimumOS: "macOS 12.0+",
     features: [
       "5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)",
