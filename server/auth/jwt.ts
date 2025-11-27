@@ -1,5 +1,8 @@
-import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import type { DeviceJWTPayload } from '@shared/types/device';
+
+// Extract error classes from the default export (CommonJS compatibility)
+const { TokenExpiredError, JsonWebTokenError } = jwt;
 
 // JWT secrets from environment
 const JWT_SECRET = process.env.JWT_SECRET || 'default-jwt-secret-change-in-production';
