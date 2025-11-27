@@ -197,40 +197,9 @@ export async function setupAuth(app: Express) {
       }
     }
 
-    // Check if already authenticated
-    if (req.isAuthenticated && req.isAuthenticated()) {
-      const user = req.user as any;
-      console.log("[Auth] User already authenticated:", {
-        hasExpires: !!user?.expires_at,
-        hasClaims: !!user?.claims,
-        sub: user?.claims?.sub
-      });
-
-      // If user object looks incomplete, force re-authentication
-      if (!user?.expires_at || !user?.claims) {
-        console.log("[Auth] User object incomplete, forcing re-authentication");
-        req.logout(() => {
-          // Continue to authentication flow below
-          console.log("[Auth] Starting login flow after logout");
-          ensureStrategy(req.hostname);
-          passport.authenticate(`replitauth:${req.hostname}`, {
-            prompt: "login consent",
-            scope: ["openid", "email", "profile", "offline_access"],
-          })(req, res, next);
-        });
-        return;
-      }
-
-      // Use stored redirect URL if available, otherwise go to dashboard
-      const storedRedirect = (req.session as any).returnTo;
-      delete (req.session as any).returnTo;
-      // Default to /dashboard for authenticated users (not / which shows Landing)
-      const finalRedirect = storedRedirect || "/dashboard";
-      console.log("[Auth] User fully authenticated, redirecting to:", finalRedirect);
-      return res.redirect(finalRedirect);
-    }
-
-    console.log("[Auth] Starting login flow");
+    // Always allow login flow when user explicitly navigates to /api/login
+    // This lets users re-authenticate or switch accounts even if already logged in
+    console.log("[Auth] Starting login flow (always allows re-authentication)");
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
