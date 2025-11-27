@@ -171,24 +171,45 @@ extension RunController {
                 if let rating = parsed.ratings.first {
                     // Convert local rating format to PhotoRating
                     let photoRating = PhotoRating(
+                        imageId: nil,
+                        filename: url.lastPathComponent,
                         starRating: rating.star,
                         colorLabel: rating.color ?? "",
                         keepReject: rating.star >= 3 ? "keep" : "reject",
                         tags: rating.tags ?? [],
                         description: rating.description ?? "",
                         technicalQuality: TechnicalQuality(
-                            sharpness: 800.0, // Placeholder, local doesn't provide detailed metrics
-                            exposure: 800.0,
-                            composition: 800.0,
+                            focusAccuracy: rating.star * 200,
+                            exposureQuality: 700,
+                            compositionScore: 600,
+                            lightingQuality: nil,
+                            colorHarmony: nil,
+                            noiseLevel: nil,
+                            sharpnessDetail: nil,
+                            dynamicRange: nil,
+                            overallTechnical: rating.star * 200,
+                            sharpness: 0.8,
+                            exposure: 0.8,
+                            composition: 0.8,
                             overallScore: Double(rating.star) * 200.0
                         ),
                         subjectAnalysis: SubjectAnalysis(
                             primarySubject: rating.title ?? "Unknown",
-                            emotion: "neutral",
+                            emotionIntensity: 500,
                             eyesOpen: true,
+                            eyeContact: nil,
+                            genuineExpression: nil,
+                            facialSharpness: nil,
+                            bodyLanguage: nil,
+                            momentTiming: nil,
+                            storyTelling: nil,
+                            uniqueness: nil,
+                            emotion: "neutral",
                             smiling: false,
                             inFocus: true
-                        )
+                        ),
+                        similarityGroup: nil,
+                        shootContext: nil
                     )
                     ratings.append(photoRating)
                 }
@@ -249,6 +270,14 @@ extension RunController {
     }
 
     private func generateXMPSidecar(rating: PhotoRating, outputURL: URL) throws {
+        // Extract values with defaults for optionals
+        let overallScore = rating.technicalQuality.overallScore ?? Double(rating.technicalQuality.overallTechnical ?? 500)
+        let sharpness = rating.technicalQuality.sharpness ?? Double(rating.technicalQuality.focusAccuracy ?? 500) / 1000.0
+        let exposure = rating.technicalQuality.exposure ?? Double(rating.technicalQuality.exposureQuality ?? 500) / 1000.0
+        let composition = rating.technicalQuality.composition ?? Double(rating.technicalQuality.compositionScore ?? 500) / 1000.0
+        let eyesOpen = rating.subjectAnalysis.eyesOpen ?? true
+        let inFocus = rating.subjectAnalysis.inFocus ?? true
+
         let xmp = """
         <?xml version="1.0" encoding="UTF-8"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Kull iOS 1.0">
@@ -271,19 +300,19 @@ extension RunController {
                 </rdf:Bag>
               </dc:subject>
               <photoshop:Category>\(rating.keepReject)</photoshop:Category>
-              <kull:TechnicalQuality>\(String(format: "%.0f", rating.technicalQuality.overallScore))</kull:TechnicalQuality>
-              <kull:Sharpness>\(String(format: "%.0f", rating.technicalQuality.sharpness))</kull:Sharpness>
-              <kull:Exposure>\(String(format: "%.0f", rating.technicalQuality.exposure))</kull:Exposure>
-              <kull:Composition>\(String(format: "%.0f", rating.technicalQuality.composition))</kull:Composition>
+              <kull:TechnicalQuality>\(String(format: "%.0f", overallScore))</kull:TechnicalQuality>
+              <kull:Sharpness>\(String(format: "%.0f", sharpness))</kull:Sharpness>
+              <kull:Exposure>\(String(format: "%.0f", exposure))</kull:Exposure>
+              <kull:Composition>\(String(format: "%.0f", composition))</kull:Composition>
               <kull:Subject>\(escapeXML(rating.subjectAnalysis.primarySubject))</kull:Subject>
-              <kull:EyesOpen>\(rating.subjectAnalysis.eyesOpen ? "true" : "false")</kull:EyesOpen>
-              <kull:InFocus>\(rating.subjectAnalysis.inFocus ? "true" : "false")</kull:InFocus>
+              <kull:EyesOpen>\(eyesOpen ? "true" : "false")</kull:EyesOpen>
+              <kull:InFocus>\(inFocus ? "true" : "false")</kull:InFocus>
             </rdf:Description>
           </rdf:RDF>
         </x:xmpmeta>
         """
 
-        try xmp.write(to: outputURL, atomically: true, encoding: .utf8)
+        try xmp.write(to: outputURL, atomically: true, encoding: String.Encoding.utf8)
     }
 
     private func escapeXML(_ string: String) -> String {
