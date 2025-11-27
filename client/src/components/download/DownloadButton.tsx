@@ -37,10 +37,14 @@ export function DownloadButton({
         description: `Downloading Kull AI ${versionInfo.version} for ${platform === 'macos' ? 'macOS' : 'iOS'}`,
       });
 
-      // Redirect to download URL or App Store
-      const url = platform === 'macos'
-        ? versionInfo.downloadUrl
-        : versionInfo.appStoreUrl;
+      // Redirect to download URL, TestFlight, or App Store
+      let url: string | undefined;
+      if (platform === 'macos') {
+        url = versionInfo.downloadUrl;
+      } else {
+        // Prefer TestFlight for iOS beta, otherwise App Store
+        url = versionInfo.testFlightUrl || versionInfo.appStoreUrl;
+      }
 
       if (url) {
         window.open(url, '_blank');
@@ -74,6 +78,7 @@ export function DownloadButton({
         </>
       );
     } else {
+      const isTestFlight = versionInfo.testFlightUrl && !versionInfo.appStoreUrl;
       return (
         <>
           {isLoading ? (
@@ -81,7 +86,7 @@ export function DownloadButton({
           ) : (
             <Apple className="w-5 h-5 mr-2" />
           )}
-          Get on App Store
+          {versionInfo.testFlightUrl ? 'Join TestFlight Beta' : 'Get on App Store'}
         </>
       );
     }

@@ -817,5 +817,43 @@ api-docs/
 
 ---
 
-**Last Updated:** 2025-11-18
+## App Store Connect Credentials
+
+**Credentials file location:** `apps/appstore-credentials.json`
+
+```json
+{
+  "keyId": "S9KW8G5RHS",
+  "issuerId": "c63dccab-1ecd-41dc-9374-174cfdb70958",
+  "teamId": "283HJ7VJR4",
+  "appId": "6747370117",
+  "privateKeyPath": "~/.private_keys/AuthKey_S9KW8G5RHS.p8"
+}
+```
+
+**Usage:**
+```bash
+# Archive and upload iOS app
+xcodebuild archive \
+  -project kull.xcodeproj \
+  -scheme kull \
+  -destination 'generic/platform=iOS' \
+  -archivePath /tmp/kull_ios.xcarchive \
+  -allowProvisioningUpdates \
+  -authenticationKeyPath ~/.private_keys/AuthKey_S9KW8G5RHS.p8 \
+  -authenticationKeyID S9KW8G5RHS \
+  -authenticationKeyIssuerID "c63dccab-1ecd-41dc-9374-174cfdb70958" \
+  DEVELOPMENT_TEAM=283HJ7VJR4
+
+# Test credentials
+xcrun altool --list-apps \
+  --apiKey S9KW8G5RHS \
+  --apiIssuer "c63dccab-1ecd-41dc-9374-174cfdb70958"
+```
+
+**NEVER commit the .p8 file to git.** It's stored in `~/.private_keys/`.
+
+---
+
+**Last Updated:** 2025-11-27
 **Next Review:** When new AI models are released or deprecated

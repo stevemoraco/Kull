@@ -6,12 +6,12 @@ const router = Router();
 // Version information for each platform
 const LATEST_VERSIONS = {
   macos: {
-    version: "1.0.0",
-    downloadUrl: "/downloads/Kull-1.0.0.dmg",
-    releaseNotes: "Initial release with AI-powered photo culling and rating",
-    releaseDate: "2025-11-26",
-    fileSize: "1.7 MB",
-    minimumOS: "macOS 12.0+",
+    version: "2025.11.27",
+    downloadUrl: "/downloads/Kull-v2025-11-27-11-54-AM.dmg",
+    releaseNotes: "Updated version with improved stability and no keychain prompts",
+    releaseDate: "2025-11-27",
+    fileSize: "2.1 MB",
+    minimumOS: "macOS 14.0+",
     features: [
       "5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)",
       "Universal Mac app (Apple Silicon & Intel)",
@@ -21,17 +21,18 @@ const LATEST_VERSIONS = {
     ]
   },
   ios: {
-    version: "1.0.0",
+    version: "2025.11.27",
     appStoreUrl: "https://apps.apple.com/app/kull-ai/id123456789",
-    testFlightUrl: "https://testflight.apple.com/join/kull-ai-beta",
-    releaseDate: "2025-01-15",
-    minimumOS: "iOS 16.0+",
+    testFlightUrl: "https://testflight.apple.com/join/Kull",
+    releaseNotes: "Initial iOS release on TestFlight",
+    releaseDate: "2025-11-27",
+    minimumOS: "iOS 17.0+",
     features: [
       "Seamless sync with Mac app",
       "Rate photos on-the-go",
       "Optimized for iPhone & iPad",
       "Offline mode support",
-      "iCloud integration"
+      "Push notifications for processing updates"
     ]
   }
 };
