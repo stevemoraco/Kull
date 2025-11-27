@@ -12,7 +12,7 @@ import OSLog
 
 /// UIHostingController subclass that handles keyboard shortcuts
 /// This is the proper way to integrate UIKeyCommands into SwiftUI on iPad
-class KeyboardHostingController<Content: View>: UIHostingController<Content> {
+final class KeyboardHostingController<Content: View>: UIHostingController<Content> {
     private var customKeyCommands: [UIKeyCommand] = []
 
     override var keyCommands: [UIKeyCommand]? {
@@ -21,6 +21,11 @@ class KeyboardHostingController<Content: View>: UIHostingController<Content> {
 
     func setKeyCommands(_ commands: [UIKeyCommand]) {
         self.customKeyCommands = commands
+    }
+
+    // Explicit deinit to work around Xcode 26 beta compiler crash
+    deinit {
+        customKeyCommands.removeAll()
     }
 }
 
