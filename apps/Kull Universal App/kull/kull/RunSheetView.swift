@@ -2,8 +2,8 @@ import SwiftUI
 
 struct RunSheetView: View {
     @Binding var selectedFolder: URL?
-    @State private var selectedProvider: AIProvider = .appleIntelligence
-    @State private var selectedMode: ProcessingMode = .local
+    @State private var selectedProvider: AIProvider = .openaiGPT5Nano
+    @State private var selectedMode: ProcessingMode = .fast
     @State private var preset: String = "standard"
     @State private var includeTitle = true
     @State private var includeDescription = true
@@ -12,11 +12,14 @@ struct RunSheetView: View {
     @State private var providers: [ProviderInfo] = []
     @State private var estimatedCost: Double = 0.0
     @State private var estimatedImageCount: Int = 0
+    @State private var imageURLs: [URL] = []
+    @State private var selectedTestImage: URL? = nil
+    @State private var testResult: String? = nil
+    @State private var isTesting = false
     @StateObject private var runner = RunController()
     @StateObject private var cloudService = CloudAIService.shared
     @SwiftUI.Environment(\.horizontalSizeClass) private var horizontalSizeClass: UserInterfaceSizeClass?
-    
-    // Cross-platform background colors; UIKit colors are unavailable on macOS builds.
+
     private var primaryBackground: Color {
         #if os(macOS)
         return Color(nsColor: .windowBackgroundColor)
@@ -24,7 +27,7 @@ struct RunSheetView: View {
         return Color(.systemBackground)
         #endif
     }
-    
+
     private var groupedBackground: Color {
         #if os(macOS)
         return Color(nsColor: .controlBackgroundColor)
@@ -34,47 +37,49 @@ struct RunSheetView: View {
     }
 
     var body: some View {
-        if horizontalSizeClass == .regular {
-            // iPad: Optimized landscape layout
-            iPadLayout
-        } else {
-            // iPhone: Compact layout
-            iPhoneLayout
-        }
-    }
-
-    // MARK: - iPad Layout
-
-    private var iPadLayout: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // Header
                 Text("Run Settings")
                     .font(.largeTitle)
                     .bold()
                     .padding(.horizontal)
 
-                // Processing Mode and Provider in horizontal layout for iPad
-                HStack(alignment: .top, spacing: 24) {
-                    processingModeSection
-                        .frame(maxWidth: .infinity)
-                    providerSection
-                        .frame(maxWidth: .infinity)
-                    presetSection
-                        .frame(maxWidth: .infinity)
+                // Image Thumbnails Section
+                if !imageURLs.isEmpty {
+                    imageThumbnailsSection
+                        .padding(.horizontal)
                 }
-                .padding(.horizontal)
 
-                // Cost estimate (more prominent on iPad)
+                // Processing Mode Section
+                processingModeSection
+                    .padding(.horizontal)
+
+                // AI Provider Section
+                providerSection
+                    .padding(.horizontal)
+
+                // Preset & Options Section
+                presetSection
+                    .padding(.horizontal)
+
+                // Cost Estimate
                 if selectedMode != .local && estimatedImageCount > 0 {
                     costEstimateCard
                         .padding(.horizontal)
                 }
 
-                // Prompt editor (larger on iPad)
+                // Prompt Editor
                 promptEditorSection
                     .padding(.horizontal)
 
-                // Progress and action buttons
+                // Test Single Image Section
+                if !imageURLs.isEmpty && selectedMode != .local {
+                    testSingleImageSection
+                        .padding(.horizontal)
+                }
+
+                // Progress and Action
                 actionSection
                     .padding(.horizontal)
             }
@@ -83,285 +88,234 @@ struct RunSheetView: View {
         .background(groupedBackground)
         .task {
             await loadProviders()
+            loadImages()
+            updateCostEstimate()
+        }
+        .onChange(of: selectedFolder) { _, _ in
+            loadImages()
             updateCostEstimate()
         }
     }
 
-    // MARK: - iPhone Layout
+    // MARK: - Image Thumbnails Section
 
-    private var iPhoneLayout: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Run Settings").font(.title2).bold()
-
-            HStack(alignment: .top, spacing: 16) {
-                // Processing Mode Selection
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Processing Mode").font(.caption).foregroundStyle(.secondary)
-                    Picker("Mode", selection: $selectedMode) {
-                        ForEach(ProcessingMode.allCases) { mode in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(mode.displayName)
-                                Text(mode.description).font(.caption2).foregroundStyle(.secondary)
-                            }.tag(mode)
-                        }
-                    }
-                    #if os(macOS)
-                    .pickerStyle(.radioGroup)
-                    #else
-                    .pickerStyle(.menu)
-                    #endif
-                    .onChange(of: selectedMode) { _, _ in
-                        updateCostEstimate()
-                    }
-                }
-
-                // Provider Selection (disabled for local mode)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("AI Provider").font(.caption).foregroundStyle(.secondary)
-                    if selectedMode == .local {
-                        Text("Apple Intelligence (Local)")
-                            .foregroundStyle(.secondary)
-                            .padding(4)
-                    } else if providers.isEmpty {
-                        Picker("Provider", selection: $selectedProvider) {
-                            ForEach(AIProvider.allCases.filter { $0 != .appleIntelligence }) { provider in
-                                Text(provider.displayName).tag(provider)
-                            }
-                        }
-                        #if os(macOS)
-                        .pickerStyle(.radioGroup)
-                        #else
-                        .pickerStyle(.menu)
-                        #endif
-                        .disabled(selectedMode == .local)
-                        .onChange(of: selectedProvider) { _, _ in
-                            updateCostEstimate()
-                        }
-                    } else {
-                        Picker("Provider", selection: $selectedProvider) {
-                            ForEach(providers) { provider in
-                                HStack {
-                                    Text(provider.name)
-                                    Spacer()
-                                    Text(provider.displayCost).font(.caption).foregroundStyle(.secondary)
-                                }.tag(AIProvider(rawValue: provider.id) ?? .openaiGPT5Nano)
-                            }
-                        }
-                        #if os(macOS)
-                        .pickerStyle(.radioGroup)
-                        #else
-                        .pickerStyle(.menu)
-                        #endif
-                        .disabled(selectedMode == .local)
-                        .onChange(of: selectedProvider) { _, _ in
-                            updateCostEstimate()
-                        }
-                    }
-                }
-
-                // Preset and Options
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Preset").font(.caption).foregroundStyle(.secondary)
-                    Picker("Preset", selection: $preset) {
-                        Text("Standard").tag("standard")
-                        Text("Wedding Storytelling").tag("wedding-storytelling")
-                        Text("Corporate Event").tag("corporate-event")
-                    }.pickerStyle(.menu)
-
-                    Toggle("Title", isOn: $includeTitle)
-                    Toggle("Description", isOn: $includeDescription)
-                    Toggle("Tags", isOn: $includeTags)
-                }
-            }
-
-            // Cost Estimate
-            if selectedMode != .local && estimatedImageCount > 0 {
-                HStack {
-                    Image(systemName: "dollarsign.circle")
-                        .foregroundStyle(.secondary)
-                    Text("Estimated cost: ")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(formatCost(estimatedCost))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                    Text("(\(estimatedImageCount) images)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(6)
-            }
-
+    private var imageThumbnailsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Custom Prompt (optional)").font(.caption).foregroundStyle(.secondary)
+                Image(systemName: "photo.on.rectangle.angled")
+                    .foregroundStyle(.blue)
+                Text("Images to Process")
+                    .font(.headline)
                 Spacer()
-                #if os(macOS)
-                Button("🎙 Transcribe…") {
-                    TranscriptionHelper().transcribe(currentText: { self.promptText }) { self.promptText = $0 }
-                }
-                #endif
+                Text("\(imageURLs.count) images")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            TextEditor(text: $promptText)
-                .font(.system(.body, design: .monospaced))
-                .border(.quaternary)
-                .frame(height: 120)
 
-            // Progress and Run Button
-            HStack {
-                if runner.isRunning {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            ProgressView(value: Double(runner.processed), total: Double(max(runner.total, 1)))
-                                .frame(width: 180)
-                            Text("\(runner.processed)/\(runner.total)")
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
+                    ForEach(imageURLs.prefix(50), id: \.self) { url in
+                        ThumbnailView(url: url, isSelected: selectedTestImage == url)
+                            .onTapGesture {
+                                selectedTestImage = url
+                            }
+                    }
+                    if imageURLs.count > 50 {
+                        VStack {
+                            Text("+\(imageURLs.count - 50)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
-                        if runner.currentCost > 0 {
-                            Text("Cost so far: \(formatCost(runner.currentCost))")
+                            Text("more")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                } else if runner.processed > 0 && runner.processed == runner.total {
-                    // Show completion message
-                    VStack(alignment: .leading, spacing: 4) {
-                        #if os(macOS)
-                        Text("✓ Complete! XMP files written next to your photos.")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Text("Open Lightroom to import with ratings.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        #else
-                        Text("✓ Complete! XMP files ready to save.")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                        Text("Use the share sheet to save XMP files back to your photo library.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        #endif
+                        .frame(width: 60, height: 60)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(8)
                     }
                 }
-                Spacer()
-                Button("Run") { Task { await startRun() } }
-                    .disabled(selectedFolder == nil || runner.isRunning)
+                .padding(.vertical, 4)
+            }
+            .frame(height: 80)
+
+            if let selected = selectedTestImage {
+                HStack {
+                    Text("Selected: \(selected.lastPathComponent)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear") {
+                        selectedTestImage = nil
+                    }
+                    .font(.caption)
+                }
             }
         }
-        .padding(20)
-        .task {
-            await loadProviders()
+        .padding()
+        .background(primaryBackground)
+        .cornerRadius(12)
+    }
+
+    // MARK: - Processing Mode Section
+
+    private var processingModeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "cpu")
+                    .foregroundStyle(.blue)
+                Text("Processing Mode")
+                    .font(.headline)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(ProcessingMode.allCases) { mode in
+                    Button(action: { selectedMode = mode }) {
+                        HStack {
+                            Image(systemName: selectedMode == mode ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(selectedMode == mode ? .blue : .secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mode.displayName)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                Text(mode.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding()
+        .background(primaryBackground)
+        .cornerRadius(12)
+    }
+
+    // MARK: - Provider Section
+
+    private var providerSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "brain")
+                    .foregroundStyle(.blue)
+                Text("AI Provider")
+                    .font(.headline)
+            }
+
+            if selectedMode == .local {
+                HStack {
+                    Image(systemName: "apple.logo")
+                    Text("Apple Intelligence (On-Device)")
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    let availableProviders = providers.isEmpty
+                        ? AIProvider.allCases.filter { $0 != .appleIntelligence }
+                        : []
+
+                    if providers.isEmpty {
+                        ForEach(availableProviders) { provider in
+                            Button(action: { selectedProvider = provider }) {
+                                HStack {
+                                    Image(systemName: selectedProvider == provider ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedProvider == provider ? .blue : .secondary)
+                                    Text(provider.displayName)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        ForEach(providers) { provider in
+                            let aiProvider = AIProvider(rawValue: provider.id) ?? .openaiGPT5Nano
+                            Button(action: { selectedProvider = aiProvider }) {
+                                HStack {
+                                    Image(systemName: selectedProvider == aiProvider ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedProvider == aiProvider ? .blue : .secondary)
+                                    VStack(alignment: .leading) {
+                                        Text(provider.name)
+                                            .foregroundStyle(.primary)
+                                        Text(provider.displayCost + " per image")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if provider.supportsBatch {
+                                        Text("Batch OK")
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.green.opacity(0.2))
+                                            .foregroundStyle(.green)
+                                            .cornerRadius(4)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(primaryBackground)
+        .cornerRadius(12)
+        .onChange(of: selectedMode) { _, newMode in
+            if newMode == .local {
+                selectedProvider = .appleIntelligence
+            } else if selectedProvider == .appleIntelligence {
+                selectedProvider = .openaiGPT5Nano
+            }
+            updateCostEstimate()
+        }
+        .onChange(of: selectedProvider) { _, _ in
             updateCostEstimate()
         }
     }
 
-    // MARK: - Reusable Components
-
-    private var processingModeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Processing Mode")
-                .font(.headline)
-            Picker("Mode", selection: $selectedMode) {
-                ForEach(ProcessingMode.allCases) { mode in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(mode.displayName)
-                        Text(mode.description).font(.caption2).foregroundStyle(.secondary)
-                    }.tag(mode)
-                }
-            }
-            #if os(macOS)
-            .pickerStyle(.radioGroup)
-            #else
-            .pickerStyle(.menu)
-            #endif
-            .frame(minHeight: 44)  // iPad: Touch target
-            .onChange(of: selectedMode) { _, _ in
-                updateCostEstimate()
-            }
-        }
-        .padding()
-        .background(primaryBackground)
-        .cornerRadius(12)
-    }
-
-    private var providerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("AI Provider")
-                .font(.headline)
-            if selectedMode == .local {
-                Text("Apple Intelligence (Local)")
-                    .foregroundStyle(.secondary)
-                    .padding(12)
-                    .frame(minHeight: 44)
-            } else if providers.isEmpty {
-                Picker("Provider", selection: $selectedProvider) {
-                    ForEach(AIProvider.allCases.filter { $0 != .appleIntelligence }) { provider in
-                        Text(provider.displayName).tag(provider)
-                    }
-                }
-                #if os(macOS)
-                .pickerStyle(.radioGroup)
-                #else
-                .pickerStyle(.menu)
-                #endif
-                .disabled(selectedMode == .local)
-                .frame(minHeight: 44)
-                .onChange(of: selectedProvider) { _, _ in
-                    updateCostEstimate()
-                }
-            } else {
-                Picker("Provider", selection: $selectedProvider) {
-                    ForEach(providers) { provider in
-                        HStack {
-                            Text(provider.name)
-                            Spacer()
-                            Text(provider.displayCost).font(.caption).foregroundStyle(.secondary)
-                        }.tag(AIProvider(rawValue: provider.id) ?? .openaiGPT5Nano)
-                    }
-                }
-                #if os(macOS)
-                .pickerStyle(.radioGroup)
-                #else
-                .pickerStyle(.menu)
-                #endif
-                .disabled(selectedMode == .local)
-                .frame(minHeight: 44)
-                .onChange(of: selectedProvider) { _, _ in
-                    updateCostEstimate()
-                }
-            }
-        }
-        .padding()
-        .background(primaryBackground)
-        .cornerRadius(12)
-    }
+    // MARK: - Preset Section
 
     private var presetSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Preset & Options")
-                .font(.headline)
+            HStack {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(.blue)
+                Text("Preset & Options")
+                    .font(.headline)
+            }
+
             Picker("Preset", selection: $preset) {
                 Text("Standard").tag("standard")
                 Text("Wedding Storytelling").tag("wedding-storytelling")
                 Text("Corporate Event").tag("corporate-event")
             }
-            .pickerStyle(.menu)
-            .frame(minHeight: 44)
+            .pickerStyle(.segmented)
 
-            Toggle("Title", isOn: $includeTitle)
-                .frame(minHeight: 44)
-            Toggle("Description", isOn: $includeDescription)
-                .frame(minHeight: 44)
-            Toggle("Tags", isOn: $includeTags)
-                .frame(minHeight: 44)
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Include Title", isOn: $includeTitle)
+                Toggle("Include Description", isOn: $includeDescription)
+                Toggle("Include Tags", isOn: $includeTags)
+            }
         }
         .padding()
         .background(primaryBackground)
         .cornerRadius(12)
     }
+
+    // MARK: - Cost Estimate Card
 
     private var costEstimateCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -395,28 +349,106 @@ struct RunSheetView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 
+    // MARK: - Prompt Editor Section
+
     private var promptEditorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Custom Prompt (optional)")
+                Image(systemName: "text.bubble")
+                    .foregroundStyle(.blue)
+                Text("Custom Prompt")
                     .font(.headline)
                 Spacer()
                 #if os(macOS)
                 Button("🎙 Transcribe…") {
                     TranscriptionHelper().transcribe(currentText: { self.promptText }) { self.promptText = $0 }
                 }
-                .frame(minHeight: 44)
                 #endif
             }
+
+            Text("Customize how the AI evaluates your photos. The default prompt works well for most shoots.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             TextEditor(text: $promptText)
                 .font(.system(.body, design: .monospaced))
-                .frame(height: horizontalSizeClass == .regular ? 180 : 120)
-                .border(.quaternary)
+                .frame(minHeight: 100, maxHeight: 200)
+                .padding(8)
+                .background(groupedBackground)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
         }
         .padding()
         .background(primaryBackground)
         .cornerRadius(12)
     }
+
+    // MARK: - Test Single Image Section
+
+    private var testSingleImageSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "flask")
+                    .foregroundStyle(.orange)
+                Text("Test Single Image")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Text("Test your prompt on a single image before running the full batch.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if let selected = selectedTestImage {
+                    Text(selected.lastPathComponent)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                } else {
+                    Text("Tap an image above to select")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button(action: { Task { await testSingleImage() } }) {
+                    HStack {
+                        if isTesting {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "play.circle")
+                        }
+                        Text("Test")
+                    }
+                }
+                .disabled(selectedTestImage == nil || isTesting)
+            }
+
+            if let result = testResult {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Result:")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Text(result)
+                        .font(.system(.caption, design: .monospaced))
+                        .padding(8)
+                        .background(groupedBackground)
+                        .cornerRadius(6)
+                }
+            }
+        }
+        .padding()
+        .background(primaryBackground)
+        .cornerRadius(12)
+    }
+
+    // MARK: - Action Section
 
     private var actionSection: some View {
         VStack(spacing: 16) {
@@ -463,11 +495,11 @@ struct RunSheetView: View {
             Button(action: { Task { await startRun() } }) {
                 HStack {
                     Image(systemName: "play.fill")
-                    Text("Run")
+                    Text("Run All \(estimatedImageCount) Images")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 56)  // iPad: Larger button
+                .frame(height: 56)
                 .background(selectedFolder == nil || runner.isRunning ? Color.gray : Color.blue)
                 .foregroundColor(.white)
                 .cornerRadius(12)
@@ -475,6 +507,8 @@ struct RunSheetView: View {
             .disabled(selectedFolder == nil || runner.isRunning)
         }
     }
+
+    // MARK: - Helper Methods
 
     private func loadProviders() async {
         do {
@@ -484,58 +518,56 @@ struct RunSheetView: View {
         }
     }
 
-    private func updateCostEstimate() {
+    private func loadImages() {
         guard let folder = selectedFolder else {
-            estimatedImageCount = 0
-            estimatedCost = 0.0
+            imageURLs = []
             return
         }
 
-        // Count images in folder
         let validExtensions = ["cr3", "nef", "arw", "orf", "raf", "dng", "jpg", "jpeg", "png", "heic"]
-        var count = 0
+        var urls: [URL] = []
 
         #if os(macOS)
-        // macOS: Use enumerator for recursive folder traversal
         let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: folder, includingPropertiesForKeys: nil) else {
-            estimatedImageCount = 0
-            estimatedCost = 0.0
+        guard let enumerator = fm.enumerator(at: folder, includingPropertiesForKeys: [.contentModificationDateKey]) else {
+            imageURLs = []
             return
         }
 
         while let url = enumerator.nextObject() as? URL {
             if validExtensions.contains(url.pathExtension.lowercased()) {
-                count += 1
+                urls.append(url)
             }
         }
         #else
-        // iOS: Use contentsOfDirectory (user selected folder from UIDocumentPicker)
         do {
             let files = try FileManager.default.contentsOfDirectory(
                 at: folder,
                 includingPropertiesForKeys: nil,
                 options: [.skipsHiddenFiles]
             )
-            count = files.filter { validExtensions.contains($0.pathExtension.lowercased()) }.count
+            urls = files.filter { validExtensions.contains($0.pathExtension.lowercased()) }
         } catch {
-            estimatedImageCount = 0
-            estimatedCost = 0.0
+            imageURLs = []
             return
         }
         #endif
 
-        estimatedImageCount = count
+        // Sort by name
+        urls.sort { $0.lastPathComponent < $1.lastPathComponent }
+        imageURLs = urls
+        estimatedImageCount = urls.count
+    }
 
-        // Calculate cost based on mode and provider
+    private func updateCostEstimate() {
+        estimatedImageCount = imageURLs.count
+
         if selectedMode == .local {
             estimatedCost = 0.0
         } else if let provider = providers.first(where: { $0.id == selectedProvider.rawValue }) {
-            let baseCost = provider.costPerImage * Double(count)
-            // Economy mode is 50% cheaper
+            let baseCost = provider.costPerImage * Double(estimatedImageCount)
             estimatedCost = selectedMode == .economy ? baseCost * 0.5 : baseCost
         } else {
-            // Fallback estimate if providers not loaded
             let baseCostPerImage: Double
             switch selectedProvider {
             case .googleFlashLite:
@@ -551,7 +583,7 @@ struct RunSheetView: View {
             case .appleIntelligence:
                 baseCostPerImage = 0.0
             }
-            let baseCost = baseCostPerImage * Double(count)
+            let baseCost = baseCostPerImage * Double(estimatedImageCount)
             estimatedCost = selectedMode == .economy ? baseCost * 0.5 : baseCost
         }
     }
@@ -564,6 +596,40 @@ struct RunSheetView: View {
         } else {
             return String(format: "$%.2f", cost)
         }
+    }
+
+    private func testSingleImage() async {
+        guard let imageURL = selectedTestImage else { return }
+
+        isTesting = true
+        testResult = nil
+
+        do {
+            let flags: [String] = [
+                includeTitle ? "title" : nil,
+                includeDescription ? "description" : nil,
+                includeTags ? "tags" : nil
+            ].compactMap { $0 }
+
+            let fullPrompt = "\(promptText)\nInclude: \(flags.joined(separator: ", "))"
+
+            let result = try await cloudService.processSingleImage(
+                imageURL: imageURL,
+                provider: selectedProvider,
+                prompt: fullPrompt
+            )
+
+            testResult = """
+            ⭐ Star Rating: \(result.result.starRating)
+            🏷️ Color: \(result.result.colorLabel)
+            📋 Decision: \(result.result.keepReject)
+            💰 Cost: \(formatCost(result.cost))
+            """
+        } catch {
+            testResult = "Error: \(error.localizedDescription)"
+        }
+
+        isTesting = false
     }
 
     private func startRun() async {
@@ -587,5 +653,90 @@ struct RunSheetView: View {
         } catch {
             print("Run failed: \(error)")
         }
+    }
+}
+
+// MARK: - Thumbnail View
+
+struct ThumbnailView: View {
+    let url: URL
+    let isSelected: Bool
+
+    #if os(macOS)
+    @State private var image: NSImage? = nil
+    #else
+    @State private var image: UIImage? = nil
+    #endif
+
+    var body: some View {
+        ZStack {
+            if let image = image {
+                #if os(macOS)
+                Image(nsImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 60, height: 60)
+                    .clipped()
+                    .cornerRadius(8)
+                #else
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 60, height: 60)
+                    .clipped()
+                    .cornerRadius(8)
+                #endif
+            } else {
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.2))
+                    .frame(width: 60, height: 60)
+                    .cornerRadius(8)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    )
+            }
+
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.blue, lineWidth: 3)
+                    .frame(width: 60, height: 60)
+            }
+        }
+        .task {
+            await loadThumbnail()
+        }
+    }
+
+    private func loadThumbnail() async {
+        #if os(macOS)
+        if let nsImage = NSImage(contentsOf: url) {
+            // Create a smaller thumbnail
+            let targetSize = CGSize(width: 120, height: 120)
+            let scaledImage = NSImage(size: targetSize)
+            scaledImage.lockFocus()
+            nsImage.draw(in: NSRect(origin: .zero, size: targetSize),
+                        from: NSRect(origin: .zero, size: nsImage.size),
+                        operation: .copy,
+                        fraction: 1.0)
+            scaledImage.unlockFocus()
+            await MainActor.run {
+                self.image = scaledImage
+            }
+        }
+        #else
+        if let data = try? Data(contentsOf: url),
+           let uiImage = UIImage(data: data) {
+            // Create thumbnail
+            let targetSize = CGSize(width: 120, height: 120)
+            let renderer = UIGraphicsImageRenderer(size: targetSize)
+            let thumbnail = renderer.image { _ in
+                uiImage.draw(in: CGRect(origin: .zero, size: targetSize))
+            }
+            await MainActor.run {
+                self.image = thumbnail
+            }
+        }
+        #endif
     }
 }
