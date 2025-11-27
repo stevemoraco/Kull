@@ -300,9 +300,16 @@ router.post('/approve', isAuthenticated, async (req: any, res: Response) => {
     };
 
     res.json(response);
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Device Auth] Error approving device:', error);
-    res.status(500).json({ error: 'Failed to approve device' });
+    // Return more specific error info for debugging
+    const errorMessage = error?.message || 'Unknown error';
+    const errorCode = error?.code || 'UNKNOWN';
+    res.status(500).json({
+      error: 'Failed to approve device',
+      detail: errorMessage,
+      code: errorCode
+    });
   }
 });
 
