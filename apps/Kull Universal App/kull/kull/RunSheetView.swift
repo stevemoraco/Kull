@@ -605,6 +605,10 @@ struct RunSheetView: View {
         testResult = nil
 
         do {
+            // Load image data from URL
+            let imageData = try Data(contentsOf: imageURL)
+            let imageFormat = imageURL.pathExtension.lowercased()
+
             let flags: [String] = [
                 includeTitle ? "title" : nil,
                 includeDescription ? "description" : nil,
@@ -614,8 +618,9 @@ struct RunSheetView: View {
             let fullPrompt = "\(promptText)\nInclude: \(flags.joined(separator: ", "))"
 
             let result = try await cloudService.processSingleImage(
-                imageURL: imageURL,
                 provider: selectedProvider,
+                imageData: imageData,
+                imageFormat: imageFormat,
                 prompt: fullPrompt
             )
 
