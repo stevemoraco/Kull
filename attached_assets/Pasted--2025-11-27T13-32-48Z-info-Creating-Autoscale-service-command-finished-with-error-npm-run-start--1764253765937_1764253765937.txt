@@ -1,0 +1,115 @@
+
+2025-11-27T13:32:48Z info: Creating Autoscale service
+command finished with error [npm run start]: exit status 1
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+CommonJS modules can always be imported via the default export, for example using:
+npm notice
+
+CommonJS modules can always be imported via the default export, for example using:
+                                 ^^^^^^^^^^^^^^^^^
+
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+const { TokenExpiredError, JsonWebTokenError } = pkg;
+> rest-express@1.0.0 start
+file:///home/runner/workspace/dist/index.js:9081
+command finished with error [npm run start]: exit status 1
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+                                 ^^^^^^^^^^^^^^^^^
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+const { TokenExpiredError, JsonWebTokenError } = pkg;
+                                 ^^^^^^^^^^^^^^^^^
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+> NODE_ENV=production node dist/index.js
+file:///home/runner/workspace/dist/index.js:9081
+> NODE_ENV=production node dist/index.js
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+file:///home/runner/workspace/dist/index.js:9081
+> NODE_ENV=production node dist/index.js
+Node.js v20.19.3
+
+CommonJS modules can always be imported via the default export, for example using:
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+file:///home/runner/workspace/dist/index.js:9081
+import pkg from 'jsonwebtoken';
+
+
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+crash loop detected
+starting up user application
+> NODE_ENV=production node dist/index.js
+npm notice
+npm notice
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+                                 ^^^^^^^^^^^^^^^^^
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+metasidecar: loaded enterprise status from environment is_enterprise=false
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+Node.js v20.19.3
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+> rest-express@1.0.0 start
+CommonJS modules can always be imported via the default export, for example using:
+import pkg from 'jsonwebtoken';
+    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+
+const { TokenExpiredError, JsonWebTokenError } = pkg;
+> rest-express@1.0.0 start
+Node.js v20.19.3
+file:///home/runner/workspace/dist/index.js:9081
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+> rest-express@1.0.0 start
+
+Node.js v20.19.3
+
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.4
+
+
+metasidecar: loaded enterprise status from environment is_enterprise=false
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+forwarding local port 5000 to external port 80 (mapped as 1104)
+
+command finished with error [npm run start]: exit status 1
+> rest-express@1.0.0 start
+
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+CommonJS modules can always be imported via the default export, for example using:
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+
+const { TokenExpiredError, JsonWebTokenError } = pkg;
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+Node.js v20.19.3
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+    at async ModuleLoader.import (node:internal/modules/esm/loader:540:24)
+import jwt, { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
+CommonJS modules can always be imported via the default export, for example using:
+    at async ModuleJob.run (node:internal/modules/esm/module_job:258:5)
+
+> rest-express@1.0.0 start
+
+crash loop detected
+                                 ^^^^^^^^^^^^^^^^^
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+
+> rest-express@1.0.0 start
+import pkg from 'jsonwebtoken';
+
+CommonJS modules can always be imported via the default export, for example using:
+> rest-express@1.0.0 start
+                                 ^^^^^^^^^^^^^^^^^
+    at ModuleJob._instantiate (node:internal/modules/esm/module_job:175:21)
+SyntaxError: Named export 'JsonWebTokenError' not found. The requested module 'jsonwebtoken' is a CommonJS module, which may not support all module.exports as named exports.
+
+command finished with error [npm run start]: exit status 1
+crash loop detected
+2025-11-27T13:36:32Z error: The deployment is crash looping. This can happen if the run command fails or exits immediately after starting. Check the logs for more information.
