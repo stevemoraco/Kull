@@ -1,4 +1,4 @@
-import * as jwt from 'jsonwebtoken';
+import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
 import type { DeviceJWTPayload } from '@shared/types/device';
 
 // JWT secrets from environment
@@ -58,9 +58,9 @@ export function verifyAccessToken(token: string): DeviceJWTPayload {
     const decoded = jwt.verify(token, JWT_SECRET) as DeviceJWTPayload;
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof TokenExpiredError) {
       throw new Error('Access token has expired');
-    } else if (error instanceof jwt.JsonWebTokenError) {
+    } else if (error instanceof JsonWebTokenError) {
       throw new Error('Invalid access token');
     }
     throw error;
@@ -81,9 +81,9 @@ export function verifyRefreshToken(token: string): { sub: string; deviceId: stri
 
     return decoded;
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
+    if (error instanceof TokenExpiredError) {
       throw new Error('Refresh token has expired');
-    } else if (error instanceof jwt.JsonWebTokenError) {
+    } else if (error instanceof JsonWebTokenError) {
       throw new Error('Invalid refresh token');
     }
     throw error;
