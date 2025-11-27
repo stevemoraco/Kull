@@ -28,6 +28,24 @@ enum AIProvider: String, Codable, CaseIterable, Identifiable {
             return "Kimi K2"
         }
     }
+
+    /// Maps to server's expected provider name (anthropic, openai, google, grok, groq)
+    var serverProviderName: String {
+        switch self {
+        case .appleIntelligence:
+            return "apple"  // Local only
+        case .googleFlashLite:
+            return "google"
+        case .openaiGPT5Nano:
+            return "openai"
+        case .anthropicHaiku:
+            return "anthropic"
+        case .grokMini:
+            return "grok"
+        case .kimiK2:
+            return "groq"
+        }
+    }
 }
 
 enum ProcessingMode: String, Codable, CaseIterable, Identifiable {
@@ -72,12 +90,31 @@ struct ProviderInfo: Codable, Identifiable {
     }
 }
 
+/// Server response from /api/ai/process-single
+struct ProcessSingleResponse: Codable {
+    let rating: PhotoRating
+    let cost: CostBreakdown
+    let processingTimeMs: Int
+    let provider: String
+}
+
+struct CostBreakdown: Codable {
+    let inputTokens: Int
+    let outputTokens: Int
+    let inputCostUSD: Double
+    let outputCostUSD: Double
+    let totalCostUSD: Double
+    let userChargeUSD: Double
+}
+
 struct ProcessResult: Codable {
     let result: PhotoRating
     let cost: Double
 }
 
 struct PhotoRating: Codable {
+    let imageId: String?
+    let filename: String?
     let starRating: Int
     let colorLabel: String
     let keepReject: String
@@ -85,38 +122,82 @@ struct PhotoRating: Codable {
     let description: String
     let technicalQuality: TechnicalQuality
     let subjectAnalysis: SubjectAnalysis
+    let similarityGroup: String?
+    let shootContext: ShootContext?
 }
 
 struct TechnicalQuality: Codable {
-    let sharpness: Double
-    let exposure: Double
-    let composition: Double
-    let overallScore: Double
+    // New 1-1000 scale fields
+    let focusAccuracy: Int?
+    let exposureQuality: Int?
+    let compositionScore: Int?
+    let lightingQuality: Int?
+    let colorHarmony: Int?
+    let noiseLevel: Int?
+    let sharpnessDetail: Int?
+    let dynamicRange: Int?
+    let overallTechnical: Int?
+
+    // Legacy 0-1 scale fields (for backward compatibility)
+    let sharpness: Double?
+    let exposure: Double?
+    let composition: Double?
+    let overallScore: Double?
 }
 
 struct SubjectAnalysis: Codable {
     let primarySubject: String
-    let emotion: String
-    let eyesOpen: Bool
-    let smiling: Bool
-    let inFocus: Bool
+    // New 1-1000 scale fields
+    let emotionIntensity: Int?
+    let eyesOpen: Bool?
+    let eyeContact: Bool?
+    let genuineExpression: Int?
+    let facialSharpness: Int?
+    let bodyLanguage: Int?
+    let momentTiming: Int?
+    let storyTelling: Int?
+    let uniqueness: Int?
+
+    // Legacy fields (for backward compatibility)
+    let emotion: String?
+    let smiling: Bool?
+    let inFocus: Bool?
+}
+
+struct ShootContext: Codable {
+    let eventType: String?
+    let shootPhase: String?
+    let timeOfDay: String?
+    let location: String?
 }
 
 // MARK: - API Request/Response Models
 
+/// Matches server's expected format for /api/ai/process-single
 private struct ProcessSingleRequest: Encodable {
     let provider: String
-    let imageData: String // base64
-    let imageFormat: String
-    let prompt: String
-    let systemPrompt: String?
+    let image: ImagePayload
+    let systemPrompt: String
+    let userPrompt: String
+}
+
+private struct ImagePayload: Encodable {
+    let data: String // base64
+    let format: String
+    let filename: String
+    let metadata: ImageMetadata?
+}
+
+private struct ImageMetadata: Encodable {
+    // Optional EXIF/IPTC metadata
 }
 
 private struct ProcessBatchRequest: Encodable {
     let provider: String
-    let images: [BatchImage]
-    let prompt: String
-    let systemPrompt: String?
+    let images: [ImagePayload]
+    let systemPrompt: String
+    let userPrompt: String
+    let useBatchAPI: Bool
 }
 
 private struct BatchImage: Encodable {
@@ -206,6 +287,23 @@ class CloudAIService: ObservableObject {
         }
     }
 
+    // MARK: - Default Prompts
+
+    private static let defaultSystemPrompt = """
+    You are an expert photo culling assistant for professional photographers. Analyze the provided image and rate it for quality, composition, technical excellence, and emotional impact.
+
+    Return your analysis as a JSON object with these fields:
+    - starRating: 1-5 star rating (5 = exceptional, 1 = reject)
+    - colorLabel: "red", "yellow", "green", "blue", "purple", or "none"
+    - keepReject: "keep", "reject", or "maybe"
+    - tags: array of relevant tags
+    - description: brief description of the image
+    - technicalQuality: object with focusAccuracy, exposureQuality, compositionScore (all 1-1000 scale)
+    - subjectAnalysis: object with primarySubject, emotionIntensity, eyesOpen, eyeContact (boolean)
+
+    Remember: These are RAW images - exposure and white balance can be fixed in post. Focus on sharpness, moment timing, and composition which cannot be fixed.
+    """
+
     // MARK: - Single Image Processing
 
     func processSingleImage(
@@ -213,7 +311,8 @@ class CloudAIService: ObservableObject {
         imageData: Data,
         imageFormat: String = "jpeg",
         prompt: String,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        filename: String = "image.jpg"
     ) async throws -> (result: PhotoRating, cost: Double) {
         logger.info("Processing single image with provider: \(provider.rawValue)")
 
@@ -225,21 +324,25 @@ class CloudAIService: ObservableObject {
         let base64Image = imageData.base64EncodedString()
 
         let body = ProcessSingleRequest(
-            provider: provider.rawValue,
-            imageData: base64Image,
-            imageFormat: imageFormat,
-            prompt: prompt,
-            systemPrompt: systemPrompt
+            provider: provider.serverProviderName,
+            image: ImagePayload(
+                data: base64Image,
+                format: imageFormat,
+                filename: filename,
+                metadata: nil
+            ),
+            systemPrompt: systemPrompt ?? Self.defaultSystemPrompt,
+            userPrompt: prompt
         )
 
         do {
-            let result: ProcessResult = try await apiClient.authenticatedRequest(
+            let response: ProcessSingleResponse = try await apiClient.authenticatedRequest(
                 "/api/ai/process-single",
                 method: "POST",
                 body: body
             )
-            logger.info("Successfully processed image, cost: $\(String(format: "%.4f", result.cost))")
-            return (result.result, result.cost)
+            logger.info("Successfully processed image, cost: $\(String(format: "%.4f", response.cost.userChargeUSD))")
+            return (response.rating, response.cost.userChargeUSD)
         } catch {
             logger.error("Failed to process image: \(error.localizedDescription)")
             throw CloudAIServiceError.processingFailed(error.localizedDescription)
@@ -313,12 +416,23 @@ class CloudAIService: ObservableObject {
 
         // Convert RatingItem to PhotoRating
         let photoRating = PhotoRating(
+            imageId: nil,
+            filename: nil,
             starRating: rating.star,
-            colorLabel: rating.color ?? "",
+            colorLabel: rating.color ?? "none",
             keepReject: rating.star >= 3 ? "keep" : "reject",
             tags: rating.tags ?? [],
             description: rating.description ?? "",
             technicalQuality: TechnicalQuality(
+                focusAccuracy: rating.star * 200,
+                exposureQuality: 700,
+                compositionScore: 600,
+                lightingQuality: nil,
+                colorHarmony: nil,
+                noiseLevel: nil,
+                sharpnessDetail: nil,
+                dynamicRange: nil,
+                overallTechnical: rating.star * 200,
                 sharpness: 0.8,
                 exposure: 0.8,
                 composition: 0.8,
@@ -326,11 +440,21 @@ class CloudAIService: ObservableObject {
             ),
             subjectAnalysis: SubjectAnalysis(
                 primarySubject: rating.title ?? "Unknown",
-                emotion: "neutral",
+                emotionIntensity: 500,
                 eyesOpen: true,
+                eyeContact: nil,
+                genuineExpression: nil,
+                facialSharpness: nil,
+                bodyLanguage: nil,
+                momentTiming: nil,
+                storyTelling: nil,
+                uniqueness: nil,
+                emotion: "neutral",
                 smiling: false,
                 inFocus: true
-            )
+            ),
+            similarityGroup: nil,
+            shootContext: nil
         )
 
         return (photoRating, 0.0) // Local processing is free
@@ -441,18 +565,20 @@ class CloudAIService: ObservableObject {
 
         // Submit batch job
         let batchImages = images.map { imageData, filename, format in
-            BatchImage(
-                imageData: imageData.base64EncodedString(),
-                imageFormat: format,
-                filename: filename
+            ImagePayload(
+                data: imageData.base64EncodedString(),
+                format: format,
+                filename: filename,
+                metadata: nil
             )
         }
 
         let body = ProcessBatchRequest(
-            provider: provider.rawValue,
+            provider: provider.serverProviderName,
             images: batchImages,
-            prompt: prompt,
-            systemPrompt: systemPrompt
+            systemPrompt: systemPrompt ?? Self.defaultSystemPrompt,
+            userPrompt: prompt,
+            useBatchAPI: true
         )
 
         let jobResponse: BatchJobResponse = try await apiClient.authenticatedRequest(

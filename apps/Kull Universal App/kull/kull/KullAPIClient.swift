@@ -243,21 +243,37 @@ final class KullAPIClient {
 
     // MARK: - Authenticated Requests with Token Management
 
+    /// Track if we're currently refreshing to prevent loops
+    private static var isRefreshing = false
+    private static var lastRefreshTime: Date?
+
     func authenticatedRequest<T: Decodable>(
         _ endpoint: String,
         method: String = "GET",
-        body: Encodable? = nil
+        body: Encodable? = nil,
+        retryCount: Int = 0
     ) async throws -> T {
         let deviceId = DeviceIDManager.shared.deviceID
 
         // Get access token from Keychain
-        guard let accessToken = KeychainManager.shared.getAccessToken(for: deviceId) else {
+        guard var accessToken = KeychainManager.shared.getAccessToken(for: deviceId) else {
             throw APIError.notAuthenticated
         }
 
-        // Check if token is expiring soon and refresh if needed
-        if isTokenExpiringSoon(accessToken) {
-            try await refreshAccessToken()
+        // Check if token is expiring soon and refresh if needed (but not if we just refreshed)
+        let shouldRefresh = isTokenExpiringSoon(accessToken) && !Self.isRefreshing
+        if shouldRefresh {
+            // Check if we refreshed recently (within last 30 seconds) to prevent loops
+            if let lastRefresh = Self.lastRefreshTime, Date().timeIntervalSince(lastRefresh) < 30 {
+                Logger.auth.debug("Skipping refresh - refreshed recently")
+            } else {
+                try await refreshAccessToken()
+                // Get the NEW token after refresh
+                guard let newToken = KeychainManager.shared.getAccessToken(for: deviceId) else {
+                    throw APIError.notAuthenticated
+                }
+                accessToken = newToken
+            }
         }
 
         // Build request with Authorization header
@@ -274,11 +290,11 @@ final class KullAPIClient {
             throw APIError.invalidResponse
         }
 
-        if httpResponse.statusCode == 401 {
-            // Token invalid, try refresh
+        if httpResponse.statusCode == 401 && retryCount < 1 {
+            // Token invalid, try refresh once
             try await refreshAccessToken()
-            // Retry request (recursive call, but with fresh token)
-            return try await self.authenticatedRequest(endpoint, method: method, body: body)
+            // Get fresh token and retry (with incremented retry count to prevent infinite loop)
+            return try await self.authenticatedRequest(endpoint, method: method, body: body, retryCount: retryCount + 1)
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
@@ -308,6 +324,18 @@ final class KullAPIClient {
     }
 
     func refreshAccessToken() async throws {
+        // Prevent concurrent refresh calls
+        guard !Self.isRefreshing else {
+            Logger.auth.debug("Already refreshing token, skipping")
+            return
+        }
+
+        Self.isRefreshing = true
+        defer {
+            Self.isRefreshing = false
+            Self.lastRefreshTime = Date()
+        }
+
         let deviceId = DeviceIDManager.shared.deviceID
 
         Logger.auth.info("Refreshing access token")
