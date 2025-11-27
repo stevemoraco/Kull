@@ -1,8 +1,6 @@
 # Node modules - will be reinstalled with production deps
-node_modules
 
 # Build artifacts (rebuilt during deployment)
-dist
 coverage
 test-results
 
