@@ -4535,9 +4535,44 @@ ${stateContext ? `---\n${stateContext}` : ''}`;
   // List available models/capabilities for Kull clients
   app.get("/api/kull/models", async (_req: any, res) => {
     try {
-      const providers = Object.values(getProviderConfig as any)
-        ? CREDIT_TOP_UP_PACKAGES // placeholder to keep imports used if getProviderConfig is refactored
-        : [];
+      // Return available AI providers with pricing (2x provider cost per CLAUDE.md)
+      const providers = [
+        {
+          id: "openai-gpt5-nano",
+          name: "GPT-5 Nano (Fast)",
+          costPerImage: 0.0004, // 2x provider cost
+          creditsPerImage: 1,
+          supportsBatch: true,
+        },
+        {
+          id: "google-flash-lite",
+          name: "Gemini 2.5 Flash Lite (Cheap)",
+          costPerImage: 0.0003,
+          creditsPerImage: 1,
+          supportsBatch: true,
+        },
+        {
+          id: "anthropic-haiku",
+          name: "Claude Haiku 4.5 (Quality)",
+          costPerImage: 0.004,
+          creditsPerImage: 4,
+          supportsBatch: true,
+        },
+        {
+          id: "grok-mini",
+          name: "Grok 2 Vision (Fast)",
+          costPerImage: 0.0005,
+          creditsPerImage: 1,
+          supportsBatch: false,
+        },
+        {
+          id: "kimi-k2",
+          name: "Kimi K2 (Groq)",
+          costPerImage: 0.0005,
+          creditsPerImage: 1,
+          supportsBatch: false,
+        },
+      ];
       res.json({ providers });
     } catch (err: any) {
       console.error("models error", err);

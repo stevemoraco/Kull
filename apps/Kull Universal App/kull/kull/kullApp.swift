@@ -103,29 +103,24 @@ final class CreditSummaryViewModel: ObservableObject {
     }
 
     func refresh() {
-        let baseURL = EnvironmentConfig.shared.apiBaseURL
-        let url = baseURL.appendingPathComponent("/api/kull/credits/summary")
         loading = true
-        URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
-            .map(\.data)
-            .decode(type: CreditSummary.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                self?.loading = false
-                if case .failure = completion {
-                    // Failed to fetch, use cached data
-                    self?.loadCachedData()
-                }
-            }, receiveValue: { [weak self] cs in
-                self?.balance = cs.balance
-                self?.planDisplayName = cs.planDisplayName
-                self?.estimatedShootsRemaining = cs.estimatedShootsRemaining
-                self?.usingCachedData = false
+        Task { @MainActor in
+            do {
+                let cs = try await KullAPIClient.shared.fetchCreditSummary()
+                self.balance = cs.balance
+                self.planDisplayName = cs.planDisplayName
+                self.estimatedShootsRemaining = cs.estimatedShootsRemaining
+                self.usingCachedData = false
+                self.loading = false
 
                 // Cache the fresh data
                 CacheManager.shared.cacheCreditSummary(cs)
-            })
-            .store(in: &cancellables)
+            } catch {
+                // Failed to fetch, use cached data
+                self.loading = false
+                self.loadCachedData()
+            }
+        }
     }
 }
 
@@ -377,26 +372,21 @@ final class MobileCredits: ObservableObject {
     }
 
     func refresh() {
-        let baseURL = EnvironmentConfig.shared.apiBaseURL
-        let url = baseURL.appendingPathComponent("/api/kull/credits/summary")
-        URLSession.shared.dataTaskPublisher(for: URLRequest(url: url))
-            .map(\.data)
-            .decode(type: CreditSummary.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                if case .failure = completion {
-                    // Failed to fetch, use cached data
-                    self?.loadCachedData()
-                }
-            }, receiveValue: { [weak self] sum in
-                self?.balance = sum.balance
-                self?.plan = sum.planDisplayName
-                self?.shootsLeft = sum.estimatedShootsRemaining
-                self?.usingCachedData = false
+        Task { @MainActor in
+            do {
+                let cs = try await KullAPIClient.shared.fetchCreditSummary()
+                self.balance = cs.balance
+                self.plan = cs.planDisplayName
+                self.shootsLeft = cs.estimatedShootsRemaining
+                self.usingCachedData = false
 
                 // Cache the fresh data
-                CacheManager.shared.cacheCreditSummary(sum)
-            }).store(in: &cancellables)
+                CacheManager.shared.cacheCreditSummary(cs)
+            } catch {
+                // Failed to fetch, use cached data
+                self.loadCachedData()
+            }
+        }
     }
 }
 

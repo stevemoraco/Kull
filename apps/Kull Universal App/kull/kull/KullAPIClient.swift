@@ -232,14 +232,12 @@ final class KullAPIClient {
     }
 
     func fetchCreditSummary() async throws -> CreditSummary {
-        let request = makeRequest(path: "/api/kull/credits/summary")
-        return try await perform(request)
+        return try await authenticatedRequest("/api/kull/credits/summary")
     }
 
     func listModels() async throws -> [ProviderCapability] {
-        let request = makeRequest(path: "/api/kull/models")
         struct Response: Decodable { let providers: [ProviderCapability] }
-        let response: Response = try await perform(request)
+        let response: Response = try await authenticatedRequest("/api/kull/models")
         return response.providers
     }
 
