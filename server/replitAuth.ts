@@ -185,6 +185,18 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Store redirect URL in session if provided
+    const redirectUrl = req.query.redirect as string;
+    if (redirectUrl) {
+      // Only allow relative URLs to prevent open redirect vulnerabilities
+      if (redirectUrl.startsWith('/') && !redirectUrl.startsWith('//')) {
+        (req.session as any).returnTo = redirectUrl;
+        console.log("[Auth] Stored redirect URL in session:", redirectUrl);
+      } else {
+        console.log("[Auth] Ignoring invalid redirect URL:", redirectUrl);
+      }
+    }
+
     // Check if already authenticated
     if (req.isAuthenticated && req.isAuthenticated()) {
       const user = req.user as any;
@@ -209,8 +221,12 @@ export async function setupAuth(app: Express) {
         return;
       }
 
-      console.log("[Auth] User fully authenticated, redirecting to /");
-      return res.redirect("/");
+      // Use stored redirect URL if available, otherwise go to home
+      const storedRedirect = (req.session as any).returnTo;
+      delete (req.session as any).returnTo;
+      const finalRedirect = storedRedirect || "/";
+      console.log("[Auth] User fully authenticated, redirecting to:", finalRedirect);
+      return res.redirect(finalRedirect);
     }
 
     console.log("[Auth] Starting login flow");
@@ -260,6 +276,11 @@ export async function setupAuth(app: Express) {
 
           console.log("[Auth] logIn successful, session ID:", req.session?.id);
 
+          // Get and clear the stored redirect URL
+          const storedRedirect = (req.session as any).returnTo;
+          delete (req.session as any).returnTo;
+          const finalRedirect = storedRedirect || "/";
+
           // Explicitly save the session before redirecting
           req.session.save((saveErr) => {
             if (saveErr) {
@@ -267,8 +288,8 @@ export async function setupAuth(app: Express) {
               return res.status(500).send("Failed to save session. Please try again.");
             }
 
-            console.log("[Auth] Session saved successfully, redirecting to /. Session ID:", req.session?.id);
-            return res.redirect("/");
+            console.log("[Auth] Session saved successfully, redirecting to:", finalRedirect, "Session ID:", req.session?.id);
+            return res.redirect(finalRedirect);
           });
         });
       })(req, res, next);
