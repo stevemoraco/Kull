@@ -221,10 +221,11 @@ export async function setupAuth(app: Express) {
         return;
       }
 
-      // Use stored redirect URL if available, otherwise go to home
+      // Use stored redirect URL if available, otherwise go to dashboard
       const storedRedirect = (req.session as any).returnTo;
       delete (req.session as any).returnTo;
-      const finalRedirect = storedRedirect || "/";
+      // Default to /dashboard for authenticated users (not / which shows Landing)
+      const finalRedirect = storedRedirect || "/dashboard";
       console.log("[Auth] User fully authenticated, redirecting to:", finalRedirect);
       return res.redirect(finalRedirect);
     }
@@ -279,7 +280,8 @@ export async function setupAuth(app: Express) {
           // Get and clear the stored redirect URL
           const storedRedirect = (req.session as any).returnTo;
           delete (req.session as any).returnTo;
-          const finalRedirect = storedRedirect || "/";
+          // Default to /dashboard for authenticated users (not / which shows Landing)
+          const finalRedirect = storedRedirect || "/dashboard";
 
           // Explicitly save the session before redirecting
           req.session.save((saveErr) => {
