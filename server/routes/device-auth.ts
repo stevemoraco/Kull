@@ -263,39 +263,56 @@ router.post('/approve', isAuthenticated, async (req: any, res: Response) => {
       return res.status(400).json({ error: 'Failed to approve code' });
     }
 
-    // Get user details
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    // Get user details - use claims data as fallback if DB lookup fails
+    let user;
+    try {
+      user = await storage.getUser(userId);
+    } catch (dbError) {
+      console.error('[Device Auth] Error fetching user from DB:', dbError);
+      // Fall back to session claims
+      user = null;
     }
 
-    // Generate tokens immediately
-    const accessToken = generateDeviceAccessToken(user.id, pending.deviceId, pending.platform);
-    const refreshToken = generateRefreshToken(user.id, pending.deviceId);
+    // Use claims data if user not found in DB
+    const userEmail = user?.email || req.user.claims.email || '';
+    const userFirstName = user?.firstName || req.user.claims.first_name || undefined;
+    const userLastName = user?.lastName || req.user.claims.last_name || undefined;
+    const effectiveUserId = user?.id || userId;
 
-    // Create device session
-    await storage.createDeviceSession({
-      userId: user.id,
-      deviceId: pending.deviceId,
-      platform: pending.platform,
-      deviceName: pending.deviceName,
-      appVersion: pending.appVersion,
-      jwtToken: refreshToken,
-      lastSeen: new Date(),
-      isActive: true,
-    });
+    // Generate tokens immediately (these are stateless JWTs)
+    const accessToken = generateDeviceAccessToken(effectiveUserId, pending.deviceId, pending.platform);
+    const refreshToken = generateRefreshToken(effectiveUserId, pending.deviceId);
 
-    console.log(`[Device Auth] Device ${pending.deviceId} approved for user ${userId}`);
+    // Try to create device session, but don't fail if it doesn't work
+    // The JWT tokens are stateless and will work regardless
+    try {
+      await storage.createDeviceSession({
+        userId: effectiveUserId,
+        deviceId: pending.deviceId,
+        platform: pending.platform,
+        deviceName: pending.deviceName,
+        appVersion: pending.appVersion,
+        jwtToken: refreshToken,
+        lastSeen: new Date(),
+        isActive: true,
+      });
+      console.log(`[Device Auth] Device session created for ${pending.deviceId}`);
+    } catch (sessionError) {
+      // Log but don't fail - tokens will still work
+      console.error('[Device Auth] Warning: Could not create device session (non-fatal):', sessionError);
+    }
+
+    console.log(`[Device Auth] Device ${pending.deviceId} approved for user ${effectiveUserId}`);
 
     const response: DeviceTokenResponse = {
       accessToken,
       refreshToken,
       expiresIn: 3600,
       user: {
-        id: user.id,
-        email: user.email || '',
-        firstName: user.firstName || undefined,
-        lastName: user.lastName || undefined,
+        id: effectiveUserId,
+        email: userEmail,
+        firstName: userFirstName,
+        lastName: userLastName,
       },
     };
 
