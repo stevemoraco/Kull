@@ -1,13 +1,21 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { useLogout } from "@/hooks/useLogout";
 import { hasPaidAccess } from "@/lib/accessControl";
+import { Button } from "@/components/ui/button";
+import { LogIn, LogOut } from "lucide-react";
 import type { User } from "@shared/schema";
 
 export function Footer() {
   const { isAuthenticated, user } = useAuth();
+  const { logout: handleLogout } = useLogout();
   const [location, setLocation] = useLocation();
   const typedUser = user as User;
   const hasAccess = hasPaidAccess(typedUser);
+
+  const handleLogin = () => {
+    window.location.href = "/api/login";
+  };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -173,6 +181,41 @@ export function Footer() {
               ))}
             </ul>
           </div>
+        </div>
+
+        {/* Account Actions */}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-4">
+          {isAuthenticated ? (
+            <>
+              <span className="text-sm text-muted-foreground">
+                Signed in as {typedUser?.email}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                data-testid="button-footer-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground">
+                Not signed in
+              </span>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleLogin}
+                data-testid="button-footer-login"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Sign In
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Bottom bar */}

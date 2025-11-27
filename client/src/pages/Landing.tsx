@@ -7,10 +7,14 @@ import { FinalCTA } from "@/components/FinalCTA";
 import { Footer } from "@/components/Footer";
 import { SectionNav } from "@/components/SectionNav";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, LayoutDashboard, LogOut } from "lucide-react";
 import { useSectionTiming } from "@/hooks/useSectionTiming";
+import { useAuth } from "@/hooks/useAuth";
+import { useLogout } from "@/hooks/useLogout";
 
 export default function Landing() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const { logout: handleLogout } = useLogout();
   // Track section timing (for analytics)
   useSectionTiming([
     'hero',
@@ -67,31 +71,76 @@ export default function Landing() {
             <button onClick={() => scrollToSection('download')} className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="nav-link-pricing">
               Pricing
             </button>
-            <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-1"
-              onClick={handleLogin}
-              data-testid="button-login-nav"
-            >
-              <Download className="w-5 h-5 mr-2 flex-shrink-0" />
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-sm">Start Free Trial</span>
-                <span className="text-sm">Download Now</span>
-              </div>
-            </Button>
+            {!isLoading && isAuthenticated ? (
+              <>
+                <Button
+                  variant="default"
+                  onClick={() => window.location.href = '/dashboard'}
+                  data-testid="button-dashboard-nav"
+                >
+                  <LayoutDashboard className="w-4 h-4 mr-2" />
+                  Go to Dashboard
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  data-testid="button-logout-nav"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-1"
+                onClick={handleLogin}
+                data-testid="button-login-nav"
+              >
+                <Download className="w-5 h-5 mr-2 flex-shrink-0" />
+                <div className="flex flex-col items-start leading-tight">
+                  <span className="text-sm">Start Free Trial</span>
+                  <span className="text-sm">Download Now</span>
+                </div>
+              </Button>
+            )}
           </div>
           
-          {/* Mobile Sign In */}
-          <Button
-            className="md:hidden bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1"
-            onClick={handleLogin}
-            data-testid="button-login-nav-mobile"
-          >
-            <Download className="w-4 h-4 mr-1.5 flex-shrink-0" />
-            <div className="flex flex-col items-start leading-tight">
-              <span className="text-xs">Start Free Trial</span>
-              <span className="text-xs">Download Now</span>
-            </div>
-          </Button>
+          {/* Mobile Navigation */}
+          <div className="md:hidden flex items-center gap-2">
+            {!isLoading && isAuthenticated ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => window.location.href = '/dashboard'}
+                  data-testid="button-dashboard-nav-mobile"
+                >
+                  <LayoutDashboard className="w-4 h-4 mr-1" />
+                  Dashboard
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={handleLogout}
+                  data-testid="button-logout-nav-mobile"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </>
+            ) : (
+              <Button
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-3 py-1"
+                onClick={handleLogin}
+                data-testid="button-login-nav-mobile"
+              >
+                <Download className="w-4 h-4 mr-1.5 flex-shrink-0" />
+                <div className="flex flex-col items-start leading-tight">
+                  <span className="text-xs">Start Free Trial</span>
+                  <span className="text-xs">Download Now</span>
+                </div>
+              </Button>
+            )}
+          </div>
         </div>
       </nav>
 
