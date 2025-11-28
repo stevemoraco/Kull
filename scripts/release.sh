@@ -132,6 +132,26 @@ echo "pending" > "$TESTFLIGHT_STATUS_FILE"
 # ============================================
 (
     echo "[DMG] Starting DMG creation..."
+
+    # Clean up any stale Kull disk mounts to prevent hdiutil errors
+    echo "[DMG] Cleaning up stale disk mounts..."
+    for disk in $(diskutil list | grep -i "Kull" | awk '{print $NF}' | grep -o 'disk[0-9]*' | sort -u); do
+        echo "[DMG]   Ejecting $disk..."
+        diskutil unmountDisk force "/dev/$disk" 2>/dev/null || true
+        hdiutil detach "/dev/$disk" -force 2>/dev/null || true
+    done
+    # Also clean up any temp DMG mounts
+    for vol in /Volumes/Kull*; do
+        if [ -d "$vol" ]; then
+            echo "[DMG]   Unmounting $vol..."
+            diskutil unmount force "$vol" 2>/dev/null || true
+        fi
+    done
+    # Kill any stale hdiutil processes
+    pkill -9 -f "hdiutil.*[Kk]ull" 2>/dev/null || true
+    sleep 1
+    echo "[DMG] Cleanup complete"
+
     cd "$XCODE_PROJECT"
 
     # Export for Developer ID (direct download)

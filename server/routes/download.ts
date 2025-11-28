@@ -86,8 +86,13 @@ async function getLatestDMG(): Promise<DMGInfo | null> {
       return null;
     }
 
-    // Sort by build number (highest first)
-    dmgFiles.sort((a, b) => parseInt(b.buildNumber) - parseInt(a.buildNumber));
+    // Sort by full version (date + build) - compare as strings: "2025.11.28.0044" > "2025.11.27.2327"
+    // This works because the date format YYYY.MM.DD sorts correctly as strings
+    dmgFiles.sort((a, b) => {
+      const fullVersionA = `${a.version}.${a.buildNumber.padStart(4, '0')}`;
+      const fullVersionB = `${b.version}.${b.buildNumber.padStart(4, '0')}`;
+      return fullVersionB.localeCompare(fullVersionA);
+    });
 
     console.log("[Download] Latest DMG:", dmgFiles[0].filename);
     return dmgFiles[0];
