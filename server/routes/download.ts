@@ -8,8 +8,8 @@ const router = Router();
 const LATEST_VERSIONS = {
   macos: {
     version: "2025.11.27",
-    buildNumber: "2104",
-    downloadUrl: "/downloads/Kull-2025.11.27.2104.dmg",
+    buildNumber: "2115",
+    downloadUrl: "/downloads/Kull-2025.11.27.2115.dmg",
     releaseNotes: "Latest release with all features",
     releaseDate: "2025-11-27",
     fileSize: "~5 MB",
@@ -24,7 +24,7 @@ const LATEST_VERSIONS = {
   },
   ios: {
     version: "2025.11.27",
-    buildNumber: "2104",
+    buildNumber: "2115",
     testFlightUrl: "https://testflight.apple.com/join/PtzCFZKb",
     releaseNotes: "iOS release on TestFlight - Beta Testing Available",
     releaseDate: "2025-11-27",
@@ -43,7 +43,7 @@ const LATEST_VERSIONS = {
 const CHANGELOG = [
   {
     version: "2025.11.27",
-    buildNumber: "2104",
+    buildNumber: "2115",
     date: "2025-11-27",
     platform: "all",
     notes: [
