@@ -8,11 +8,11 @@ const router = Router();
 const LATEST_VERSIONS = {
   macos: {
     version: "2025.11.27",
-    buildNumber: "2253",
-    downloadUrl: "/downloads/Kull-2025.11.27.2253.dmg",
+    buildNumber: "2327",
+    downloadUrl: "/downloads/Kull-2025.11.27.2327.dmg",
     releaseNotes: "Latest release with all features",
     releaseDate: "2025-11-27",
-    fileSize: "~2 MB",
+    fileSize: "~5 MB",
     minimumOS: "macOS 14.0+",
     features: [
       "5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)",
@@ -24,7 +24,7 @@ const LATEST_VERSIONS = {
   },
   ios: {
     version: "2025.11.27",
-    buildNumber: "2253",
+    buildNumber: "2327",
     testFlightUrl: "https://testflight.apple.com/join/PtzCFZKb",
     releaseNotes: "iOS release on TestFlight - Beta Testing Available",
     releaseDate: "2025-11-27",
@@ -43,15 +43,14 @@ const LATEST_VERSIONS = {
 const CHANGELOG = [
   {
     version: "2025.11.27",
-    buildNumber: "2253",
+    buildNumber: "2327",
     date: "2025-11-27",
     platform: "all",
     notes: [
       "Universal Mac and iOS app release",
       "AI-powered photo rating using 5 advanced models",
       "TestFlight beta available for iOS",
-      "Direct DMG download for macOS",
-      "Styled DMG installer with proper layout"
+      "Direct DMG download for macOS"
     ]
   }
 ];

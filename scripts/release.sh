@@ -140,19 +140,22 @@ xcodebuild -exportArchive \
   -authenticationKeyIssuerID "$ISSUER_ID"
 
 # ============================================
-# PARALLEL EXECUTION: DMG + TestFlight
+# PARALLEL EXECUTION: DMG + TestFlight + Replit Deploy
 # ============================================
 echo ""
 echo "Step 7: Starting parallel tasks..."
 echo "  - Task A: DMG creation, signing, notarization, website update"
 echo "  - Task B: TestFlight polling and submission"
+echo "  - Task C: Replit deployment (production site)"
 echo ""
 
 # Create temp files for status tracking
 DMG_STATUS_FILE=$(mktemp)
 TESTFLIGHT_STATUS_FILE=$(mktemp)
+REPLIT_STATUS_FILE=$(mktemp)
 echo "pending" > "$DMG_STATUS_FILE"
 echo "pending" > "$TESTFLIGHT_STATUS_FILE"
+echo "pending" > "$REPLIT_STATUS_FILE"
 
 # ============================================
 # TASK A: DMG Creation (runs in background)
@@ -303,7 +306,16 @@ APPLESCRIPT_EOF
     if [ -f "$DMG_NAME" ]; then
         echo "[DMG] Copying to website..."
         mkdir -p "$PROJECT_ROOT/client/public/downloads/"
-        rm -f "$PROJECT_ROOT/client/public/downloads/"Kull-*.dmg
+
+        # Delete OLD DMGs (not the new one we're about to copy)
+        # This fixes the bug where old versions weren't being cleaned up
+        for old_dmg in "$PROJECT_ROOT/client/public/downloads/"Kull-*.dmg; do
+            if [ -f "$old_dmg" ] && [ "$(basename "$old_dmg")" != "$DMG_NAME" ]; then
+                echo "[DMG] Removing old DMG: $(basename "$old_dmg")"
+                rm -f "$old_dmg"
+            fi
+        done
+
         cp "$DMG_NAME" "$PROJECT_ROOT/client/public/downloads/"
 
         cd "$PROJECT_ROOT/client/public/downloads/"
@@ -490,13 +502,54 @@ Co-Authored-By: Claude <noreply@anthropic.com>" || echo "Nothing to commit"
 git push origin main || echo "Push failed - check git status"
 
 echo ""
-echo "✓ Git push complete - now waiting for TestFlight to finish..."
+echo "✓ Git push complete - starting Replit deploy in parallel with TestFlight..."
 
-# Now wait for TestFlight (just for status reporting, not blocking)
+# ============================================
+# Task C: Deploy to Replit (runs in background)
+# ============================================
+(
+    echo "[REPLIT] Starting deployment (Replit pulls from GitHub)..."
+    cd "$PROJECT_ROOT"
+
+    if [ -x "$PROJECT_ROOT/scripts/replit-deploy-kull.sh" ]; then
+        # Run the deploy command which triggers deployment AND watches until complete
+        if "$PROJECT_ROOT/scripts/replit-deploy-kull.sh" deploy 2>&1 | while read line; do
+            echo "[REPLIT] $line"
+        done; then
+            echo "success" > "$REPLIT_STATUS_FILE"
+            echo "[REPLIT] ✓ Deployment complete!"
+        else
+            echo "failed" > "$REPLIT_STATUS_FILE"
+            echo "[REPLIT] ✗ Deployment failed"
+        fi
+    else
+        echo "skipped - script not found" > "$REPLIT_STATUS_FILE"
+        echo "[REPLIT] ⚠️ replit-deploy-kull.sh not found or not executable"
+    fi
+) &
+REPLIT_PID=$!
+
+echo ""
+echo "  [TASKS RUNNING IN PARALLEL]"
+echo "    - TestFlight polling (PID: $TESTFLIGHT_PID)"
+echo "    - Replit deployment (PID: $REPLIT_PID)"
+echo ""
+echo "  Waiting for both to complete..."
+
+# Wait for TestFlight
 wait $TESTFLIGHT_PID
 TESTFLIGHT_EXIT=$?
 TESTFLIGHT_RESULT=$(cat "$TESTFLIGHT_STATUS_FILE")
-rm -f "$DMG_STATUS_FILE" "$TESTFLIGHT_STATUS_FILE"
+echo "  ✓ TestFlight finished: $TESTFLIGHT_RESULT"
+
+# Wait for Replit
+wait $REPLIT_PID
+REPLIT_EXIT=$?
+REPLIT_RESULT=$(cat "$REPLIT_STATUS_FILE")
+echo "  ✓ Replit finished: $REPLIT_RESULT"
+
+# Cleanup temp files
+rm -f "$DMG_STATUS_FILE" "$TESTFLIGHT_STATUS_FILE" "$REPLIT_STATUS_FILE"
 
 echo ""
 echo "================================================"
@@ -509,7 +562,9 @@ echo "  DMG: $DMG_NAME"
 echo ""
 echo "  DMG Status: $DMG_RESULT"
 echo "  TestFlight Status: $TESTFLIGHT_RESULT"
+echo "  Replit Deploy: $REPLIT_RESULT"
 echo ""
 echo "  TestFlight: https://testflight.apple.com/join/PtzCFZKb"
 echo "  Download:   https://kullai.com/downloads/$DMG_NAME"
+echo "  Live Site:  https://kullai.com"
 echo "================================================"

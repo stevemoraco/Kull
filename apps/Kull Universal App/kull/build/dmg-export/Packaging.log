@@ -1,60 +1,60 @@
-2025-11-28 05:33:54 +0000 [MT] Initial pipeline context: <IDEDistributionProcessingPipelineContext: 0xc8a73c900; archive(resolved)="<IDEArchive: 0xc8a4ef560>", distributionTask(resolved)="2", distributionDestination(resolved)="1", distributionMethod(resolved)="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team(resolved)="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
+2025-11-28 06:29:17 +0000 [MT] Initial pipeline context: <IDEDistributionProcessingPipelineContext: 0xc547c4f00; archive(resolved)="<IDEArchive: 0xc5451f4f0>", distributionTask(resolved)="2", distributionDestination(resolved)="1", distributionMethod(resolved)="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team(resolved)="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
 	Chain (12, self inclusive):
-	<IDEDistributionProcessingPipelineContext: 0xc8a73c900; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionProcessingPipelineContext: 0xc8a73c600; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954e300; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954de00; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954d900; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954db80; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954cf00; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954cc80; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954ca00; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="<IDEProvisioningBasicTeam: 0xc8a6b13e0; teamID='283HJ7VJR4', teamName='(null)'>">
-	<IDEDistributionContext: 0xc8954c780; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="(null)">
-	<IDEDistributionContext: 0xc8954c000; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc8a6c00a0>", team="(null)">
-	<IDEDistributionContext: 0x1055d63b0; archive = "<IDEArchive: 0xc8a4ef560>", distributionMethod="(null)", team="(null)">
-</IDEDistributionProcessingPipelineContext: 0xc8a73c900>
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionCreateDestRootStep
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionCopyItemStep
-2025-11-28 05:33:54 +0000 [MT] Running /usr/bin/ditto '-V' '/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app' '/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/Root/Applications/kull.app'
-2025-11-28 05:33:54 +0000  >>> Copying /Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app 
-2025-11-28 05:33:54 +0000  copying file ./Contents/_CodeSignature/CodeResources ... 
-2025-11-28 05:33:54 +0000  3811 bytes for ./Contents/_CodeSignature/CodeResources
-2025-11-28 05:33:54 +0000  copying file ./Contents/MacOS/kull ... 
-2025-11-28 05:33:54 +0000  2529536 bytes for ./Contents/MacOS/kull
-2025-11-28 05:33:54 +0000  copying file ./Contents/Resources/AppIcon.icns ... 
-2025-11-28 05:33:54 +0000  64407 bytes for ./Contents/Resources/AppIcon.icns
-copying file ./Contents/Resources/Assets.car ... 
-2025-11-28 05:33:54 +0000  962552 bytes for ./Contents/Resources/Assets.car
-2025-11-28 05:33:54 +0000  copying file ./Contents/Resources/PrivacyInfo.xcprivacy ... 
-2025-11-28 05:33:54 +0000  3458 bytes for ./Contents/Resources/PrivacyInfo.xcprivacy
-2025-11-28 05:33:54 +0000  copying file ./Contents/Resources/kull.momd/kull.omo ... 
-2025-11-28 05:33:54 +0000  1944 bytes for ./Contents/Resources/kull.momd/kull.omo
-2025-11-28 05:33:54 +0000  copying file ./Contents/Resources/kull.momd/VersionInfo.plist ... 
-2025-11-28 05:33:54 +0000  290 bytes for ./Contents/Resources/kull.momd/VersionInfo.plist
-2025-11-28 05:33:54 +0000  copying file ./Contents/Resources/kull.momd/kull.mom ... 
-2025-11-28 05:33:54 +0000  1312 bytes for ./Contents/Resources/kull.momd/kull.mom
-2025-11-28 05:33:54 +0000  copying file ./Contents/embedded.provisionprofile ... 
-2025-11-28 05:33:54 +0000  15748 bytes for ./Contents/embedded.provisionprofile
-2025-11-28 05:33:54 +0000  copying file ./Contents/Info.plist ... 
-2025-11-28 05:33:54 +0000  6108 bytes for ./Contents/Info.plist
-2025-11-28 05:33:54 +0000  copying file ./Contents/PkgInfo ... 
-2025-11-28 05:33:54 +0000  8 bytes for ./Contents/PkgInfo
-2025-11-28 05:33:54 +0000 [MT] /usr/bin/ditto exited with 0
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionEmbedProfileStep
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionInfoPlistStep
-2025-11-28 05:33:54 +0000 [MT] Skipping step: IDEDistributionInfoPlistStep because it said so
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionAppThinningPlistStep
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionSymbolsStep
-2025-11-28 05:33:54 +0000 [MT] Skipping step: IDEDistributionSymbolsStep because it said so
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionAppThinningStep
-2025-11-28 05:33:54 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionArchThinningStep
-2025-11-28 05:33:54 +0000 [MT] Archs to thin for item /Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app are []
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionODRStep
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionStripXattrsStep
-2025-11-28 05:33:54 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
-2025-11-28 05:33:54 +0000 [MT] Processing step: IDEDistributionCodesignStep
-2025-11-28 05:33:54 +0000 [MT] Entitlements for <IDEDistributionItem: 0xc8874ad00; bundleID='media.lander.kull', path='<DVTFilePath:0xc887486c0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc8874ad60; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc887c5a40; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
+	<IDEDistributionProcessingPipelineContext: 0xc547c4f00; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionProcessingPipelineContext: 0xc547c4900; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54726080; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54725e00; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54725b80; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54725900; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54724f00; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54724c80; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54724a00; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="<IDEProvisioningBasicTeam: 0xc5472d2e0; teamID='283HJ7VJR4', teamName='(null)'>">
+	<IDEDistributionContext: 0xc54724780; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="(null)">
+	<IDEDistributionContext: 0xc54724000; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="<IDEDistributionMethodDeveloperID: 0xc53dcbf00>", team="(null)">
+	<IDEDistributionContext: 0x100def7f0; archive = "<IDEArchive: 0xc5451f4f0>", distributionMethod="(null)", team="(null)">
+</IDEDistributionProcessingPipelineContext: 0xc547c4f00>
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionCreateDestRootStep
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionCopyItemStep
+2025-11-28 06:29:17 +0000 [MT] Running /usr/bin/ditto '-V' '/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app' '/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/Root/Applications/kull.app'
+2025-11-28 06:29:17 +0000  >>> Copying /Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app 
+2025-11-28 06:29:17 +0000  copying file ./Contents/_CodeSignature/CodeResources ... 
+2025-11-28 06:29:17 +0000  3811 bytes for ./Contents/_CodeSignature/CodeResources
+2025-11-28 06:29:17 +0000  copying file ./Contents/MacOS/kull ... 
+2025-11-28 06:29:17 +0000  2529536 bytes for ./Contents/MacOS/kull
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/AppIcon.icns ... 
+2025-11-28 06:29:17 +0000  64407 bytes for ./Contents/Resources/AppIcon.icns
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/Assets.car ... 
+2025-11-28 06:29:17 +0000  962552 bytes for ./Contents/Resources/Assets.car
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/PrivacyInfo.xcprivacy ... 
+2025-11-28 06:29:17 +0000  3458 bytes for ./Contents/Resources/PrivacyInfo.xcprivacy
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/kull.momd/kull.omo ... 
+2025-11-28 06:29:17 +0000  1944 bytes for ./Contents/Resources/kull.momd/kull.omo
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/kull.momd/VersionInfo.plist ... 
+2025-11-28 06:29:17 +0000  290 bytes for ./Contents/Resources/kull.momd/VersionInfo.plist
+2025-11-28 06:29:17 +0000  copying file ./Contents/Resources/kull.momd/kull.mom ... 
+2025-11-28 06:29:17 +0000  1312 bytes for ./Contents/Resources/kull.momd/kull.mom
+2025-11-28 06:29:17 +0000  copying file ./Contents/embedded.provisionprofile ... 
+2025-11-28 06:29:17 +0000  15748 bytes for ./Contents/embedded.provisionprofile
+2025-11-28 06:29:17 +0000  copying file ./Contents/Info.plist ... 
+2025-11-28 06:29:17 +0000  6108 bytes for ./Contents/Info.plist
+2025-11-28 06:29:17 +0000  copying file ./Contents/PkgInfo ... 
+2025-11-28 06:29:17 +0000  8 bytes for ./Contents/PkgInfo
+2025-11-28 06:29:17 +0000 [MT] /usr/bin/ditto exited with 0
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionEmbedProfileStep
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionInfoPlistStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionInfoPlistStep because it said so
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionAppThinningPlistStep
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionSymbolsStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionSymbolsStep because it said so
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionAppThinningStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionArchThinningStep
+2025-11-28 06:29:17 +0000 [MT] Archs to thin for item /Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app are []
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionODRStep
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionStripXattrsStep
+2025-11-28 06:29:17 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionCodesignStep
+2025-11-28 06:29:17 +0000 [MT] Entitlements for <IDEDistributionItem: 0xc5279e7c0; bundleID='media.lander.kull', path='<DVTFilePath:0xc5279c180:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc5279e760; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc52839440; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
     "1.2.840.113635.100.6.1.12",
     "1.2.840.113635.100.6.1.2"
 ), issueDate='2025-06-15 01:32:58 +0000''>', entitlements='{
@@ -69,7 +69,7 @@ copying file ./Contents/Resources/Assets.car ...
     "com.apple.security.cs.disable-library-validation" = 0;
     "com.apple.security.files.user-selected.read-write" = 1;
     "com.apple.security.network.client" = 1;
-}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc887499e0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'>: {
+}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc5279d500:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'>: {
     "com.apple.application-identifier" = "283HJ7VJR4.media.lander.kull";
     "com.apple.developer.team-identifier" = 283HJ7VJR4;
     "com.apple.security.app-sandbox" = 1;
@@ -82,8 +82,8 @@ copying file ./Contents/Resources/Assets.car ...
     "com.apple.security.files.user-selected.read-write" = 1;
     "com.apple.security.network.client" = 1;
 }
-2025-11-28 05:33:54 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
-2025-11-28 05:33:54 +0000 [MT] Entitlements for <IDEDistributionItem: 0xc8874ad00; bundleID='media.lander.kull', path='<DVTFilePath:0xc887486c0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc8874ad60; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc887c6280; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
+2025-11-28 06:29:17 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
+2025-11-28 06:29:17 +0000 [MT] Entitlements for <IDEDistributionItem: 0xc5279e7c0; bundleID='media.lander.kull', path='<DVTFilePath:0xc5279c180:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc5279e760; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc52839740; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
     "1.2.840.113635.100.6.1.12",
     "1.2.840.113635.100.6.1.2"
 ), issueDate='2025-06-15 01:32:58 +0000''>', entitlements='{
@@ -98,7 +98,7 @@ copying file ./Contents/Resources/Assets.car ...
     "com.apple.security.cs.disable-library-validation" = 0;
     "com.apple.security.files.user-selected.read-write" = 1;
     "com.apple.security.network.client" = 1;
-}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc887499e0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'> are: {
+}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc5279d500:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'> are: {
     "com.apple.application-identifier" = "283HJ7VJR4.media.lander.kull";
     "com.apple.developer.team-identifier" = 283HJ7VJR4;
     "com.apple.security.app-sandbox" = 1;
@@ -111,7 +111,7 @@ copying file ./Contents/Resources/Assets.car ...
     "com.apple.security.files.user-selected.read-write" = 1;
     "com.apple.security.network.client" = 1;
 }
-2025-11-28 05:33:54 +0000 [MT] Writing entitlements for <IDEDistributionItem: 0xc8874ad00; bundleID='media.lander.kull', path='<DVTFilePath:0xc887486c0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc8874ad60; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc887c6280; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
+2025-11-28 06:29:17 +0000 [MT] Writing entitlements for <IDEDistributionItem: 0xc5279e7c0; bundleID='media.lander.kull', path='<DVTFilePath:0xc5279c180:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0xc5279e760; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0xc52839740; name='Apple Development: Stephen Moraco (CNFRKNKY86)', hash='3DC076E29C8636E6C309ED7D0450597ABE92B127', serialNumber='45082169AF9C7A659681221BE90CB9FA', certificateKinds='(
     "1.2.840.113635.100.6.1.12",
     "1.2.840.113635.100.6.1.2"
 ), issueDate='2025-06-15 01:32:58 +0000''>', entitlements='{
@@ -126,29 +126,29 @@ copying file ./Contents/Resources/Assets.car ...
     "com.apple.security.cs.disable-library-validation" = 0;
     "com.apple.security.files.user-selected.read-write" = 1;
     "com.apple.security.network.client" = 1;
-}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc887499e0:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'> to: /var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/entitlements~~~p79uJK
-2025-11-28 05:33:54 +0000 [MT] invoking codesign: <NSConcreteTask: 0xc8a7f35c0; launchPath='/usr/bin/codesign', arguments='(
+}', teamID='283HJ7VJR4', identifier='media.lander.kull', executablePath='<DVTFilePath:0xc5279d500:'/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull/apps/Kull Universal App/kull/build/mac.xcarchive/Products/Applications/kull.app/Contents/MacOS/kull'>', hardenedRuntime='1'>'> to: /var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/entitlements~~~AdTUtu
+2025-11-28 06:29:17 +0000 [MT] invoking codesign: <NSConcreteTask: 0xc54886a80; launchPath='/usr/bin/codesign', arguments='(
     "-f",
     "-s",
     FAD6F297292A1D63AC46DDE03E0049F1A91F2B02,
     "--entitlements",
-    "/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/entitlements~~~p79uJK",
+    "/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/entitlements~~~AdTUtu",
     "--requirements",
     "=designated => anchor apple generic  and identifier \"$self.identifier\" and ((cert leaf[field.1.2.840.113635.100.6.1.9] exists) or ( certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists  and certificate leaf[subject.OU] = \"283HJ7VJR4\" ))",
     "--preserve-metadata=identifier,flags,runtime,launch-constraints,library-constraints",
     "--generate-entitlement-der",
     "--strip-disallowed-xattrs",
     "-vvv",
-    "/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/Root/Applications/kull.app"
+    "/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/Root/Applications/kull.app"
 )'>
-2025-11-28 05:33:55 +0000 [MT] codesign output: /var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/Root/Applications/kull.app: replacing existing signature
-/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/Root/Applications/kull.app: signed app bundle with Mach-O universal (x86_64 arm64) [media.lander.kull]
-2025-11-28 05:33:55 +0000 [MT] Processing step: IDEDistributionZipODRItemStep
-2025-11-28 05:33:55 +0000 [MT] Skipping step: IDEDistributionZipODRItemStep because it said so
-2025-11-28 05:33:55 +0000 [MT] Processing step: IDEDistributionSkipPackagingStep
-2025-11-28 05:33:55 +0000 [MT] Processing step: IDEDistributionAppStoreInformationStep
-2025-11-28 05:33:55 +0000 [MT] Skipping step: IDEDistributionAppStoreInformationStep because it said so
-2025-11-28 05:33:55 +0000 [MT] Processing step: IDEDistributionGenerateProcessedDistributionItems
-2025-11-28 05:33:55 +0000 [MT] IDEDistributionItem init <DVTFilePath:0xc88254000:'/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~uVIF1W/Root/Applications/kull.app'>
-2025-11-28 05:33:55 +0000 [MT] Processing step: IDEDistributionCreateManifestStep
-2025-11-28 05:33:55 +0000 [MT] Skipping step: IDEDistributionCreateManifestStep because it said so
+2025-11-28 06:29:17 +0000 [MT] codesign output: /var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/Root/Applications/kull.app: replacing existing signature
+/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/Root/Applications/kull.app: signed app bundle with Mach-O universal (x86_64 arm64) [media.lander.kull]
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionZipODRItemStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionZipODRItemStep because it said so
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionSkipPackagingStep
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionAppStoreInformationStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionAppStoreInformationStep because it said so
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionGenerateProcessedDistributionItems
+2025-11-28 06:29:17 +0000 [MT] IDEDistributionItem init <DVTFilePath:0xc521395c0:'/var/folders/14/mxc4n4px1k9cxkh3p5nxzrmm0000gn/T/XcodeDistPipeline.~~~jTKEOC/Root/Applications/kull.app'>
+2025-11-28 06:29:17 +0000 [MT] Processing step: IDEDistributionCreateManifestStep
+2025-11-28 06:29:17 +0000 [MT] Skipping step: IDEDistributionCreateManifestStep because it said so
