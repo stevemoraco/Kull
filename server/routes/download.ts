@@ -210,7 +210,7 @@ router.get("/dmg/:filename", async (req: Request, res: Response) => {
     // Stream the file to the response
     const stream = file.createReadStream();
 
-    stream.on('error', (error) => {
+    stream.on('error', (error: Error) => {
       console.error("Error streaming DMG:", error);
       if (!res.headersSent) {
         res.status(500).json({ message: "Failed to stream DMG file" });
@@ -332,12 +332,14 @@ router.get("/list", async (req: Request, res: Response) => {
 // GET /api/download/changelog - Returns full changelog history (generated from DMGs)
 router.get("/changelog", async (req: Request, res: Response) => {
   try {
-    const files = await storageClient.list();
+    const bucket = storageClient.bucket(BUCKET_ID);
+    const [files] = await bucket.getFiles({ prefix: DMG_PREFIX });
     const dmgFiles: DMGInfo[] = [];
 
     for (const file of files) {
-      if (file.key.endsWith('.dmg')) {
-        const parsed = parseDMGFilename(file.key);
+      const filename = file.name.replace(DMG_PREFIX, '');
+      if (filename.endsWith('.dmg')) {
+        const parsed = parseDMGFilename(filename);
         if (parsed) {
           dmgFiles.push(parsed);
         }
