@@ -78,6 +78,41 @@ def api_patch(path, data):
 
     return response, None
 
+def detect_platform(build):
+    """Detect platform from build attributes (platform field not always present)"""
+    attrs = build.get('attributes', {})
+
+    # Check if there's a direct platform field first
+    platform = attrs.get('platform')
+    if platform:
+        return platform
+
+    # Otherwise infer from minOsVersion:
+    # - iOS builds typically have minOsVersion of "17.0" or higher (iOS 17+)
+    # - macOS builds have minOsVersion of "14.0" with no computedMinMacOsVersion
+    min_os = attrs.get('minOsVersion', '')
+    computed_mac = attrs.get('computedMinMacOsVersion')
+
+    # If there's no computedMinMacOsVersion and minOsVersion looks like macOS version
+    if computed_mac is None and min_os.startswith('14.'):
+        return 'MAC_OS'
+
+    # If computedMinMacOsVersion exists, it's iOS with Catalyst support
+    if computed_mac is not None:
+        return 'IOS'
+
+    # Fall back to minOsVersion check (iOS 17+ vs macOS 14+)
+    try:
+        major = int(min_os.split('.')[0])
+        if major >= 15:  # iOS versions are 15, 16, 17+
+            return 'IOS'
+        elif major == 14:  # Could be macOS 14 or iOS 14
+            return 'MAC_OS'  # Assume macOS since iOS 14 is old
+    except:
+        pass
+
+    return 'unknown'
+
 def get_builds_by_version(version):
     """Get all builds matching a specific version number"""
     response = api_get(f'/v1/builds?filter[version]={version}&limit=10')
@@ -101,7 +136,7 @@ def process_build(build, public_group_id):
     """Process a single build: set compliance, add to group, submit for review"""
     build_id = build['id']
     version = build['attributes'].get('version', 'unknown')
-    platform = build['attributes'].get('platform', 'unknown')
+    platform = detect_platform(build)
     uses_encryption = build['attributes'].get('usesNonExemptEncryption')
 
     print(f"\n  Processing {platform} build {version}...")
@@ -203,7 +238,7 @@ def main():
             builds = get_builds_by_version(target_build)
 
             for build in builds:
-                platform = build['attributes'].get('platform', 'unknown')
+                platform = detect_platform(build)
                 state = build['attributes'].get('processingState', 'unknown')
 
                 if platform == 'IOS' and state == 'VALID':
@@ -285,7 +320,7 @@ def main():
         macos_build = None
 
         for build in recent_builds:
-            platform = build['attributes'].get('platform', 'unknown')
+            platform = detect_platform(build)
             state = build['attributes'].get('processingState', 'unknown')
 
             if state == 'VALID':
