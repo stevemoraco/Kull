@@ -1,10 +1,33 @@
 import { Router, type Request, Response } from "express";
-import { Client } from '@replit/object-storage';
+import { Storage } from "@google-cloud/storage";
 import { storage } from "../storage";
 import multer from 'multer';
 
 const router = Router();
-const storageClient = new Client();
+
+// Initialize Google Cloud Storage client for Replit Object Storage
+const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const storageClient = new Storage({
+  credentials: {
+    audience: "replit",
+    subject_token_type: "access_token",
+    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
+    type: "external_account",
+    credential_source: {
+      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
+      format: {
+        type: "json",
+        subject_token_field_name: "access_token",
+      },
+    },
+    universe_domain: "googleapis.com",
+  },
+  projectId: "",
+});
+
+// Bucket configuration - using the folder structure Objects/builds
+const BUCKET_ID = process.env.REPLIT_OBJECT_STORAGE_BUCKET_ID || "replit-objstore-e81d00f9-23cb-4cee-bed9-b804b7721355";
+const DMG_PREFIX = "Objects/builds/";
 
 // Configure multer for file uploads (store in memory)
 const upload = multer({ storage: multer.memoryStorage() });
@@ -43,13 +66,15 @@ function parseDMGFilename(filename: string): DMGInfo | null {
  */
 async function getLatestDMG(): Promise<DMGInfo | null> {
   try {
-    const files = await storageClient.list();
+    const bucket = storageClient.bucket(BUCKET_ID);
+    const [files] = await bucket.getFiles({ prefix: DMG_PREFIX });
 
     // Filter for .dmg files and parse them
     const dmgFiles: DMGInfo[] = [];
     for (const file of files) {
-      if (file.key.endsWith('.dmg')) {
-        const parsed = parseDMGFilename(file.key);
+      const filename = file.name.replace(DMG_PREFIX, '');
+      if (filename.endsWith('.dmg')) {
+        const parsed = parseDMGFilename(filename);
         if (parsed) {
           dmgFiles.push(parsed);
         }
@@ -57,12 +82,14 @@ async function getLatestDMG(): Promise<DMGInfo | null> {
     }
 
     if (dmgFiles.length === 0) {
+      console.log("[Download] No DMG files found in bucket:", BUCKET_ID, "prefix:", DMG_PREFIX);
       return null;
     }
 
     // Sort by build number (highest first)
     dmgFiles.sort((a, b) => parseInt(b.buildNumber) - parseInt(a.buildNumber));
 
+    console.log("[Download] Latest DMG:", dmgFiles[0].filename);
     return dmgFiles[0];
   } catch (error) {
     console.error("Error fetching latest DMG:", error);
@@ -161,15 +188,27 @@ router.get("/dmg/:filename", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid DMG filename format" });
     }
 
-    // Stream the file from object storage
-    const stream = await storageClient.downloadAsStream(filename);
+    const bucket = storageClient.bucket(BUCKET_ID);
+    const file = bucket.file(`${DMG_PREFIX}${filename}`);
+
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.status(404).json({ message: "DMG file not found" });
+    }
+
+    // Get file metadata for size
+    const [metadata] = await file.getMetadata();
 
     // Set proper headers for DMG download
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    if (metadata.size) {
+      res.setHeader('Content-Length', metadata.size);
+    }
 
-    // Pipe the stream to the response
-    stream.pipe(res);
+    // Stream the file to the response
+    const stream = file.createReadStream();
 
     stream.on('error', (error) => {
       console.error("Error streaming DMG:", error);
@@ -177,9 +216,11 @@ router.get("/dmg/:filename", async (req: Request, res: Response) => {
         res.status(500).json({ message: "Failed to stream DMG file" });
       }
     });
+
+    stream.pipe(res);
   } catch (error: any) {
     console.error("Error downloading DMG:", error);
-    if (error.message?.includes('not found') || error.code === 'ENOENT') {
+    if (error.code === 404) {
       return res.status(404).json({ message: "DMG file not found" });
     }
     res.status(500).json({ message: "Failed to download DMG file" });
@@ -210,17 +251,22 @@ router.post("/upload", upload.single('dmg'), async (req: Request, res: Response)
     }
 
     // Upload to object storage
-    await storageClient.uploadFromBytes(filename, req.file.buffer);
+    const bucket = storageClient.bucket(BUCKET_ID);
+    const file = bucket.file(`${DMG_PREFIX}${filename}`);
+    await file.save(req.file.buffer, {
+      contentType: 'application/octet-stream',
+    });
 
     console.log(`[Upload] Successfully uploaded ${filename} (version: ${parsed.version}, build: ${parsed.buildNumber})`);
 
     // Get all DMG files and delete old ones (keep only latest 2 versions)
-    const files = await storageClient.list();
+    const [files] = await bucket.getFiles({ prefix: DMG_PREFIX });
     const dmgFiles: DMGInfo[] = [];
 
-    for (const file of files) {
-      if (file.key.endsWith('.dmg')) {
-        const parsedFile = parseDMGFilename(file.key);
+    for (const f of files) {
+      const fname = f.name.replace(DMG_PREFIX, '');
+      if (fname.endsWith('.dmg')) {
+        const parsedFile = parseDMGFilename(fname);
         if (parsedFile) {
           dmgFiles.push(parsedFile);
         }
@@ -233,7 +279,7 @@ router.post("/upload", upload.single('dmg'), async (req: Request, res: Response)
     // Delete all except the latest 2
     if (dmgFiles.length > 2) {
       for (let i = 2; i < dmgFiles.length; i++) {
-        await storageClient.delete(dmgFiles[i].filename);
+        await bucket.file(`${DMG_PREFIX}${dmgFiles[i].filename}`).delete();
         console.log(`[Upload] Deleted old DMG: ${dmgFiles[i].filename}`);
       }
     }
@@ -254,12 +300,14 @@ router.post("/upload", upload.single('dmg'), async (req: Request, res: Response)
 // GET /api/download/list - List all available DMGs (for debugging)
 router.get("/list", async (req: Request, res: Response) => {
   try {
-    const files = await storageClient.list();
+    const bucket = storageClient.bucket(BUCKET_ID);
+    const [files] = await bucket.getFiles({ prefix: DMG_PREFIX });
     const dmgFiles: DMGInfo[] = [];
 
     for (const file of files) {
-      if (file.key.endsWith('.dmg')) {
-        const parsed = parseDMGFilename(file.key);
+      const filename = file.name.replace(DMG_PREFIX, '');
+      if (filename.endsWith('.dmg')) {
+        const parsed = parseDMGFilename(filename);
         if (parsed) {
           dmgFiles.push(parsed);
         }
@@ -271,6 +319,8 @@ router.get("/list", async (req: Request, res: Response) => {
 
     res.json({
       count: dmgFiles.length,
+      bucket: BUCKET_ID,
+      prefix: DMG_PREFIX,
       dmgs: dmgFiles
     });
   } catch (error) {
