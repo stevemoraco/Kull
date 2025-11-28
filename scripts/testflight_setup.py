@@ -129,11 +129,12 @@ def main():
 
     # Process latest iOS and macOS builds
     processed_count = 0
-    for build in recent_builds[:2]:  # Process latest 2 builds
+    for build in recent_builds[:4]:  # Process latest 4 builds (2 iOS + 2 macOS)
         build_id = build['id']
         version = build['attributes'].get('version', 'unknown')
         platform = build['attributes'].get('platform', 'unknown')
         processing_state = build['attributes'].get('processingState', 'unknown')
+        uses_encryption = build['attributes'].get('usesNonExemptEncryption')
 
         print(f"\n3. Processing build {version} ({platform})...")
 
@@ -142,9 +143,25 @@ def main():
             print(f"  Skipping - build state is {processing_state}, not VALID")
             continue
 
-        # Note: Export compliance is typically set at app level, not per-build
-        # Skip the per-build export compliance call as it's not supported for this endpoint
-        print("  a) Export compliance: Using app-level setting (configured in App Store Connect)")
+        # Set export compliance if not already set
+        # Kull does NOT use non-exempt encryption (only standard HTTPS)
+        print("  a) Setting export compliance...")
+        if uses_encryption is None:
+            compliance_response = api_patch(f'/v1/builds/{build_id}', {
+                'data': {
+                    'type': 'builds',
+                    'id': build_id,
+                    'attributes': {
+                        'usesNonExemptEncryption': False
+                    }
+                }
+            })
+            if compliance_response:
+                print("     ✓ Export compliance set (no encryption)")
+            else:
+                print("     ⚠ Failed to set export compliance - may need manual setup")
+        else:
+            print(f"     ✓ Already set: usesNonExemptEncryption={uses_encryption}")
 
         # Add to public group (API doesn't allow GET for membership check, so just try to add)
         print("  b) Adding to public beta group...")
