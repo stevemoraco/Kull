@@ -387,33 +387,29 @@ DMG_PID=$!
 TESTFLIGHT_PID=$!
 
 # ============================================
-# Wait for both tasks to complete
+# Wait for DMG task first, then commit and push IMMEDIATELY
+# TestFlight continues in background - doesn't block git push
 # ============================================
 echo ""
-echo "Waiting for parallel tasks to complete..."
+echo "Waiting for DMG task to complete (git push happens immediately after)..."
 echo "  DMG task PID: $DMG_PID"
-echo "  TestFlight task PID: $TESTFLIGHT_PID"
+echo "  TestFlight task PID: $TESTFLIGHT_PID (runs in parallel, doesn't block git)"
 echo ""
 
+# Wait ONLY for DMG - it produces files that need committing
 wait $DMG_PID
 DMG_EXIT=$?
-wait $TESTFLIGHT_PID
-TESTFLIGHT_EXIT=$?
-
 DMG_RESULT=$(cat "$DMG_STATUS_FILE")
-TESTFLIGHT_RESULT=$(cat "$TESTFLIGHT_STATUS_FILE")
-rm -f "$DMG_STATUS_FILE" "$TESTFLIGHT_STATUS_FILE"
 
 echo ""
-echo "Parallel tasks complete:"
-echo "  DMG: $DMG_RESULT (exit: $DMG_EXIT)"
-echo "  TestFlight: $TESTFLIGHT_RESULT (exit: $TESTFLIGHT_EXIT)"
+echo "DMG task complete: $DMG_RESULT (exit: $DMG_EXIT)"
 
 # ============================================
-# Step 8: Git commit and push
+# Step 8: Git commit and push IMMEDIATELY after DMG
+# Don't wait for TestFlight - it doesn't produce files to commit
 # ============================================
 echo ""
-echo "Step 8: Committing and pushing to git..."
+echo "Step 8: Committing and pushing to git (not waiting for TestFlight)..."
 cd "$PROJECT_ROOT"
 
 # Stage all changes
@@ -433,6 +429,15 @@ Co-Authored-By: Claude <noreply@anthropic.com>" || echo "Nothing to commit"
 
 # Push to main
 git push origin main || echo "Push failed - check git status"
+
+echo ""
+echo "✓ Git push complete - now waiting for TestFlight to finish..."
+
+# Now wait for TestFlight (just for status reporting, not blocking)
+wait $TESTFLIGHT_PID
+TESTFLIGHT_EXIT=$?
+TESTFLIGHT_RESULT=$(cat "$TESTFLIGHT_STATUS_FILE")
+rm -f "$DMG_STATUS_FILE" "$TESTFLIGHT_STATUS_FILE"
 
 echo ""
 echo "================================================"
