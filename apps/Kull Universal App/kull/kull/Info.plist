@@ -36,14 +36,20 @@
 		<key>NSExceptionDomains</key>
 		<dict>
 			<!-- Allow secure connections to our backend -->
-			<key>lander.media</key>
+			<key>kullai.com</key>
 			<dict>
 				<key>NSIncludesSubdomains</key>
 				<true/>
 				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
 				<false/>
 				<key>NSTemporaryExceptionMinimumTLSVersion</key>
-				<string>TLSv1.3</string>
+				<string>TLSv1.2</string>
+			</dict>
+			<!-- Allow localhost for development -->
+			<key>localhost</key>
+			<dict>
+				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
 			</dict>
 		</dict>
 	</dict>
@@ -54,6 +60,14 @@
 		<string>remote-notification</string>
 		<string>fetch</string>
 		<string>processing</string>
+	</array>
+
+	<!-- Background Task Scheduler Permitted Identifiers (Required for iOS 13+) -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>media.lander.kull.sync</string>
+		<string>media.lander.kull.processing</string>
+		<string>media.lander.kull.refresh</string>
 	</array>
 
 	<!-- Document Support (iOS) -->
@@ -131,25 +145,6 @@
 			</array>
 		</dict>
 	</array>
-
-	<!-- Scene Configuration (iOS) -->
-	<key>UIApplicationSceneManifest</key>
-	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<true/>
-		<key>UISceneConfigurations</key>
-		<dict>
-			<key>UIWindowSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneConfigurationName</key>
-					<string>Default Configuration</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-				</dict>
-			</array>
-		</dict>
-	</dict>
 
 	<!-- iPad Multitasking -->
 	<key>UIRequiresFullScreen</key>

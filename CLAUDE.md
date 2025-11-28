@@ -622,6 +622,132 @@ open kull.xcodeproj  # Open in Xcode
 
 ---
 
+## CI/CD & Automation
+
+### Overview
+Kull uses a fully automated release pipeline:
+- **Push to main** → Xcode Cloud builds iOS + macOS → TestFlight → App Store
+- **Push to main** → GitHub Actions builds DMG → GitHub Releases → Website update
+
+### Version Numbering
+All builds use date/time-based version numbers:
+- **Format:** `YYYYMMDDHHMM` (e.g., `202411271430`)
+- **CFBundleShortVersionString:** Marketing version ("1.0", "2.0") - manual increment
+- **CFBundleVersion:** Build number - auto-generated from date/time
+
+### Xcode Cloud (iOS + macOS App Store)
+
+**Triggers:**
+- Push to `main` branch
+- Changes in `apps/Kull Universal App/` directory
+
+**Pipeline:**
+1. Clone repo
+2. Run `ci_scripts/ci_pre_xcodebuild.sh` (sets build version)
+3. Build iOS and macOS apps
+4. Archive and sign
+5. Upload to TestFlight (auto-distribute to public testers)
+6. Submit for App Store Review (if all checks pass)
+
+**TestFlight Public Link:** https://testflight.apple.com/join/PtzCFZKb
+
+**ci_scripts Location:**
+```
+apps/Kull Universal App/kull/ci_scripts/
+├── ci_pre_xcodebuild.sh    # Version numbering
+├── ci_post_xcodebuild.sh   # Post-build tasks
+└── ci_post_clone.sh        # Dependency installation
+```
+
+### GitHub Actions (DMG Distribution)
+
+**Workflow:** `.github/workflows/build-dmg.yml`
+
+**Triggers:**
+- Push to `main` branch
+- Changes in `apps/Kull Universal App/` directory
+- Manual trigger via workflow_dispatch
+
+**Pipeline:**
+1. Build macOS app with xcodebuild
+2. Create DMG with create-dmg
+3. Upload to GitHub Releases
+4. Update download page link
+5. Commit and push changes
+
+**GitHub Secrets Required:**
+- `APPLE_CERTIFICATE_BASE64` - Developer ID certificate
+- `APPLE_CERTIFICATE_PASSWORD` - Certificate password
+- `APPLE_TEAM_ID` - 283HJ7VJR4
+- `ASC_KEY_ID` - S9KW8G5RHS
+- `ASC_ISSUER_ID` - c63dccab-1ecd-41dc-9374-174cfdb70958
+- `ASC_PRIVATE_KEY` - Contents of AuthKey_S9KW8G5RHS.p8
+
+### App Store Connect API
+
+**Credentials (stored in `~/.private_keys/`):**
+- Key ID: S9KW8G5RHS
+- Issuer ID: c63dccab-1ecd-41dc-9374-174cfdb70958
+- Private Key: AuthKey_S9KW8G5RHS.p8
+- Team ID: 283HJ7VJR4
+- App ID: 6755838738
+- Bundle ID: media.lander.kull
+
+**Website:** https://kullai.com
+
+### Manual Release Steps
+
+If automation fails, manual release process:
+
+**iOS/macOS App Store:**
+```bash
+cd "apps/Kull Universal App/kull"
+# Set version
+VERSION=$(date +%Y%m%d%H%M)
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" kull/Info.plist
+
+# Build and archive
+xcodebuild archive -scheme kull -destination 'generic/platform=iOS' -archivePath build/ios.xcarchive
+xcodebuild archive -scheme kull -destination 'generic/platform=macOS' -archivePath build/mac.xcarchive
+
+# Upload to App Store Connect
+xcodebuild -exportArchive -archivePath build/ios.xcarchive -exportPath build/ios -exportOptionsPlist ExportOptions-AppStore.plist
+xcrun altool --upload-app -f build/ios/*.ipa -t ios --apiKey S9KW8G5RHS --apiIssuer c63dccab-1ecd-41dc-9374-174cfdb70958
+```
+
+**DMG:**
+```bash
+# Build
+xcodebuild archive -scheme kull -destination 'generic/platform=macOS' -archivePath build/mac.xcarchive
+xcodebuild -exportArchive -archivePath build/mac.xcarchive -exportPath build/mac -exportOptionsPlist ExportOptions-DeveloperID.plist
+
+# Create DMG
+create-dmg --volname "Kull" "Kull-$VERSION.dmg" build/mac/kull.app
+
+# Notarize
+xcrun notarytool submit "Kull-$VERSION.dmg" --keychain-profile "AC_PASSWORD" --wait
+xcrun stapler staple "Kull-$VERSION.dmg"
+```
+
+### Troubleshooting
+
+**Xcode Cloud build fails:**
+1. Check ci_scripts have execute permissions: `chmod +x ci_scripts/*.sh`
+2. Verify bundle ID matches App Store Connect
+3. Check signing certificates are valid
+
+**DMG not notarized:**
+1. Ensure Developer ID certificate is used
+2. Check notarization status: `xcrun notarytool log <submission-id> --keychain-profile "AC_PASSWORD"`
+3. Verify hardened runtime is enabled
+
+**TestFlight not updating:**
+1. Check build version is unique (must increment)
+2. Verify export compliance in App Store Connect
+3. Check beta review status
+
+---
+
 ## Testing Requirements
 
 **ALL agents must write tests with 100% pass rate before completing.**
@@ -805,6 +931,9 @@ api-docs/
 6. Show real costs to users, not "credits"
 7. Write tests as you code
 8. Make tests 100% green before marking complete
+9. Use date/time versioning (YYYYMMDDHHMM) for all builds
+10. Let CI/CD handle releases - don't manually upload unless automation fails
+11. Test locally before pushing to main (triggers automatic release)
 
 ---
 

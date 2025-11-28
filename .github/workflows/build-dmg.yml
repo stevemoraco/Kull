@@ -1,0 +1,240 @@
+name: Build and Release macOS DMG
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/Kull Universal App/**'
+      - '.github/workflows/build-dmg.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Generate version number
+        id: version
+        run: |
+          VERSION=$(date -u +"%Y.%m.%d.%H%M")
+          FRIENDLY_VERSION=$(date -u +"%Y-%m-%d-%I-%M-%p")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "friendly_version=$FRIENDLY_VERSION" >> $GITHUB_OUTPUT
+          echo "dmg_name=Kull-v${FRIENDLY_VERSION}.dmg" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (friendly: $FRIENDLY_VERSION)"
+
+      - name: Install Apple Certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Import certificate from secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Allow codesign to use the keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Build macOS app
+        run: |
+          cd "apps/Kull Universal App/kull"
+
+          # Archive the app
+          xcodebuild archive \
+            -scheme kull \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/kull.xcarchive \
+            MARKETING_VERSION="1.0" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.version }}" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=283HJ7VJR4
+
+      - name: Export app
+        run: |
+          cd "apps/Kull Universal App/kull"
+
+          # Export using the ExportOptions.plist
+          xcodebuild -exportArchive \
+            -archivePath build/kull.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          cd "apps/Kull Universal App/kull"
+
+          # Create DMG with create-dmg
+          create-dmg \
+            --volname "Kull" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "kull.app" 175 190 \
+            --hide-extension "kull.app" \
+            --app-drop-link 425 190 \
+            "${{ steps.version.outputs.dmg_name }}" \
+            "build/export/kull.app" || true
+
+          # Verify DMG was created
+          if [ ! -f "${{ steps.version.outputs.dmg_name }}" ]; then
+            echo "Error: DMG file was not created"
+            exit 1
+          fi
+
+          # Get file size
+          DMG_SIZE=$(du -h "${{ steps.version.outputs.dmg_name }}" | cut -f1)
+          echo "dmg_size=$DMG_SIZE" >> $GITHUB_OUTPUT
+
+          # Move DMG to repository root for easier access
+          mv "${{ steps.version.outputs.dmg_name }}" ../../../
+
+      - name: Notarize app
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Submit for notarization
+          xcrun notarytool submit \
+            "${{ steps.version.outputs.dmg_name }}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          # Staple the notarization ticket
+          xcrun stapler staple "${{ steps.version.outputs.dmg_name }}"
+
+      - name: Upload DMG to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Kull v${{ steps.version.outputs.version }}
+          files: ${{ steps.version.outputs.dmg_name }}
+          generate_release_notes: true
+          body: |
+            ## Kull macOS App - Version ${{ steps.version.outputs.version }}
+
+            ### Download
+            - **File:** ${{ steps.version.outputs.dmg_name }}
+            - **Size:** ${{ steps.dmg.outputs.dmg_size }}
+            - **Minimum macOS:** 14.0 (Sonoma)
+
+            ### Installation
+            1. Download the DMG file
+            2. Open the downloaded file
+            3. Drag Kull.app to your Applications folder
+            4. Launch Kull from Applications
+
+            ### Features
+            - 5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)
+            - Universal Mac app (Apple Silicon & Intel)
+            - Instant photo rating and organization
+            - Works with any folder on your Mac
+            - Auto-sync with iOS companion app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy DMG to client/public/downloads
+        run: |
+          mkdir -p client/public/downloads
+          cp "${{ steps.version.outputs.dmg_name }}" client/public/downloads/
+
+          # Also keep a "latest" version
+          cp "${{ steps.version.outputs.dmg_name }}" client/public/downloads/Kull-latest.dmg
+
+      - name: Update download route with new version
+        run: |
+          cat > /tmp/version_update.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const filePath = path.join(__dirname, '../server/routes/download.ts');
+          let content = fs.readFileSync(filePath, 'utf8');
+
+          const version = process.env.VERSION;
+          const friendlyVersion = process.env.FRIENDLY_VERSION;
+          const dmgName = process.env.DMG_NAME;
+          const releaseDate = new Date().toISOString().split('T')[0];
+
+          // Update the LATEST_VERSIONS object
+          const versionRegex = /macos: \{[\s\S]*?version: "[^"]*"/;
+          content = content.replace(versionRegex, `macos: {\n    version: "${version}"`);
+
+          const downloadUrlRegex = /downloadUrl: "[^"]*"/;
+          content = content.replace(downloadUrlRegex, `downloadUrl: "/downloads/${dmgName}"`);
+
+          const releaseDateRegex = /releaseDate: "[^"]*"/;
+          content = content.replace(releaseDateRegex, `releaseDate: "${releaseDate}"`);
+
+          fs.writeFileSync(filePath, content, 'utf8');
+          console.log('Updated download.ts with new version:', version);
+          EOF
+
+          VERSION="${{ steps.version.outputs.version }}" \
+          FRIENDLY_VERSION="${{ steps.version.outputs.friendly_version }}" \
+          DMG_NAME="${{ steps.version.outputs.dmg_name }}" \
+          node /tmp/version_update.js
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build website
+        run: npm run build
+
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          git add client/public/downloads/
+          git add server/routes/download.ts
+
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update DMG to version ${{ steps.version.outputs.version }}
+
+          - New DMG: ${{ steps.version.outputs.dmg_name }}
+          - Release: v${{ steps.version.outputs.version }}
+          - Built by GitHub Actions"
+
+            git push
+          fi
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true

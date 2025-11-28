@@ -1,0 +1,94 @@
+# Xcode Cloud Workflow Configuration Reference
+# Note: Xcode Cloud workflows are primarily configured via Xcode UI,
+# but this file documents the expected configuration for reference.
+
+workflow:
+  name: "Production Build"
+  description: "Automatic builds for main branch with TestFlight distribution"
+
+  # Trigger conditions
+  start_conditions:
+    branch_changes:
+      - branch: "main"
+        auto_cancel_builds: true
+
+  # Build environment
+  environment:
+    xcode_version: "latest"
+    macos_version: "latest"
+    clean_build: true
+
+  # Build actions
+  actions:
+    # 1. Build and Archive
+    - action: "archive"
+      platform: "iOS"
+      scheme: "kull"
+      destination: "generic/platform=iOS"
+
+    # 2. Run Tests
+    - action: "test"
+      platform: "iOS"
+      scheme: "kull"
+      test_plan: "Default"
+      test_destinations:
+        - "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.0"
+        - "platform=iOS Simulator,name=iPad Pro (12.9-inch),OS=18.0"
+
+  # Post-build actions
+  post_actions:
+    # TestFlight Distribution
+    testflight:
+      enabled: true
+      groups:
+        - "External Testers"
+      notify_testers: true
+      public_link: "https://testflight.apple.com/join/PtzCFZKb"
+
+    # App Store Submission (OPTIONAL - enable when ready)
+    app_store:
+      enabled: false  # Set to true when ready for production
+      automatic_release: false
+      phased_release: true
+      conditions:
+        - all_tests_pass: true
+
+# App Store Connect Configuration
+app_store_connect:
+  api_key_id: "S9KW8G5RHS"
+  issuer_id: "c63dccab-1ecd-41dc-9374-174cfdb70958"
+  app_id: "6755838738"
+  bundle_id: "media.lander.kull"
+
+# Version Numbering
+versioning:
+  marketing_version: "1.0"  # CFBundleShortVersionString (manual)
+  build_number: "YYYYMMDDHHMM"  # CFBundleVersion (auto-generated)
+  build_number_format: "date +%Y%m%d%H%M"
+
+# CI Scripts (executed in this order)
+ci_scripts:
+  post_clone: "ci_scripts/ci_post_clone.sh"
+  pre_xcodebuild: "ci_scripts/ci_pre_xcodebuild.sh"
+  post_xcodebuild: "ci_scripts/ci_post_xcodebuild.sh"
+
+# Notifications
+notifications:
+  email:
+    - "steve@lander.media"
+  events:
+    - build_succeeded
+    - build_failed
+    - tests_failed
+    - testflight_uploaded
+
+# Archive Settings
+archive:
+  include_symbols: true  # Include dSYM files
+  include_bitcode: false  # Bitcode deprecated
+  export_method: "app-store"
+
+# Code Signing
+code_signing:
+  automatic: true  # Xcode Cloud manages certificates
+  team_id: "YOUR_TEAM_ID"  # Fill in your Apple Developer Team ID
