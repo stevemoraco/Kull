@@ -294,8 +294,12 @@ echo ""
 echo "Step 10: Updating website..."
 
 if [ -f "$XCODE_PROJECT/build/dmg-export/$DMG_NAME" ]; then
-    # Create downloads directory and copy DMG
+    # Create downloads directory and remove ALL old DMG files
     mkdir -p "$PROJECT_ROOT/client/public/downloads/"
+    echo "  Removing old DMG files..."
+    rm -f "$PROJECT_ROOT/client/public/downloads/"Kull-*.dmg
+
+    # Copy new DMG
     cp "$XCODE_PROJECT/build/dmg-export/$DMG_NAME" "$PROJECT_ROOT/client/public/downloads/"
 
     # Also create a "latest" symlink
