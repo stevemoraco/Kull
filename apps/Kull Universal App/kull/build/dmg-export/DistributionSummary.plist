@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>kull</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>x86_64</string>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>2017</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>33EE7B89C514F5846975B9174C1A765650D94561</string>
+				<key>dateExpires</key>
+				<string>2/1/27</string>
+				<key>type</key>
+				<string>Cloud Managed Developer ID Application</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>com.apple.application-identifier</key>
+				<string>283HJ7VJR4.media.lander.kull</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>283HJ7VJR4</string>
+				<key>com.apple.security.app-sandbox</key>
+				<true/>
+				<key>com.apple.security.automation.apple-events</key>
+				<false/>
+				<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+				<false/>
+				<key>com.apple.security.cs.allow-jit</key>
+				<false/>
+				<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+				<false/>
+				<key>com.apple.security.cs.disable-executable-page-protection</key>
+				<false/>
+				<key>com.apple.security.cs.disable-library-validation</key>
+				<false/>
+				<key>com.apple.security.files.user-selected.read-write</key>
+				<true/>
+				<key>com.apple.security.network.client</key>
+				<true/>
+			</dict>
+			<key>name</key>
+			<string>kull.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>3e8fc3d6-7829-4b8d-ab09-a97500dc32cb</string>
+				<key>dateExpires</key>
+				<string>11/23/43</string>
+				<key>name</key>
+				<string>Mac Team Direct Provisioning Profile: media.lander.kull</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>283HJ7VJR4</string>
+				<key>name</key>
+				<string></string>
+			</dict>
+			<key>versionNumber</key>
+			<string>2025.11.27</string>
+		</dict>
+	</array>
+</dict>
+</plist>

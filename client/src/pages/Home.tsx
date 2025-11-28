@@ -22,6 +22,18 @@ export default function Home() {
   const { balance } = useCredits();
   const hasAccess = hasPaidAccess(typedUser);
 
+  // Fetch latest version information
+  const { data: versions } = useQuery({
+    queryKey: ['latest-versions'],
+    queryFn: async () => {
+      const response = await fetch('/api/download/latest');
+      if (!response.ok) {
+        throw new Error('Failed to fetch version information');
+      }
+      return response.json();
+    },
+  });
+
   const handleSelectPlan = (tier: 'professional' | 'studio') => {
     window.location.href = `/checkout?plan=${tier}`;
   };
@@ -119,11 +131,20 @@ export default function Home() {
               <p className="text-muted-foreground mb-6">
                 Get the universal Mac app and start rating, organizing, and tagging photos from any folder.
               </p>
-              <Button className="w-full" data-testid="button-download-dmg">
+              <Button
+                className="w-full"
+                data-testid="button-download-dmg"
+                onClick={() => {
+                  const downloadUrl = versions?.macos?.downloadUrl || '/downloads/Kull-latest.dmg';
+                  window.location.href = downloadUrl;
+                }}
+              >
                 <Download className="w-4 h-4 mr-2" />
                 Download DMG File
               </Button>
-              <p className="text-xs text-muted-foreground mt-3">macOS 11.0 or later required</p>
+              <p className="text-xs text-muted-foreground mt-3">
+                {versions?.macos?.minimumOS || 'macOS 14.0+'} • Version {versions?.macos?.version || 'loading...'}
+              </p>
             </div>
 
             <div className="bg-card border border-card-border rounded-2xl p-8 hover-elevate">
@@ -134,11 +155,21 @@ export default function Home() {
               <p className="text-muted-foreground mb-6">
                 Rate and organize photos on the go with automatic sync across all devices.
               </p>
-              <Button className="w-full" variant="outline" data-testid="button-download-ios">
+              <Button
+                className="w-full"
+                variant="outline"
+                data-testid="button-download-ios"
+                onClick={() => {
+                  const testFlightUrl = versions?.ios?.testFlightUrl || 'https://testflight.apple.com/join/PtzCFZKb';
+                  window.open(testFlightUrl, '_blank');
+                }}
+              >
                 <Smartphone className="w-4 h-4 mr-2" />
-                Get on App Store
+                Join TestFlight Beta
               </Button>
-              <p className="text-xs text-muted-foreground mt-3">iOS 15.0 or later required</p>
+              <p className="text-xs text-muted-foreground mt-3">
+                {versions?.ios?.minimumOS || 'iOS 17.0+'} • Version {versions?.ios?.version || 'loading...'}
+              </p>
             </div>
           </div>
         )}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- App Sandbox (macOS) -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- File Access (User-Selected Files) -->
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+
+	<!-- Network Client (Required for AI API calls) -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+
+	<!-- Hardened Runtime (macOS) -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<false/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<false/>
+	<key>com.apple.security.cs.allow-dyld-environment-variables</key>
+	<false/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.cs.disable-executable-page-protection</key>
+	<false/>
+
+	<!-- Code Signing - MUST BE TRUE for debugging -->
+	<key>com.apple.security.get-task-allow</key>
+	<true/>
+
+	<!-- Apple Events (macOS - for potential Lightroom integration) -->
+	<key>com.apple.security.automation.apple-events</key>
+	<false/>
+
+	<!-- Background Tasks (iOS) -->
+	<key>com.apple.developer.default-data-protection</key>
+	<string>NSFileProtectionComplete</string>
+</dict>
+</plist>

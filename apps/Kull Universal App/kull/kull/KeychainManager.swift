@@ -1,5 +1,4 @@
 import Foundation
-import Security
 import OSLog
 
 enum KeychainError: Error {
@@ -9,91 +8,64 @@ enum KeychainError: Error {
     case invalidData
 }
 
+/// Token storage using UserDefaults instead of Keychain
+/// This avoids all keychain access prompts and permission issues
 class KeychainManager {
     static let shared = KeychainManager()
 
-    private let serviceName = "com.kull.app"
+    private let defaults = UserDefaults.standard
+    private let keyPrefix = "com.kull.token."
 
     private init() {}
 
     // MARK: - Access Token (1 hour expiry)
 
     func saveAccessToken(_ token: String, for deviceId: String) throws {
-        let key = "access_token_\(deviceId)"
-        do {
-            try save(token, forKey: key)
-            Logger.keychain.logKeychainOperation("Save access token", success: true)
-        } catch {
-            Logger.keychain.logKeychainOperation("Save access token", success: false, error: error)
-            throw error
-        }
+        let key = "\(keyPrefix)access_\(deviceId)"
+        defaults.set(token, forKey: key)
+        Logger.keychain.logKeychainOperation("Save access token", success: true)
     }
 
     func getAccessToken(for deviceId: String) -> String? {
-        let key = "access_token_\(deviceId)"
-        do {
-            let token = try retrieve(forKey: key)
+        let key = "\(keyPrefix)access_\(deviceId)"
+        let token = defaults.string(forKey: key)
+        if token != nil {
             Logger.keychain.debug("Retrieved access token")
-            return token
-        } catch {
-            if case KeychainError.itemNotFound = error {
-                Logger.keychain.debug("Access token not found")
-            } else {
-                Logger.keychain.error("Failed to retrieve access token: \(error.localizedDescription)")
-            }
-            return nil
+        } else {
+            Logger.keychain.debug("Access token not found")
         }
+        return token
     }
 
     func deleteAccessToken(for deviceId: String) throws {
-        let key = "access_token_\(deviceId)"
-        do {
-            try delete(forKey: key)
-            Logger.keychain.logKeychainOperation("Delete access token", success: true)
-        } catch {
-            Logger.keychain.logKeychainOperation("Delete access token", success: false, error: error)
-            throw error
-        }
+        let key = "\(keyPrefix)access_\(deviceId)"
+        defaults.removeObject(forKey: key)
+        Logger.keychain.logKeychainOperation("Delete access token", success: true)
     }
 
     // MARK: - Refresh Token (30 days expiry)
 
     func saveRefreshToken(_ token: String, for deviceId: String) throws {
-        let key = "refresh_token_\(deviceId)"
-        do {
-            try save(token, forKey: key)
-            Logger.keychain.logKeychainOperation("Save refresh token", success: true)
-        } catch {
-            Logger.keychain.logKeychainOperation("Save refresh token", success: false, error: error)
-            throw error
-        }
+        let key = "\(keyPrefix)refresh_\(deviceId)"
+        defaults.set(token, forKey: key)
+        Logger.keychain.logKeychainOperation("Save refresh token", success: true)
     }
 
     func getRefreshToken(for deviceId: String) -> String? {
-        let key = "refresh_token_\(deviceId)"
-        do {
-            let token = try retrieve(forKey: key)
+        let key = "\(keyPrefix)refresh_\(deviceId)"
+        let token = defaults.string(forKey: key)
+        if token != nil {
             Logger.keychain.debug("Retrieved refresh token")
-            return token
-        } catch {
-            if case KeychainError.itemNotFound = error {
-                Logger.keychain.debug("Refresh token not found")
-            } else {
-                Logger.keychain.error("Failed to retrieve refresh token: \(error.localizedDescription)")
-            }
-            return nil
+        } else {
+            Logger.keychain.debug("Refresh token not found")
         }
+        return token
     }
 
     func deleteRefreshToken(for deviceId: String) throws {
-        let key = "refresh_token_\(deviceId)"
-        do {
-            try delete(forKey: key)
-            Logger.keychain.logKeychainOperation("Delete refresh token", success: true)
-        } catch {
-            Logger.keychain.logKeychainOperation("Delete refresh token", success: false, error: error)
-            throw error
-        }
+        let key = "\(keyPrefix)refresh_\(deviceId)"
+        defaults.removeObject(forKey: key)
+        Logger.keychain.logKeychainOperation("Delete refresh token", success: true)
     }
 
     // MARK: - Clear All
@@ -103,100 +75,5 @@ class KeychainManager {
         try? deleteAccessToken(for: deviceId)
         try? deleteRefreshToken(for: deviceId)
         Logger.keychain.notice("All tokens cleared")
-    }
-
-    // MARK: - Private Keychain Operations
-
-    private func save(_ value: String, forKey key: String) throws {
-        guard let data = value.data(using: .utf8) else {
-            throw KeychainError.invalidData
-        }
-
-        // Check if item exists
-        if (try? retrieve(forKey: key)) != nil {
-            // Update existing
-            try update(data, forKey: key)
-        } else {
-            // Add new
-            try add(data, forKey: key)
-        }
-    }
-
-    private func add(_ data: Data, forKey key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
-        ]
-
-        let status = SecItemAdd(query as CFDictionary, nil)
-
-        guard status == errSecSuccess else {
-            if status == errSecDuplicateItem {
-                throw KeychainError.duplicateItem
-            }
-            throw KeychainError.unexpectedStatus(status)
-        }
-    }
-
-    private func update(_ data: Data, forKey key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key
-        ]
-
-        let attributes: [String: Any] = [
-            kSecValueData as String: data
-        ]
-
-        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-
-        guard status == errSecSuccess else {
-            throw KeychainError.unexpectedStatus(status)
-        }
-    }
-
-    private func retrieve(forKey key: String) throws -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                throw KeychainError.itemNotFound
-            }
-            throw KeychainError.unexpectedStatus(status)
-        }
-
-        guard let data = result as? Data,
-              let string = String(data: data, encoding: .utf8) else {
-            throw KeychainError.invalidData
-        }
-
-        return string
-    }
-
-    private func delete(forKey key: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unexpectedStatus(status)
-        }
     }
 }

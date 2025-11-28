@@ -4,14 +4,15 @@ import { storage } from "../storage";
 const router = Router();
 
 // Version information for each platform
-// NOTE: macOS version info is auto-updated by GitHub Actions workflow (.github/workflows/build-dmg.yml)
+// NOTE: Auto-updated by release.sh script
 const LATEST_VERSIONS = {
   macos: {
     version: "2025.11.27",
-    downloadUrl: "/downloads/Kull-v2025-11-27-06-19-PM.dmg",
-    releaseNotes: "Updated version with improved stability and no keychain prompts",
+    buildNumber: "2017",
+    downloadUrl: "/downloads/Kull-2025.11.27.2017.dmg",
+    releaseNotes: "Latest release with all features",
     releaseDate: "2025-11-27",
-    fileSize: "1.7 MB",
+    fileSize: "~5 MB",
     minimumOS: "macOS 14.0+",
     features: [
       "5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)",
@@ -23,8 +24,9 @@ const LATEST_VERSIONS = {
   },
   ios: {
     version: "2025.11.27",
+    buildNumber: "2017",
     testFlightUrl: "https://testflight.apple.com/join/PtzCFZKb",
-    releaseNotes: "Initial iOS release on TestFlight - Beta Testing Now Available",
+    releaseNotes: "iOS release on TestFlight - Beta Testing Available",
     releaseDate: "2025-11-27",
     minimumOS: "iOS 17.0+",
     features: [
@@ -40,16 +42,15 @@ const LATEST_VERSIONS = {
 // Full changelog history
 const CHANGELOG = [
   {
-    version: "1.0.0",
-    date: "2025-01-15",
+    version: "2025.11.27",
+    buildNumber: "2017",
+    date: "2025-11-27",
     platform: "all",
     notes: [
-      "Initial release of Kull AI",
+      "Universal Mac and iOS app release",
       "AI-powered photo rating using 5 advanced models",
-      "Universal Mac app with Apple Silicon optimization",
-      "iOS companion app for on-the-go rating",
-      "Auto-sync across all devices",
-      "Support for RAW and JPEG formats"
+      "TestFlight beta available for iOS",
+      "Direct DMG download for macOS"
     ]
   }
 ];
@@ -80,7 +81,6 @@ router.post("/track", async (req: any, res: Response) => {
     const { platform, version } = req.body;
     const userId = req.user?.claims?.sub || null;
 
-    // Get IP address
     const ipAddress = req.headers['cf-connecting-ip'] ||
                      req.headers['x-real-ip'] ||
                      req.headers['x-forwarded-for']?.split(',')[0] ||
@@ -88,11 +88,8 @@ router.post("/track", async (req: any, res: Response) => {
                      req.socket?.remoteAddress ||
                      'unknown';
 
-    // Get user agent
     const userAgent = req.headers['user-agent'] || 'unknown';
 
-    // Track the download event
-    // TODO: Add storage.trackDownload method when downloads table is added to schema
     console.log(`[Download] Tracked: platform=${platform}, version=${version}, userId=${userId || 'anonymous'}, ip=${ipAddress}`);
 
     res.json({ success: true });

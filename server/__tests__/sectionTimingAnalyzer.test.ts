@@ -300,10 +300,10 @@ describe('sectionTimingAnalyzer', () => {
 
       const markdown = formatSectionInsights(insights);
 
-      // Implementation uses: 🔥 High, 💡 Medium, 📊 Low
+      // Implementation uses: 🔥 High, 👀 Medium, 👁️ Low
       expect(markdown).toContain('🔥'); // High interest
-      expect(markdown).toContain('💡'); // Medium interest
-      expect(markdown).toContain('📊'); // Low interest
+      expect(markdown).toContain('👀'); // Medium interest
+      expect(markdown).toContain('👁️'); // Low interest
     });
   });
 

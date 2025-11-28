@@ -10,13 +10,7 @@
 	<key>com.apple.security.network.client</key>
 	<true/>
 
-	<!-- Shared keychain access -->
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)media.lander.kull</string>
-	</array>
-
-	<!-- Disallow debugger attachment in release builds -->
+	<!-- Must be false for App Store distribution -->
 	<key>com.apple.security.get-task-allow</key>
 	<false/>
 </dict>

@@ -2,24 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Push Notifications -->
-	<key>aps-environment</key>
-	<string>development</string>
-
-	<!-- iCloud / CloudKit -->
-	<key>com.apple.developer.icloud-container-identifiers</key>
-	<array/>
-	<key>com.apple.developer.icloud-services</key>
-	<array>
-		<string>CloudKit</string>
-	</array>
-
-	<!-- Keychain Sharing -->
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)media.lander.kull</string>
-	</array>
-
 	<!-- App Sandbox (macOS) -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
@@ -44,7 +26,7 @@
 	<key>com.apple.security.cs.disable-executable-page-protection</key>
 	<false/>
 
-	<!-- Code Signing -->
+	<!-- Code Signing - Must be false for App Store distribution -->
 	<key>com.apple.security.get-task-allow</key>
 	<false/>
 

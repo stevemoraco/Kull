@@ -16,8 +16,18 @@ enum SyncMessageType: String, Codable {
     case deviceConnected = "DEVICE_CONNECTED"
     case deviceDisconnected = "DEVICE_DISCONNECTED"
     case adminSessionUpdate = "ADMIN_SESSION_UPDATE"
+    case providerHealth = "PROVIDER_HEALTH"
     case ping = "PING"
     case pong = "PONG"
+
+    // Handle unknown message types gracefully (future-proofing)
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = SyncMessageType(rawValue: rawValue) ?? .unknown
+    }
 }
 
 // MARK: - Shoot Status

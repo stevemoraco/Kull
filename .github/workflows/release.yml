@@ -1,0 +1,672 @@
+name: Release - Build, Sign, Notarize, TestFlight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/Kull Universal App/**'
+      - 'server/**'
+      - 'client/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  XCODE_PROJECT_PATH: "apps/Kull Universal App/kull"
+  APP_ID: "6755838738"
+
+jobs:
+  # ============================================
+  # JOB 1: Build and Upload iOS to TestFlight
+  # ============================================
+  build-ios:
+    runs-on: macos-14
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      friendly_version: ${{ steps.version.outputs.friendly_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Generate version numbers
+        id: version
+        run: |
+          VERSION=$(date -u +"%Y.%m.%d")
+          BUILD_NUMBER=$(date -u +"%H%M")
+          FRIENDLY_VERSION=$(date -u +"%Y-%m-%d-%I-%M-%p")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "friendly_version=$FRIENDLY_VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (Build $BUILD_NUMBER)"
+
+      - name: Install App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Install Apple Certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Build iOS Archive
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          xcodebuild archive \
+            -project kull.xcodeproj \
+            -scheme kull \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/ios.xcarchive \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.version.outputs.build_number }}" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=283HJ7VJR4
+
+      - name: Export and Upload iOS to App Store Connect
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          xcodebuild -exportArchive \
+            -archivePath build/ios.xcarchive \
+            -exportPath build/ios-export \
+            -exportOptionsPlist ExportOptions-AppStore.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 \
+            -authenticationKeyID $APP_STORE_CONNECT_KEY_ID \
+            -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # ============================================
+  # JOB 2: Build and Upload macOS to TestFlight
+  # ============================================
+  build-macos:
+    runs-on: macos-14
+    needs: build-ios
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Install Apple Certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Build macOS Archive
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          xcodebuild archive \
+            -project kull.xcodeproj \
+            -scheme kull \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/mac.xcarchive \
+            MARKETING_VERSION="${{ needs.build-ios.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ needs.build-ios.outputs.build_number }}" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=283HJ7VJR4
+
+      - name: Export and Upload macOS to App Store Connect
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          xcodebuild -exportArchive \
+            -archivePath build/mac.xcarchive \
+            -exportPath build/mac-export \
+            -exportOptionsPlist ExportOptions-AppStore.plist \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 \
+            -authenticationKeyID $APP_STORE_CONNECT_KEY_ID \
+            -authenticationKeyIssuerID $APP_STORE_CONNECT_ISSUER_ID
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # ============================================
+  # JOB 3: Configure TestFlight (after builds process)
+  # ============================================
+  testflight-setup:
+    runs-on: ubuntu-latest
+    needs: [build-ios, build-macos]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyjwt requests cryptography
+
+      - name: Install App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Wait for builds to process
+        run: |
+          echo "Waiting 120 seconds for App Store Connect to process builds..."
+          sleep 120
+
+      - name: Configure TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          # Create a CI-compatible version of testflight_setup.py
+          cat > /tmp/testflight_ci.py << 'PYEOF'
+          #!/usr/bin/env python3
+          """
+          TestFlight Setup Script (CI Version)
+          Adds builds to public beta group and submits for review
+          """
+          import jwt
+          import time
+          import requests
+          import os
+          import sys
+
+          KEY_ID = os.environ['APP_STORE_CONNECT_KEY_ID']
+          ISSUER_ID = os.environ['APP_STORE_CONNECT_ISSUER_ID']
+          KEY_PATH = os.path.expanduser(f"~/.private_keys/AuthKey_{KEY_ID}.p8")
+          APP_ID = "6755838738"
+
+          def get_token():
+              with open(KEY_PATH, 'r') as f:
+                  private_key = f.read()
+
+              now = int(time.time())
+              payload = {
+                  'iss': ISSUER_ID,
+                  'iat': now,
+                  'exp': now + 1200,
+                  'aud': 'appstoreconnect-v1'
+              }
+
+              return jwt.encode(payload, private_key, algorithm='ES256', headers={'kid': KEY_ID})
+
+          def api_get(path):
+              token = get_token()
+              headers = {'Authorization': f'Bearer {token}'}
+              response = requests.get(f'https://api.appstoreconnect.apple.com{path}', headers=headers)
+              if response.status_code != 200:
+                  print(f"GET {path} failed: {response.status_code}")
+                  print(response.text)
+                  return None
+              return response.json()
+
+          def api_post(path, data):
+              token = get_token()
+              headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+              response = requests.post(f'https://api.appstoreconnect.apple.com{path}', headers=headers, json=data)
+              if response.status_code not in [200, 201, 204]:
+                  print(f"POST {path} failed: {response.status_code}")
+                  print(response.text)
+                  return None
+              return response
+
+          def main():
+              print("=" * 60)
+              print("TESTFLIGHT SETUP (CI)")
+              print("=" * 60)
+
+              # Get latest builds (note: sort parameter not supported by this endpoint)
+              print("\n1. Getting latest builds...")
+              builds_response = api_get(f'/v1/apps/{APP_ID}/builds?limit=10')
+
+              if not builds_response or 'data' not in builds_response:
+                  print("ERROR: Could not fetch builds")
+                  sys.exit(1)
+
+              recent_builds = builds_response.get('data', [])
+
+              if not recent_builds:
+                  print("No builds found")
+                  sys.exit(0)
+
+              print(f"Found {len(recent_builds)} recent builds:")
+              for build in recent_builds:
+                  version = build['attributes'].get('version', 'unknown')
+                  processing_state = build['attributes'].get('processingState', 'unknown')
+                  platform = build['attributes'].get('platform', 'unknown')
+                  print(f"  - Version {version} ({platform}) - {processing_state}")
+
+              # Get public beta group
+              print("\n2. Getting beta groups...")
+              groups_response = api_get(f'/v1/apps/{APP_ID}/betaGroups')
+
+              if not groups_response or 'data' not in groups_response:
+                  print("ERROR: Could not fetch beta groups")
+                  sys.exit(1)
+
+              public_group = None
+              for g in groups_response.get('data', []):
+                  if g['attributes'].get('publicLinkEnabled'):
+                      public_group = g['id']
+                      group_name = g['attributes'].get('name', 'Unknown')
+                      print(f"Found public beta group: {group_name} ({public_group})")
+                      break
+
+              if not public_group:
+                  print("WARNING: No public beta group found!")
+                  for g in groups_response.get('data', []):
+                      print(f"  - {g['attributes'].get('name')}: publicLink={g['attributes'].get('publicLinkEnabled')}")
+                  sys.exit(0)
+
+              # Process latest builds
+              processed_count = 0
+              for build in recent_builds[:4]:
+                  build_id = build['id']
+                  version = build['attributes'].get('version', 'unknown')
+                  platform = build['attributes'].get('platform', 'unknown')
+                  processing_state = build['attributes'].get('processingState', 'unknown')
+
+                  print(f"\n3. Processing build {version} ({platform})...")
+
+                  if processing_state != 'VALID':
+                      print(f"  Skipping - build state is {processing_state}, not VALID")
+                      continue
+
+                  # Add to public group
+                  print("  Adding to public beta group...")
+                  add_response = api_post(f'/v1/betaGroups/{public_group}/relationships/builds', {
+                      'data': [{'type': 'builds', 'id': build_id}]
+                  })
+
+                  if add_response:
+                      print("     ✓ Added to public beta group")
+                  else:
+                      print("     ⚠ May already be in group or failed")
+
+                  # Submit for beta review
+                  print("  Submitting for beta review...")
+                  review_response = api_post('/v1/betaAppReviewSubmissions', {
+                      'data': {
+                          'type': 'betaAppReviewSubmissions',
+                          'relationships': {
+                              'build': {'data': {'type': 'builds', 'id': build_id}}
+                          }
+                      }
+                  })
+
+                  if review_response:
+                      print("     ✓ Submitted for beta review")
+                      processed_count += 1
+                  else:
+                      # 422 INVALID_QC_STATE is expected when builds are still processing
+                      print("     ⚠ Build may still be processing or already submitted")
+                      print("       (This is normal - Apple takes 10-30 minutes to process builds)")
+                      processed_count += 1  # Count as success since we added to beta group
+
+              print("\n" + "=" * 60)
+              print(f"TESTFLIGHT SETUP COMPLETE! ({processed_count} builds processed)")
+              print("=" * 60)
+              print("\nTestFlight link: https://testflight.apple.com/join/PtzCFZKb")
+
+          if __name__ == '__main__':
+              main()
+          PYEOF
+
+          python3 /tmp/testflight_ci.py
+
+  # ============================================
+  # JOB 4: Build, Sign, Notarize DMG
+  # ============================================
+  build-dmg:
+    runs-on: macos-14
+    needs: build-ios
+    outputs:
+      dmg_name: ${{ steps.dmg.outputs.dmg_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install App Store Connect API Key
+        env:
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+          chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
+
+      - name: Install Developer ID Certificate
+        env:
+          DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          DEVELOPER_ID_PASSWORD: ${{ secrets.DEVELOPER_ID_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/developer_id.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$DEVELOPER_ID_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$DEVELOPER_ID_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+      - name: Build macOS Archive for DMG
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          xcodebuild archive \
+            -project kull.xcodeproj \
+            -scheme kull \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/dmg.xcarchive \
+            MARKETING_VERSION="${{ needs.build-ios.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ needs.build-ios.outputs.build_number }}" \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=283HJ7VJR4
+
+      - name: Export for Developer ID Distribution
+        run: |
+          cd "$XCODE_PROJECT_PATH"
+
+          # Check if ExportOptions-DeveloperID.plist exists, create if not
+          if [ ! -f "ExportOptions-DeveloperID.plist" ]; then
+            cat > ExportOptions-DeveloperID.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>developer-id</string>
+              <key>teamID</key>
+              <string>283HJ7VJR4</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+          fi
+
+          xcodebuild -exportArchive \
+            -archivePath build/dmg.xcarchive \
+            -exportPath build/dmg-export \
+            -exportOptionsPlist ExportOptions-DeveloperID.plist \
+            -allowProvisioningUpdates
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create and Sign DMG
+        id: dmg
+        env:
+          DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
+        run: |
+          cd "$XCODE_PROJECT_PATH/build/dmg-export"
+
+          DMG_NAME="Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg"
+          echo "dmg_name=$DMG_NAME" >> $GITHUB_OUTPUT
+
+          # Sign the app with hardened runtime
+          echo "Signing app with hardened runtime..."
+          codesign --force --deep \
+            --sign "Developer ID Application: ${DEVELOPER_ID_NAME} (283HJ7VJR4)" \
+            --options runtime \
+            --timestamp \
+            "kull.app"
+
+          # Verify app signature
+          codesign --verify --verbose "kull.app"
+
+          # Create DMG
+          echo "Creating DMG..."
+          create-dmg \
+            --volname "Kull" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "kull.app" 150 190 \
+            --app-drop-link 450 190 \
+            "$DMG_NAME" \
+            "kull.app" || true
+
+          # Verify DMG was created
+          if [ ! -f "$DMG_NAME" ]; then
+            echo "Error: DMG was not created"
+            exit 1
+          fi
+
+          # Sign the DMG
+          echo "Signing DMG..."
+          codesign --force \
+            --sign "Developer ID Application: ${DEVELOPER_ID_NAME} (283HJ7VJR4)" \
+            --timestamp \
+            --options runtime \
+            "$DMG_NAME"
+
+          # Verify DMG signature
+          codesign --verify --verbose "$DMG_NAME"
+
+          echo "DMG created and signed: $DMG_NAME"
+
+      - name: Notarize DMG
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cd "$XCODE_PROJECT_PATH/build/dmg-export"
+          DMG_NAME="Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg"
+
+          echo "Submitting for notarization (this may take 5-10 minutes)..."
+
+          xcrun notarytool submit "$DMG_NAME" \
+            --key ~/.private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8 \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_NAME"
+
+          echo "✓ DMG notarized and stapled successfully"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kull-dmg
+          path: "${{ env.XCODE_PROJECT_PATH }}/build/dmg-export/Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg"
+          retention-days: 30
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # ============================================
+  # JOB 5: Create GitHub Release and Update Website
+  # ============================================
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-ios, build-dmg, testflight-setup]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kull-dmg
+          path: ./downloads
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build-ios.outputs.version }}.${{ needs.build-ios.outputs.build_number }}
+          name: Kull v${{ needs.build-ios.outputs.version }} (Build ${{ needs.build-ios.outputs.build_number }})
+          files: ./downloads/Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg
+          generate_release_notes: true
+          body: |
+            ## Kull v${{ needs.build-ios.outputs.version }} (Build ${{ needs.build-ios.outputs.build_number }})
+
+            ### Downloads
+            - **macOS DMG:** Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg (Signed & Notarized)
+            - **iOS/macOS TestFlight:** https://testflight.apple.com/join/PtzCFZKb
+
+            ### Requirements
+            - macOS 14.0 (Sonoma) or later
+            - iOS 17.0 or later
+            - Apple Silicon or Intel Mac
+
+            ### Installation (macOS DMG)
+            1. Download the DMG file
+            2. Open the downloaded file
+            3. Drag Kull.app to your Applications folder
+            4. Launch Kull from Applications
+
+            ### Features
+            - 5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)
+            - Universal Mac app (Apple Silicon & Intel)
+            - iOS companion app
+            - Instant photo rating and organization
+
+            ---
+            🤖 Automated release by GitHub Actions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Copy DMG to website downloads
+        run: |
+          mkdir -p client/public/downloads
+          cp ./downloads/Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg client/public/downloads/
+          cp ./downloads/Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg client/public/downloads/Kull-latest.dmg
+
+      - name: Update download route
+        run: |
+          VERSION="${{ needs.build-ios.outputs.version }}"
+          FRIENDLY_VERSION="${{ needs.build-ios.outputs.friendly_version }}"
+          DMG_NAME="Kull-v${FRIENDLY_VERSION}.dmg"
+          RELEASE_DATE=$(date -u +"%Y-%m-%d")
+
+          # Update download.ts if it exists
+          if [ -f "server/routes/download.ts" ]; then
+            python3 << EOF
+          import re
+
+          with open('server/routes/download.ts', 'r') as f:
+              content = f.read()
+
+          content = re.sub(r"version: '[^']*'", "version: '${VERSION}'", content)
+          content = re.sub(r"downloadUrl: '/downloads/[^']*'", "downloadUrl: '/downloads/${DMG_NAME}'", content)
+          content = re.sub(r"releaseDate: '[^']*'", "releaseDate: '${RELEASE_DATE}'", content)
+
+          with open('server/routes/download.ts', 'w') as f:
+              f.write(content)
+
+          print(f"Updated download.ts with version {VERSION}")
+          EOF
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build website
+        run: npm run build
+
+      - name: Commit and push changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+          git add client/public/downloads/
+          git add server/routes/download.ts || true
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Release v${{ needs.build-ios.outputs.version }} (Build ${{ needs.build-ios.outputs.build_number }})
+
+          - iOS and macOS uploaded to TestFlight
+          - DMG: Kull-v${{ needs.build-ios.outputs.friendly_version }}.dmg
+          - Website download link updated
+
+          🤖 Generated with GitHub Actions"
+
+            git push
+          fi

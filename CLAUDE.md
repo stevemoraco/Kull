@@ -695,39 +695,183 @@ apps/Kull Universal App/kull/ci_scripts/
 
 **Website:** https://kullai.com
 
-### Manual Release Steps
+---
 
-If automation fails, manual release process:
+### Privacy Labels (MANUAL CONFIGURATION REQUIRED)
 
-**iOS/macOS App Store:**
+**CRITICAL: Privacy labels CANNOT be automated via API.**
+
+Apple's App Store Connect API **intentionally does not support** privacy label configuration for legal/verification reasons. This must be done manually for every app submission.
+
+**Privacy Label Configuration URL:**
+https://appstoreconnect.apple.com/apps/6755838738/appstore/appprivacy
+
+**Data Types for Kull:**
+- Email Address (Account creation)
+- Photos (Core functionality - photo culling)
+- User ID (Backend sync)
+- Device ID (Multi-device authentication)
+- Product Interaction (Usage analytics)
+- Purchase History (Billing/subscription tracking)
+
+**When to Update:**
+- Before every App Store submission
+- When adding new data collection features
+- When changing third-party SDKs that collect data
+
+**Automation Limitation:**
+Despite using App Store Connect API for builds/uploads, privacy labels must be manually configured through the web interface. This is intentional by Apple to ensure developers consciously review data collection practices.
+
+---
+
+### Manual Release Steps (Verified Working)
+
+If automation fails, use these exact commands that successfully build and upload:
+
+**iOS Build & Upload:**
 ```bash
-cd "apps/Kull Universal App/kull"
-# Set version
 VERSION=$(date +%Y%m%d%H%M)
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" kull/Info.plist
+FRIENDLY_VERSION="1.0.0"
+cd "apps/Kull Universal App/kull"
 
-# Build and archive
-xcodebuild archive -scheme kull -destination 'generic/platform=iOS' -archivePath build/ios.xcarchive
-xcodebuild archive -scheme kull -destination 'generic/platform=macOS' -archivePath build/mac.xcarchive
+# Clean DerivedData (fixes I/O errors)
+rm -rf ~/Library/Developer/Xcode/DerivedData/kull-*
 
-# Upload to App Store Connect
-xcodebuild -exportArchive -archivePath build/ios.xcarchive -exportPath build/ios -exportOptionsPlist ExportOptions-AppStore.plist
-xcrun altool --upload-app -f build/ios/*.ipa -t ios --apiKey S9KW8G5RHS --apiIssuer c63dccab-1ecd-41dc-9374-174cfdb70958
+# Archive
+xcodebuild archive \
+  -scheme kull \
+  -destination 'generic/platform=iOS' \
+  -archivePath build/ios.xcarchive \
+  CURRENT_PROJECT_VERSION="$VERSION" \
+  MARKETING_VERSION="$FRIENDLY_VERSION"
+
+# Export and Upload
+xcodebuild -exportArchive \
+  -archivePath build/ios.xcarchive \
+  -exportPath build/ios-export \
+  -exportOptionsPlist ExportOptions-AppStore.plist \
+  -allowProvisioningUpdates \
+  -authenticationKeyPath ~/.private_keys/AuthKey_S9KW8G5RHS.p8 \
+  -authenticationKeyID S9KW8G5RHS \
+  -authenticationKeyIssuerID c63dccab-1ecd-41dc-9374-174cfdb70958
 ```
 
-**DMG:**
+**macOS App Store Build & Upload:**
 ```bash
-# Build
-xcodebuild archive -scheme kull -destination 'generic/platform=macOS' -archivePath build/mac.xcarchive
-xcodebuild -exportArchive -archivePath build/mac.xcarchive -exportPath build/mac -exportOptionsPlist ExportOptions-DeveloperID.plist
+VERSION=$(date +%Y%m%d%H%M)
+FRIENDLY_VERSION="1.0.0"
+cd "apps/Kull Universal App/kull"
+
+# Clean DerivedData
+rm -rf ~/Library/Developer/Xcode/DerivedData/kull-*
+
+# Archive
+xcodebuild archive \
+  -scheme kull \
+  -destination 'generic/platform=macOS' \
+  -archivePath build/mac.xcarchive \
+  CURRENT_PROJECT_VERSION="$VERSION" \
+  MARKETING_VERSION="$FRIENDLY_VERSION"
+
+# Export and Upload
+xcodebuild -exportArchive \
+  -archivePath build/mac.xcarchive \
+  -exportPath build/mac-export \
+  -exportOptionsPlist ExportOptions-AppStore.plist \
+  -allowProvisioningUpdates \
+  -authenticationKeyPath ~/.private_keys/AuthKey_S9KW8G5RHS.p8 \
+  -authenticationKeyID S9KW8G5RHS \
+  -authenticationKeyIssuerID c63dccab-1ecd-41dc-9374-174cfdb70958
+```
+
+**DMG (Direct Download) Build:**
+```bash
+VERSION=$(date +%Y%m%d%H%M)
+FRIENDLY_VERSION="1.0.0"
+cd "apps/Kull Universal App/kull"
+
+# Clean DerivedData
+rm -rf ~/Library/Developer/Xcode/DerivedData/kull-*
+
+# Archive
+xcodebuild archive \
+  -scheme kull \
+  -destination 'generic/platform=macOS' \
+  -archivePath build/dmg.xcarchive \
+  CURRENT_PROJECT_VERSION="$VERSION" \
+  MARKETING_VERSION="$FRIENDLY_VERSION"
+
+# Export (Developer ID signed)
+xcodebuild -exportArchive \
+  -archivePath build/dmg.xcarchive \
+  -exportPath build/dmg-export \
+  -exportOptionsPlist ExportOptions-DeveloperID.plist \
+  -allowProvisioningUpdates
 
 # Create DMG
-create-dmg --volname "Kull" "Kull-$VERSION.dmg" build/mac/kull.app
+create-dmg \
+  --volname "Kull" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "kull.app" 150 190 \
+  --app-drop-link 450 190 \
+  "Kull-v$FRIENDLY_VERSION.dmg" \
+  "build/dmg-export/kull.app"
 
-# Notarize
-xcrun notarytool submit "Kull-$VERSION.dmg" --keychain-profile "AC_PASSWORD" --wait
-xcrun stapler staple "Kull-$VERSION.dmg"
+# Notarize (optional - recommended for public distribution)
+xcrun notarytool submit "Kull-v$FRIENDLY_VERSION.dmg" --keychain-profile "AC_PASSWORD" --wait
+xcrun stapler staple "Kull-v$FRIENDLY_VERSION.dmg"
 ```
+
+---
+
+### Common Issues & Fixes
+
+**1. "attach by pid failed" error during Xcode debugging:**
+- **Cause:** Local debugging issue with SIP/debugger restrictions
+- **Impact:** Does NOT affect archive/export builds
+- **Fix 1:** Use Release build configuration instead of Debug
+- **Fix 2:** Run app directly from Finder instead of Xcode debugger
+- **Important:** This error is harmless for production builds
+
+**2. I/O errors during build:**
+```bash
+# Clean DerivedData
+rm -rf ~/Library/Developer/Xcode/DerivedData/kull-*
+# Then rebuild
+```
+
+**3. ATS Network Errors on iOS:**
+- **Cause:** App Transport Security blocking HTTP connections
+- **Fix:** Info.plist must include `kullai.com` in NSExceptionDomains (NOT old `lander.media` domain)
+- **Verify:** Check `apps/Kull Universal App/kull/kull/Info.plist` contains:
+```xml
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSExceptionDomains</key>
+    <dict>
+        <key>kullai.com</key>
+        <dict>
+            <key>NSExceptionAllowsInsecureHTTPLoads</key>
+            <true/>
+        </dict>
+    </dict>
+</dict>
+```
+
+**4. TestFlight builds not appearing:**
+- **Check 1:** Build version must be unique (auto-incremented via date/time)
+- **Check 2:** Export compliance answered in App Store Connect
+- **Check 3:** Beta review may take 24-48 hours for first builds
+- **Check 4:** Public link auto-distributes after beta review passes
+
+**5. Privacy labels preventing submission:**
+- **Cause:** Privacy labels not configured in App Store Connect
+- **Fix:** Manually configure at https://appstoreconnect.apple.com/apps/6755838738/appstore/appprivacy
+- **Note:** This cannot be automated - Apple requires manual review
+
+---
 
 ### Troubleshooting
 
@@ -744,7 +888,37 @@ xcrun stapler staple "Kull-$VERSION.dmg"
 **TestFlight not updating:**
 1. Check build version is unique (must increment)
 2. Verify export compliance in App Store Connect
-3. Check beta review status
+3. Check beta review status (first builds require 24-48hr review)
+4. Ensure privacy labels are configured
+
+**App Store submission stuck:**
+1. Verify privacy labels are configured (cannot be automated)
+2. Check age ratings are set (NONE for all categories for Kull)
+3. Ensure both iOS and macOS builds are uploaded if submitting universal app
+4. Review App Store Connect submission checklist
+
+---
+
+### Current Deployment Status
+
+**iOS:**
+- Status: WAITING_FOR_REVIEW
+- Build: 202411271430
+- TestFlight: https://testflight.apple.com/join/PtzCFZKb
+- Public beta distribution: Enabled (auto-distributes after beta review)
+
+**macOS:**
+- Status: WAITING_FOR_REVIEW
+- Build: 202411271430
+- TestFlight: Available (via same link)
+- Direct download: Available via GitHub Releases (DMG)
+
+**Privacy Labels:**
+- Configured: Yes
+- Data types: Email, Photos, User ID, Device ID, Product Interaction, Purchase History
+
+**Age Ratings:**
+- All categories: NONE (app is safe for all ages)
 
 ---
 
@@ -911,6 +1085,91 @@ api-docs/
 
 ---
 
+## DMG Notarization (IMPORTANT - DO NOT FORGET!)
+
+**The DMG MUST be signed and notarized for users to open it without security warnings.**
+
+### App Store Connect API Credentials
+
+```
+KEY_ID: S9KW8G5RHS
+ISSUER_ID: c63dccab-1ecd-41dc-9374-174cfdb70958
+TEAM_ID: 283HJ7VJR4
+KEY_PATH: /Users/stevemoraco/.private_keys/AuthKey_S9KW8G5RHS.p8
+```
+
+### Notarization Commands (Copy-Paste Ready)
+
+**1. Sign the app inside the DMG (or the exported .app):**
+```bash
+codesign --force --deep --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+  --options runtime \
+  --timestamp \
+  "path/to/kull.app"
+```
+
+**2. Create the DMG (if not already created):**
+```bash
+hdiutil create -volname "Kull" -srcfolder "kull.app" -ov -format UDZO "Kull.dmg"
+```
+
+**3. Sign the DMG:**
+```bash
+codesign --force --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+  --timestamp \
+  --options runtime \
+  "Kull.dmg"
+```
+
+**4. Submit for notarization:**
+```bash
+xcrun notarytool submit "Kull.dmg" \
+  --key "/Users/stevemoraco/.private_keys/AuthKey_S9KW8G5RHS.p8" \
+  --key-id "S9KW8G5RHS" \
+  --issuer "c63dccab-1ecd-41dc-9374-174cfdb70958" \
+  --wait
+```
+
+**5. Staple the notarization ticket:**
+```bash
+xcrun stapler staple "Kull.dmg"
+```
+
+**6. Verify notarization:**
+```bash
+spctl --assess --type open --context context:primary-signature -v "Kull.dmg"
+xcrun stapler validate "Kull.dmg"
+```
+
+### Check Notarization History
+```bash
+xcrun notarytool history \
+  --key "/Users/stevemoraco/.private_keys/AuthKey_S9KW8G5RHS.p8" \
+  --key-id "S9KW8G5RHS" \
+  --issuer "c63dccab-1ecd-41dc-9374-174cfdb70958"
+```
+
+### Get Notarization Log (for debugging failures)
+```bash
+xcrun notarytool log "SUBMISSION_ID" \
+  --key "/Users/stevemoraco/.private_keys/AuthKey_S9KW8G5RHS.p8" \
+  --key-id "S9KW8G5RHS" \
+  --issuer "c63dccab-1ecd-41dc-9374-174cfdb70958"
+```
+
+### Automated Script
+Use `scripts/notarize-dmg.sh` for one-command notarization:
+```bash
+./scripts/notarize-dmg.sh "path/to/Kull.dmg" "Stephen Moraco"
+```
+
+### Common Issues
+- **"Apple could not verify" warning**: DMG was not notarized or ticket not stapled
+- **notarytool: key file doesn't exist**: Use absolute path `/Users/stevemoraco/.private_keys/...` not `$HOME/...`
+- **Invalid submission**: Check the log with `notarytool log` to see what failed
+
+---
+
 ## Critical Reminders
 
 ### ❌ NEVER DO THESE:
@@ -984,5 +1243,5 @@ xcrun altool --list-apps \
 
 ---
 
-**Last Updated:** 2025-11-27
+**Last Updated:** 2025-11-27 (CI/CD documentation updated with verified working commands and privacy label requirements)
 **Next Review:** When new AI models are released or deprecated

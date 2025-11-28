@@ -1,0 +1,68 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    KULL APP PRIVACY - QUICK REFERENCE                        ║
+║                         Manual Configuration Required                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+DIRECT LINK: https://appstoreconnect.apple.com/apps/6755838738/appstore/appprivacy
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 1: Email Address (Contact Info)                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           App Functionality                                        │
+│ Linked to User:     YES                                                      │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 2: Photos or Videos (User Content)                                │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           App Functionality                                        │
+│ Linked to User:     NO ⚠️ IMPORTANT                                          │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 3: User ID (Identifiers)                                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           App Functionality                                        │
+│ Linked to User:     YES                                                      │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 4: Device ID (Identifiers)                                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           App Functionality                                        │
+│ Linked to User:     YES                                                      │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 5: Product Interaction (Usage Data)                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           Analytics, App Functionality (BOTH)                      │
+│ Linked to User:     YES                                                      │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ DATA TYPE 6: Purchase History (Financial Info)                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Data Use:           App Functionality                                        │
+│ Linked to User:     YES                                                      │
+│ Used for Tracking:  NO                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ SUMMARY: 6 data types total                                                 ║
+║ Time required: ~10-15 minutes                                                ║
+║                                                                              ║
+║ ⚠️  API Configuration: NOT SUPPORTED by Apple                                ║
+║ ✓  Privacy Policy URL: Already configured (https://kull.foto/privacy)       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+NOTES:
+- Photos are processed locally/temporarily but NOT stored with user identity
+- All data collection is for app functionality only
+- NO third-party advertising or tracking
+- This is a one-time setup; persists across app updates
