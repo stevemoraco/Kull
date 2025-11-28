@@ -133,7 +133,7 @@ export default function Download() {
                 size="lg"
               />
               <p className="text-sm text-muted-foreground">
-                Version {currentVersionInfo.version} • {currentVersionInfo.minimumOS}
+                Version {currentVersionInfo.version} (Build {currentVersionInfo.buildNumber}) • {currentVersionInfo.minimumOS}
                 {!isAuthenticated && (
                   <>
                     {" • "}
