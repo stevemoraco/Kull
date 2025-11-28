@@ -150,7 +150,7 @@ sleep 90
 # Step 8: Configure TestFlight
 echo ""
 echo "Step 8: Configuring TestFlight..."
-python3 "$PROJECT_ROOT/scripts/testflight_setup.py" || echo "TestFlight setup completed (some builds may still be processing)"
+python3 "$PROJECT_ROOT/scripts/testflight_setup.py" --build "$BUILD_NUMBER"
 
 # Step 9: Build DMG for direct download (reuse mac archive)
 echo ""
