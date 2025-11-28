@@ -11,15 +11,15 @@
 				<string>arm64</string>
 			</array>
 			<key>buildNumber</key>
-			<string>2115</string>
+			<string>2146</string>
 			<key>certificate</key>
 			<dict>
 				<key>SHA1</key>
-				<string>33EE7B89C514F5846975B9174C1A765650D94561</string>
+				<string>FAD6F297292A1D63AC46DDE03E0049F1A91F2B02</string>
 				<key>dateExpires</key>
 				<string>2/1/27</string>
 				<key>type</key>
-				<string>Cloud Managed Developer ID Application</string>
+				<string>Developer ID Application</string>
 			</dict>
 			<key>entitlements</key>
 			<dict>
@@ -51,7 +51,7 @@
 			<key>profile</key>
 			<dict>
 				<key>UUID</key>
-				<string>3e8fc3d6-7829-4b8d-ab09-a97500dc32cb</string>
+				<string>bc4f6d98-ca2c-4ad2-a182-709604eab055</string>
 				<key>dateExpires</key>
 				<string>11/23/43</string>
 				<key>name</key>

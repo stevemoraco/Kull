@@ -171,9 +171,18 @@ xcodebuild -exportArchive \
 
 cd "$XCODE_PROJECT/build/dmg-export"
 
+# Create staging directory with app and Applications symlink
+echo "  Creating DMG staging directory..."
+rm -rf dmg-staging
+mkdir -p dmg-staging
+cp -R "kull.app" dmg-staging/
+ln -s /Applications dmg-staging/Applications
+
 # Create DMG
 echo "  Creating DMG: $DMG_NAME..."
+rm -f "$DMG_NAME"
 if command -v create-dmg &> /dev/null; then
+    echo "  Using create-dmg..."
     create-dmg \
       --volname "Kull" \
       --window-pos 200 120 \
@@ -182,9 +191,13 @@ if command -v create-dmg &> /dev/null; then
       --icon "kull.app" 150 190 \
       --app-drop-link 450 190 \
       "$DMG_NAME" \
-      "kull.app" 2>/dev/null || true
+      "dmg-staging/kull.app" || {
+        echo "  create-dmg failed, using hdiutil fallback..."
+        hdiutil create -volname "Kull" -srcfolder "dmg-staging" -ov -format UDZO "$DMG_NAME"
+      }
 else
-    hdiutil create -volname "Kull" -srcfolder "kull.app" -ov -format UDZO "$DMG_NAME"
+    echo "  Using hdiutil..."
+    hdiutil create -volname "Kull" -srcfolder "dmg-staging" -ov -format UDZO "$DMG_NAME"
 fi
 
 # Sign and notarize DMG
@@ -214,9 +227,16 @@ if [ -f "$DMG_NAME" ]; then
         --timestamp \
         "kull.app" 2>/dev/null || echo "  App signing skipped (may already be signed)"
 
+    # Re-create staging directory with signed app
+    rm -rf dmg-staging
+    mkdir -p dmg-staging
+    cp -R "kull.app" dmg-staging/
+    ln -s /Applications dmg-staging/Applications
+
     # Re-create DMG with signed app
     rm -f "$DMG_NAME"
     if command -v create-dmg &> /dev/null; then
+        echo "  Re-creating DMG with signed app..."
         create-dmg \
           --volname "Kull" \
           --window-pos 200 120 \
@@ -225,9 +245,12 @@ if [ -f "$DMG_NAME" ]; then
           --icon "kull.app" 150 190 \
           --app-drop-link 450 190 \
           "$DMG_NAME" \
-          "kull.app" 2>/dev/null || true
+          "dmg-staging/kull.app" || {
+            echo "  create-dmg failed, using hdiutil fallback..."
+            hdiutil create -volname "Kull" -srcfolder "dmg-staging" -ov -format UDZO "$DMG_NAME"
+          }
     else
-        hdiutil create -volname "Kull" -srcfolder "kull.app" -ov -format UDZO "$DMG_NAME"
+        hdiutil create -volname "Kull" -srcfolder "dmg-staging" -ov -format UDZO "$DMG_NAME"
     fi
 
     # Sign the DMG
