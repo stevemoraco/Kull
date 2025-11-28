@@ -4,13 +4,14 @@ import { storage } from "../storage";
 const router = Router();
 
 // Version information for each platform
+// NOTE: macOS version info is auto-updated by GitHub Actions workflow (.github/workflows/build-dmg.yml)
 const LATEST_VERSIONS = {
   macos: {
     version: "2025.11.27",
-    downloadUrl: "/downloads/Kull-v2025-11-27-11-54-AM.dmg",
+    downloadUrl: "/downloads/Kull-v2025-11-27-06-19-PM.dmg",
     releaseNotes: "Updated version with improved stability and no keychain prompts",
     releaseDate: "2025-11-27",
-    fileSize: "2.1 MB",
+    fileSize: "1.7 MB",
     minimumOS: "macOS 14.0+",
     features: [
       "5 AI models (Gemini, Grok, Kimi k2, Claude, GPT-5)",
@@ -22,9 +23,8 @@ const LATEST_VERSIONS = {
   },
   ios: {
     version: "2025.11.27",
-    appStoreUrl: "https://apps.apple.com/app/kull-ai/id123456789",
-    testFlightUrl: "https://testflight.apple.com/join/Kull",
-    releaseNotes: "Initial iOS release on TestFlight",
+    testFlightUrl: "https://testflight.apple.com/join/PtzCFZKb",
+    releaseNotes: "Initial iOS release on TestFlight - Beta Testing Now Available",
     releaseDate: "2025-11-27",
     minimumOS: "iOS 17.0+",
     features: [
