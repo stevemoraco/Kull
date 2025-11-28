@@ -194,6 +194,12 @@ def process_build(build, public_group_id):
     elif "ENTITY_ERROR.RELATIONSHIP.INVALID" in str(error):
         print("       ✓ Build already in beta testing")
         return True
+    elif "ANOTHER_BUILD_IN_BETA_REVIEW" in str(error):
+        print("       ⏳ Waiting - another build is in Apple review (will auto-queue)")
+        return "waiting"  # Partial success - needs to wait
+    elif "SUBMISSION_LIMIT_REACHED" in str(error):
+        print("       ⏳ Submission limit reached - try again later")
+        return "waiting"  # Partial success - rate limited
     else:
         print(f"       ⚠ Submission issue: {error[:150] if error else 'unknown'}")
         return True  # Count as success if we got this far
@@ -279,24 +285,38 @@ def main():
         print("\n3. Processing builds...")
 
         success_count = 0
+        waiting_count = 0
         if ios_build:
-            if process_build(ios_build, public_group_id):
+            result = process_build(ios_build, public_group_id)
+            if result == True:
                 success_count += 1
+            elif result == "waiting":
+                waiting_count += 1
         if macos_build:
-            if process_build(macos_build, public_group_id):
+            result = process_build(macos_build, public_group_id)
+            if result == True:
                 success_count += 1
+            elif result == "waiting":
+                waiting_count += 1
 
-        if success_count == 2:
+        total_processed = success_count + waiting_count
+        if total_processed == 2:
             print("\n" + "=" * 60)
-            print("✓ TESTFLIGHT SETUP COMPLETE!")
-            print("=" * 60)
-            print(f"  Both iOS and macOS builds submitted for public testing")
+            if waiting_count > 0:
+                print("⏳ TESTFLIGHT SETUP - WAITING FOR APPLE")
+                print("=" * 60)
+                print(f"  {success_count} build(s) submitted, {waiting_count} waiting")
+                print(f"  Builds added to beta group - will auto-submit when unblocked")
+            else:
+                print("✓ TESTFLIGHT SETUP COMPLETE!")
+                print("=" * 60)
+                print(f"  Both iOS and macOS builds submitted for public testing")
             print(f"  TestFlight: https://testflight.apple.com/join/PtzCFZKb")
-        elif success_count == 1:
+        elif total_processed == 1:
             print("\n" + "=" * 60)
             print("⚠ PARTIAL SUCCESS")
             print("=" * 60)
-            print(f"  Only 1 of 2 builds submitted")
+            print(f"  Only 1 of 2 builds processed")
         else:
             print("\n" + "=" * 60)
             print("✗ TESTFLIGHT SETUP FAILED")
