@@ -1113,10 +1113,18 @@ scripts/release.sh
 ### Environment Variables for Release
 
 **DEPLOY_SECRET** - Required for DMG upload to server
-- Set locally before running release.sh: `export DEPLOY_SECRET="your-secret"`
-- Must also be set on Replit in the Secrets tab
+- **Value:** `8166ca518b1e80df3c3d36fce063b5ac5ddf60f87521be733dd62c4da9eefcd4`
+- Set locally before running release.sh: `export DEPLOY_SECRET="8166ca518b1e80df3c3d36fce063b5ac5ddf60f87521be733dd62c4da9eefcd4"`
+- Also set on Replit in the Secrets tab (already configured)
 - If not set, release.sh will create the DMG but skip the upload
 - The secret is used to authenticate with the `/api/download/upload` endpoint
+
+**Manual Upload Command:**
+```bash
+curl -X POST "https://kullai.com/api/download/upload" \
+  -F "dmg=@path/to/Kull-YYYY.MM.DD.BBBB.dmg" \
+  -F "secret=8166ca518b1e80df3c3d36fce063b5ac5ddf60f87521be733dd62c4da9eefcd4"
+```
 
 **How It Works:**
 - `scripts/release.sh` builds and notarizes the DMG locally
