@@ -207,10 +207,69 @@ echo "pending" > "$TESTFLIGHT_STATUS_FILE"
         CAN_NOTARIZE=false
     fi
 
-    # Create DMG
-    echo "[DMG] Creating $DMG_NAME..."
+    # Create styled DMG (use /tmp to avoid Dropbox sync issues)
+    echo "[DMG] Creating styled $DMG_NAME..."
+    DMG_TEMP_DIR="/tmp/kull-dmg-$$"
+    rm -rf "$DMG_TEMP_DIR"
+    mkdir -p "$DMG_TEMP_DIR"
+
+    # Copy files to temp
+    cp -R "kull.app" "$DMG_TEMP_DIR/"
+    mkdir -p "$DMG_TEMP_DIR/staging"
+    cp -R "$DMG_TEMP_DIR/kull.app" "$DMG_TEMP_DIR/staging/"
+    ln -s /Applications "$DMG_TEMP_DIR/staging/Applications"
+
+    cd "$DMG_TEMP_DIR"
+    rm -f temp.dmg final.dmg
+
+    # Create a temporary read-write DMG first
+    hdiutil create -volname "Kull" -srcfolder "staging" -ov -format UDRW temp.dmg
+
+    # Mount it
+    hdiutil attach temp.dmg -readwrite -noverify
+    sleep 1
+
+    # Apply styling with AppleScript
+    echo "[DMG] Applying Finder styling..."
+    osascript << 'APPLESCRIPT_EOF'
+tell application "Finder"
+    tell disk "Kull"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set bounds of container window to {100, 100, 640, 440}
+        set theViewOptions to icon view options of container window
+        set arrangement of theViewOptions to not arranged
+        set icon size of theViewOptions to 128
+        set background color of theViewOptions to {65535, 65535, 65535}
+        -- Position icons: app on left, Applications on right
+        set position of item "kull.app" of container window to {130, 170}
+        set position of item "Applications" of container window to {410, 170}
+        close
+        open
+        update without registering applications
+        delay 2
+        close
+    end tell
+end tell
+APPLESCRIPT_EOF
+
+    # Make sure Finder is done
+    sleep 3
+
+    # Unmount
+    hdiutil detach "/Volumes/Kull" -force 2>/dev/null || true
+    sleep 2
+
+    # Convert to compressed read-only DMG
+    hdiutil convert temp.dmg -format UDZO -o final.dmg
+
+    # Move back to export directory
+    cd "$XCODE_PROJECT/build/dmg-export"
     rm -f "$DMG_NAME"
-    hdiutil create -volname "Kull" -srcfolder "dmg-staging" -ov -format UDZO "$DMG_NAME"
+    mv "$DMG_TEMP_DIR/final.dmg" "$DMG_NAME"
+    rm -rf "$DMG_TEMP_DIR"
 
     # Sign DMG if we have Developer ID
     if [ -n "$DEVELOPER_ID_CERT" ]; then
