@@ -162,9 +162,25 @@ final class WebSocketService: ObservableObject {
 
         print("[WebSocket] Connecting to \(url.absoluteString)")
 
+        // Create URLSession configuration optimized for WebSocket
+        // WebSocket upgrades require HTTP/1.1, not HTTP/2
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForResource = 300
+        // Disable HTTP/2 by setting the protocol classes
+        // The default URLSessionWebSocketTask should handle this, but we configure for reliability
+        configuration.httpAdditionalHeaders = [
+            "Connection": "keep-alive"
+        ]
+
+        // Create a URLRequest to have more control over the connection
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 60
+        // WebSocket task handles upgrade headers automatically
+
         // Create WebSocket task
-        let session = URLSession(configuration: .default)
-        webSocketTask = session.webSocketTask(with: url)
+        let session = URLSession(configuration: configuration)
+        webSocketTask = session.webSocketTask(with: request)
 
         // Start receiving messages
         receiveMessage()

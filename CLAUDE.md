@@ -1085,9 +1085,66 @@ api-docs/
 
 ---
 
-## DMG Notarization (IMPORTANT - DO NOT FORGET!)
+## Release Pipeline (FULLY AUTOMATED)
 
-**The DMG MUST be signed and notarized for users to open it without security warnings.**
+### One-Command Release: `scripts/release.sh`
+
+The release script handles EVERYTHING automatically:
+1. Builds iOS and macOS apps
+2. Uploads both to TestFlight
+3. Creates signed DMG for direct download
+4. Notarizes DMG (if Developer ID certificate exists)
+5. Updates website download page
+6. Commits and pushes to git
+
+**Run a release:**
+```bash
+scripts/release.sh
+```
+
+**Version Format:**
+- MARKETING_VERSION: `2025.11.27` (date)
+- BUILD_NUMBER: `2017` (HHMM time)
+- FULL_VERSION: `2025.11.27.2017` (DMG filename matches TestFlight exactly)
+
+---
+
+### ONE-TIME SETUP: Developer ID Certificate
+
+**CRITICAL: For notarized DMGs (no Gatekeeper warnings), you need a Developer ID Application certificate.**
+
+Apple's API **does not allow** creating Developer ID certificates programmatically (returns 403 FORBIDDEN "Account Holder only"). This requires a one-time manual setup through Xcode GUI.
+
+**Setup Script (opens Xcode GUI):**
+```bash
+scripts/setup_developer_id.sh
+```
+
+**Or Manual Steps:**
+1. Open Xcode > Settings (Cmd+,)
+2. Go to 'Accounts' tab
+3. Select your Apple ID
+4. Click 'Manage Certificates...'
+5. Click '+' and select 'Developer ID Application'
+6. Wait for certificate to be created and downloaded
+
+**Verify Certificate Exists:**
+```bash
+security find-identity -v -p codesigning | grep "Developer ID"
+```
+
+**Expected Output (after setup):**
+```
+1) ABC123... "Developer ID Application: Stephen Moraco (283HJ7VJR4)"
+```
+
+**If No Developer ID Certificate:**
+- release.sh still works but uses Apple Development certificate
+- DMG is signed but NOT notarized
+- Users see "Apple could not verify" warning (must right-click > Open)
+- Run `scripts/setup_developer_id.sh` to fix
+
+---
 
 ### App Store Connect API Credentials
 
@@ -1096,26 +1153,29 @@ KEY_ID: S9KW8G5RHS
 ISSUER_ID: c63dccab-1ecd-41dc-9374-174cfdb70958
 TEAM_ID: 283HJ7VJR4
 KEY_PATH: /Users/stevemoraco/.private_keys/AuthKey_S9KW8G5RHS.p8
+APP_ID: 6755838738
 ```
 
-### Notarization Commands (Copy-Paste Ready)
+---
 
-**1. Sign the app inside the DMG (or the exported .app):**
+### Manual Notarization Commands (if needed)
+
+**1. Sign the app with Developer ID:**
 ```bash
-codesign --force --deep --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+codesign --force --deep --sign "Developer ID Application: Stephen Moraco (283HJ7VJR4)" \
   --options runtime \
   --timestamp \
   "path/to/kull.app"
 ```
 
-**2. Create the DMG (if not already created):**
+**2. Create the DMG:**
 ```bash
 hdiutil create -volname "Kull" -srcfolder "kull.app" -ov -format UDZO "Kull.dmg"
 ```
 
 **3. Sign the DMG:**
 ```bash
-codesign --force --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+codesign --force --sign "Developer ID Application: Stephen Moraco (283HJ7VJR4)" \
   --timestamp \
   --options runtime \
   "Kull.dmg"
@@ -1141,6 +1201,8 @@ spctl --assess --type open --context context:primary-signature -v "Kull.dmg"
 xcrun stapler validate "Kull.dmg"
 ```
 
+---
+
 ### Check Notarization History
 ```bash
 xcrun notarytool history \
@@ -1157,16 +1219,40 @@ xcrun notarytool log "SUBMISSION_ID" \
   --issuer "c63dccab-1ecd-41dc-9374-174cfdb70958"
 ```
 
-### Automated Script
-Use `scripts/notarize-dmg.sh` for one-command notarization:
-```bash
-./scripts/notarize-dmg.sh "path/to/Kull.dmg" "Stephen Moraco"
+---
+
+### Release Pipeline Files
+
+```
+scripts/
+├── release.sh                    # Main release script (fully automated)
+├── setup_developer_id.sh         # One-time Developer ID certificate setup
+├── create_developer_id_cert.py   # API approach (doesn't work - Apple restriction)
+└── testflight_setup.py           # TestFlight configuration
 ```
 
+---
+
 ### Common Issues
-- **"Apple could not verify" warning**: DMG was not notarized or ticket not stapled
-- **notarytool: key file doesn't exist**: Use absolute path `/Users/stevemoraco/.private_keys/...` not `$HOME/...`
-- **Invalid submission**: Check the log with `notarytool log` to see what failed
+
+**"Apple could not verify" warning on DMG:**
+- Cause: No Developer ID certificate
+- Fix: Run `scripts/setup_developer_id.sh` (one-time setup)
+
+**Notarization returns "Invalid":**
+- Cause: Signed with Apple Development instead of Developer ID
+- Fix: Create Developer ID certificate via Xcode GUI
+
+**API returns 403 FORBIDDEN for certificate creation:**
+- This is expected - Apple only allows Account Holder to create Developer ID certs via GUI
+- Cannot be automated - use `scripts/setup_developer_id.sh` for GUI-based setup
+
+**notarytool: key file doesn't exist:**
+- Use absolute path `/Users/stevemoraco/.private_keys/...` not `$HOME/...`
+
+**Build version conflict:**
+- HHMM format ensures unique build numbers within a day
+- If running multiple releases same hour, wait for next hour or manually increment
 
 ---
 
@@ -1243,5 +1329,5 @@ xcrun altool --list-apps \
 
 ---
 
-**Last Updated:** 2025-11-27 (CI/CD documentation updated with verified working commands and privacy label requirements)
+**Last Updated:** 2025-11-27 (Release pipeline fully documented - scripts/release.sh is fully automated, Developer ID certificate requires one-time Xcode GUI setup due to Apple API restrictions)
 **Next Review:** When new AI models are released or deprecated

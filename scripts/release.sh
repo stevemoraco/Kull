@@ -8,6 +8,48 @@ set -e
 
 # Configuration
 PROJECT_ROOT="/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull"
+
+# Step 0: Git sync - pull, merge, and ensure we're on main
+echo ""
+echo "Step 0: Syncing with remote (pull, merge, push)..."
+cd "$PROJECT_ROOT"
+
+# Ensure we're on main branch
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "  Switching from '$CURRENT_BRANCH' to 'main'..."
+    git checkout main
+fi
+
+# Fetch latest from remote
+echo "  Fetching latest from origin..."
+git fetch origin main
+
+# Check if we need to merge
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+BASE=$(git merge-base HEAD origin/main)
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+    echo "  ✓ Already up to date with origin/main"
+elif [ "$LOCAL" = "$BASE" ]; then
+    echo "  Pulling changes from origin/main..."
+    git pull origin main --no-edit
+    echo "  ✓ Pulled latest changes"
+elif [ "$REMOTE" = "$BASE" ]; then
+    echo "  ✓ Local is ahead of origin (will push at end)"
+else
+    echo "  Merging origin/main into local..."
+    if git merge origin/main --no-edit; then
+        echo "  ✓ Merged successfully"
+    else
+        echo "  ⚠️ MERGE CONFLICT DETECTED!"
+        echo "  Please resolve conflicts manually, then run release.sh again"
+        exit 1
+    fi
+fi
+
+echo "  ✓ Git sync complete"
 XCODE_PROJECT="$PROJECT_ROOT/apps/Kull Universal App/kull"
 APP_ID="6755838738"
 KEY_ID="S9KW8G5RHS"
@@ -150,10 +192,24 @@ if [ -f "$DMG_NAME" ]; then
     echo ""
     echo "Step 9b: Signing and notarizing DMG..."
 
+    # Check if Developer ID Application certificate exists
+    DEVELOPER_ID_CERT=$(security find-identity -v -p codesigning 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/' || true)
+
+    if [ -n "$DEVELOPER_ID_CERT" ]; then
+        echo "  ✓ Found Developer ID certificate: $DEVELOPER_ID_CERT"
+        SIGNING_IDENTITY="$DEVELOPER_ID_CERT"
+        CAN_NOTARIZE=true
+    else
+        echo "  ⚠ No Developer ID certificate found - using Apple Development"
+        echo "    Run: scripts/setup_developer_id.sh for one-time setup"
+        SIGNING_IDENTITY="Apple Development: Stephen Moraco (CNFRKNKY86)"
+        CAN_NOTARIZE=false
+    fi
+
     # Sign the app with hardened runtime
-    echo "  Signing app..."
+    echo "  Signing app with: $SIGNING_IDENTITY"
     codesign --force --deep \
-        --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+        --sign "$SIGNING_IDENTITY" \
         --options runtime \
         --timestamp \
         "kull.app" 2>/dev/null || echo "  App signing skipped (may already be signed)"
@@ -177,28 +233,34 @@ if [ -f "$DMG_NAME" ]; then
     # Sign the DMG
     echo "  Signing DMG..."
     codesign --force \
-        --sign "Apple Development: Stephen Moraco (CNFRKNKY86)" \
+        --sign "$SIGNING_IDENTITY" \
         --timestamp \
         --options runtime \
         "$DMG_NAME" 2>/dev/null || echo "  DMG signing skipped"
 
-    # Submit for notarization
-    echo "  Submitting for notarization (this takes ~5 minutes)..."
-    NOTARIZE_OUTPUT=$(xcrun notarytool submit "$DMG_NAME" \
-        --key "$KEY_PATH" \
-        --key-id "$KEY_ID" \
-        --issuer "$ISSUER_ID" \
-        --wait 2>&1) || true
+    # Submit for notarization (only if we have Developer ID)
+    if [ "$CAN_NOTARIZE" = true ]; then
+        echo "  Submitting for notarization (this takes ~5 minutes)..."
+        NOTARIZE_OUTPUT=$(xcrun notarytool submit "$DMG_NAME" \
+            --key "$KEY_PATH" \
+            --key-id "$KEY_ID" \
+            --issuer "$ISSUER_ID" \
+            --wait 2>&1) || true
 
-    echo "$NOTARIZE_OUTPUT"
+        echo "$NOTARIZE_OUTPUT"
 
-    if echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
-        echo "  Stapling notarization ticket..."
-        xcrun stapler staple "$DMG_NAME"
-        echo "✓ DMG signed and notarized successfully"
+        if echo "$NOTARIZE_OUTPUT" | grep -q "status: Accepted"; then
+            echo "  Stapling notarization ticket..."
+            xcrun stapler staple "$DMG_NAME"
+            echo "✓ DMG signed and notarized successfully"
+        else
+            echo "⚠️  Notarization may have failed"
+            echo "  DMG will still be usable but users may see Gatekeeper warnings"
+        fi
     else
-        echo "⚠️  Notarization may have failed or timed out"
-        echo "  DMG will still be usable but users may see Gatekeeper warnings"
+        echo "  ⚠ Skipping notarization (no Developer ID certificate)"
+        echo "    DMG is signed but users will need to right-click > Open"
+        echo "    For fully notarized DMGs, run: scripts/setup_developer_id.sh"
     fi
 else
     echo "⚠️  DMG creation failed"
