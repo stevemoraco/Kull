@@ -34,7 +34,7 @@ Complete automation for building and releasing Kull to TestFlight and direct dow
 7. **Wait** - Let builds process (90 seconds)
 8. **TestFlight** - Configure public beta and submit for review
 9. **DMG** - Build signed DMG for direct download
-10. **Website** - Update download.ts with new version
+10. **Upload** - Upload DMG to Replit Object Storage via API
 11. **Git** - Commit and push changes
 
 ## Version Format

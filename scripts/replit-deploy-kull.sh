@@ -146,16 +146,31 @@ cmd_deploy() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     
-    # Sync with git first
-    echo -e "${YELLOW}🔄 Syncing with git...${NC}"
-    if git pull origin main 2>/dev/null; then
-        echo -e "${GREEN}✓ Git synced${NC}"
-    elif git pull origin master 2>/dev/null; then
-        echo -e "${GREEN}✓ Git synced${NC}"
-    elif git pull 2>/dev/null; then
-        echo -e "${GREEN}✓ Git synced${NC}"
+    # Sync Replit with GitHub via our API endpoint
+    # This tells the Replit server to run: git fetch --all && git reset --hard origin/main
+    echo -e "${YELLOW}🔄 Syncing Replit with GitHub...${NC}"
+
+    DEPLOY_SECRET="${DEPLOY_SECRET:-}"
+    if [ -z "$DEPLOY_SECRET" ]; then
+        echo -e "${GRAY}⚠ DEPLOY_SECRET not set - skipping remote git sync${NC}"
+        echo -e "${GRAY}  Set DEPLOY_SECRET env var to enable automatic git sync${NC}"
     else
-        echo -e "${GRAY}⚠ Git sync skipped (no remote or already up to date)${NC}"
+        GIT_SYNC_RESPONSE=$(curl -s -X POST "https://kullai.com/api/deploy/git-sync" \
+            -H "Content-Type: application/json" \
+            -d "{\"secret\": \"$DEPLOY_SECRET\"}" \
+            --max-time 60)
+
+        if echo "$GIT_SYNC_RESPONSE" | grep -q '"success":true'; then
+            COMMIT_INFO=$(echo "$GIT_SYNC_RESPONSE" | grep -o '"commit":"[^"]*"' | cut -d'"' -f4)
+            echo -e "${GREEN}✓ Replit synced with GitHub${NC}"
+            if [ -n "$COMMIT_INFO" ]; then
+                echo -e "${GRAY}  Now at: $COMMIT_INFO${NC}"
+            fi
+        else
+            echo -e "${RED}⚠ Git sync failed${NC}"
+            echo -e "${GRAY}  Response: $(echo "$GIT_SYNC_RESPONSE" | head -c 100)${NC}"
+            echo -e "${GRAY}  Continuing with deployment anyway...${NC}"
+        fi
     fi
     echo ""
     

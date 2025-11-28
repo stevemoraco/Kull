@@ -672,8 +672,8 @@ apps/Kull Universal App/kull/ci_scripts/
 1. Build macOS app with xcodebuild
 2. Create DMG with create-dmg
 3. Upload to GitHub Releases
-4. Update download page link
-5. Commit and push changes
+4. Upload DMG to Replit Object Storage via `/api/download/upload`
+5. Server dynamically serves latest version (no code changes needed)
 
 **GitHub Secrets Required:**
 - `APPLE_CERTIFICATE_BASE64` - Developer ID certificate
@@ -682,6 +682,7 @@ apps/Kull Universal App/kull/ci_scripts/
 - `ASC_KEY_ID` - S9KW8G5RHS
 - `ASC_ISSUER_ID` - c63dccab-1ecd-41dc-9374-174cfdb70958
 - `ASC_PRIVATE_KEY` - Contents of AuthKey_S9KW8G5RHS.p8
+- `DEPLOY_SECRET` - Secret for authenticating DMG uploads to server
 
 ### App Store Connect API
 
@@ -1093,9 +1094,9 @@ The release script handles EVERYTHING automatically:
 1. Builds iOS and macOS apps
 2. Uploads both to TestFlight
 3. Creates signed DMG for direct download
-4. Notarizes DMG (if Developer ID certificate exists)
-5. Updates website download page
-6. Commits and pushes to git
+4. Notarizes and staples DMG
+5. Uploads DMG to Replit Object Storage via API
+6. Server dynamically serves latest version (no git push needed)
 
 **Run a release:**
 ```bash
@@ -1106,6 +1107,29 @@ scripts/release.sh
 - MARKETING_VERSION: `2025.11.27` (date)
 - BUILD_NUMBER: `2017` (HHMM time)
 - FULL_VERSION: `2025.11.27.2017` (DMG filename matches TestFlight exactly)
+
+---
+
+### Environment Variables for Release
+
+**DEPLOY_SECRET** - Required for DMG upload to server
+- Set locally before running release.sh: `export DEPLOY_SECRET="your-secret"`
+- Must also be set on Replit in the Secrets tab
+- If not set, release.sh will create the DMG but skip the upload
+- The secret is used to authenticate with the `/api/download/upload` endpoint
+
+**How It Works:**
+- `scripts/release.sh` builds and notarizes the DMG locally
+- After notarization succeeds, it POSTs the DMG file to `https://kullai.com/api/download/upload`
+- The server validates the DEPLOY_SECRET header
+- DMG is uploaded to Replit Object Storage
+- `server/routes/download.ts` dynamically serves the latest version from Object Storage
+
+**No Git Commits Required:**
+- The old flow modified `download.ts` and pushed to git
+- The new flow uploads directly to Object Storage
+- The server reads the latest version from storage on each request
+- No code changes needed when releasing a new version
 
 ---
 
@@ -1228,7 +1252,11 @@ scripts/
 ├── release.sh                    # Main release script (fully automated)
 ├── setup_developer_id.sh         # One-time Developer ID certificate setup
 ├── create_developer_id_cert.py   # API approach (doesn't work - Apple restriction)
-└── testflight_setup.py           # TestFlight configuration
+├── testflight_setup.py           # TestFlight configuration
+└── replit-deploy-kull.sh         # Manual Replit deployment (kept for future use, not called by release.sh)
+
+server/routes/
+└── download.ts                   # Upload API + dynamically serves latest DMG from Object Storage
 ```
 
 ---
@@ -1329,5 +1357,5 @@ xcrun altool --list-apps \
 
 ---
 
-**Last Updated:** 2025-11-27 (Release pipeline fully documented - scripts/release.sh is fully automated, Developer ID certificate requires one-time Xcode GUI setup due to Apple API restrictions)
+**Last Updated:** 2025-11-28 (Updated release pipeline to use Replit Object Storage API instead of git commits for DMG distribution. DMGs now upload directly to server via /api/download/upload endpoint using DEPLOY_SECRET authentication.)
 **Next Review:** When new AI models are released or deprecated

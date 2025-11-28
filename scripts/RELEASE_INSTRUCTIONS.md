@@ -11,7 +11,7 @@ The `release.sh` script automates the entire release process for Kull in one pas
 5. ✅ Uploads macOS to App Store Connect / TestFlight
 6. ✅ Configures TestFlight (adds to public beta group, submits for review)
 7. ✅ Builds DMG for direct download
-8. ✅ Updates website download links
+8. ✅ Uploads DMG to Replit Object Storage via API
 9. ✅ Commits and pushes to git
 
 ## Version Format
@@ -90,7 +90,7 @@ Step 6: Uploading macOS to App Store Connect...
 Step 7: Waiting for builds to process (90 seconds)...
 Step 8: Configuring TestFlight...
 Step 9: Building DMG...
-Step 10: Updating website...
+Step 10: Uploading to server...
 Step 11: Committing and pushing...
 ================================================
 RELEASE COMPLETE!
@@ -283,8 +283,11 @@ create-dmg --volname "Kull" \
 
 - **Modified by Script:**
   - `apps/Kull Universal App/kull/kull.xcodeproj/project.pbxproj` - Version numbers
-  - `server/routes/download.ts` - Download URL and version
-  - `client/public/downloads/Kull-v*.dmg` - New DMG file added
+- **Uploaded by Script:**
+  - DMG uploaded to Replit Object Storage via `/api/download/upload`
+- **Server Dynamic Handling:**
+  - Download page automatically shows latest DMG from object storage
+  - No manual version updates needed
 
 ## Support
 
