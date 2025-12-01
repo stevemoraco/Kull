@@ -898,6 +898,66 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/kull-*
 3. Ensure both iOS and macOS builds are uploaded if submitting universal app
 4. Review App Store Connect submission checklist
 
+**Beta Review Rejection Fixes (Common Guidelines):**
+
+If Apple rejects your TestFlight beta build, here are the common fixes:
+
+1. **Guideline 2.1 - Demo Account Required:**
+   - Demo account: `kulltest@mora.co` / `kulltest123`
+   - Set via App Store Connect API in `scripts/testflight_setup.py`
+   - Or manually in App Store Connect > App > TestFlight > Test Information
+
+2. **Guideline 2.4.5(i) - Invalid Entitlements:**
+   - NEVER set optional entitlements to `false` in `.entitlements` files
+   - Only include entitlements you actually need with `true` values
+   - Remove entries like `com.apple.security.cs.allow-jit: false` entirely
+   - File: `apps/Kull Universal App/kull/kull/kull.entitlements`
+
+3. **Guideline 4.0 - Sign-In Must Use ASWebAuthenticationSession:**
+   - iOS apps MUST use `ASWebAuthenticationSession` for web-based sign-in
+   - NEVER use `UIApplication.shared.open(url)` to open Safari for auth
+   - Implementation in: `apps/Kull Universal App/kull/kull/AuthViewModel.swift`
+   - Requires `import AuthenticationServices`
+   - For iOS, need `ASWebAuthenticationPresentationContextProviding` to get window
+
+**App Store Connect Webhooks (WWDC 2025):**
+
+Apple now supports webhooks for real-time notifications. We have an endpoint ready:
+
+**Webhook Endpoint:** `https://kullai.com/api/webhooks/appstore`
+
+**Setup in App Store Connect:**
+1. Go to **Users and Access > Integrations > Webhooks**
+2. Click **(+)** to add webhook
+3. Set **Name:** `Kull Build Notifications`
+4. Set **Payload URL:** `https://kullai.com/api/webhooks/appstore`
+5. Set **Secret:** Generate a secret and add to Replit as `APPSTORE_WEBHOOK_SECRET`
+6. Select the **Kull** app
+7. Enable events:
+   - **TestFlight Beta Review State Changed** (build approvals/rejections)
+   - **App Store Version State Changed** (App Store status changes)
+   - **TestFlight Beta Feedback** (tester feedback)
+8. Click **Save**
+
+**Webhook Events Received:**
+- `TESTFLIGHT_BETA_REVIEW_STATE_CHANGED` - Notifies when builds are APPROVED, REJECTED, IN_REVIEW
+- `APP_STORE_VERSION_STATE_CHANGED` - Notifies App Store version status changes
+- `TESTFLIGHT_BETA_FEEDBACK` - New tester comments/ratings
+
+**Important Limitation:**
+The webhook payload includes the STATE (REJECTED, APPROVED, etc.) but **NOT the rejection reason text**.
+For rejection details, you must still check:
+- App Store Connect Resolution Center
+- Email notifications
+- Click the rejected build in App Store Connect
+
+**Webhook Implementation:** `server/routes/appstore-webhooks.ts`
+
+**Test the webhook:**
+```bash
+curl https://kullai.com/api/webhooks/appstore/health
+```
+
 ---
 
 ### Current Deployment Status
@@ -1088,25 +1148,40 @@ api-docs/
 
 ## Release Pipeline (FULLY AUTOMATED)
 
-### One-Command Release: `scripts/release.sh`
+### Quick Reference: Run a Release
 
-The release script handles EVERYTHING automatically:
-1. Builds iOS and macOS apps
-2. Uploads both to TestFlight
-3. Creates signed DMG for direct download
-4. Notarizes and staples DMG
-5. Uploads DMG to Replit Object Storage via API
-6. Server dynamically serves latest version (no git push needed)
-
-**Run a release:**
 ```bash
-scripts/release.sh
+# Set the deploy secret (required for DMG upload)
+export DEPLOY_SECRET="8166ca518b1e80df3c3d36fce063b5ac5ddf60f87521be733dd62c4da9eefcd4"
+
+# Run the release from the project root
+cd "/Users/stevemoraco/Lander Dropbox/Steve Moraco/Mac (6)/Downloads/ai image culling/kull"
+./scripts/release.sh
 ```
 
-**Version Format:**
-- MARKETING_VERSION: `2025.11.27` (date)
-- BUILD_NUMBER: `2017` (HHMM time)
-- FULL_VERSION: `2025.11.27.2017` (DMG filename matches TestFlight exactly)
+**That's it!** The script handles everything automatically.
+
+### What `scripts/release.sh` Does
+
+1. **Builds iOS and macOS apps** - Archives for both platforms
+2. **Uploads to App Store Connect** - Both builds uploaded for TestFlight
+3. **Polls for processing** - Waits for Apple to process the builds
+4. **Configures TestFlight** - Sets export compliance, "What to Test" notes
+5. **Adds to Public Testers group** - Builds available via public TestFlight link
+6. **Submits for beta review** - Triggers Apple's beta review process
+7. **Creates signed DMG** - Developer ID signed for direct download
+8. **Notarizes DMG** - Apple notarization for Gatekeeper
+9. **Uploads DMG to server** - Via `/api/download/upload` API endpoint
+
+### Version Format
+- MARKETING_VERSION: `2025.11.28` (date)
+- BUILD_NUMBER: `0114` (HHMM time, 4 digits)
+- FULL_VERSION: `2025.11.28.0114` (DMG filename matches TestFlight exactly)
+
+### Release Output Locations
+- **TestFlight:** https://testflight.apple.com/join/PtzCFZKb
+- **DMG Download:** https://kullai.com/downloads/Kull-YYYY.MM.DD.BBBB.dmg
+- **Latest API:** https://kullai.com/api/download/latest
 
 ---
 

@@ -132,6 +132,69 @@ def get_public_beta_group():
 
     return None, None
 
+WHAT_TO_TEST = """Key features to test in this build:
+
+1. SIGN IN & AUTHENTICATION
+   - Sign in with your Kull account
+   - Test device pairing flow
+
+2. PHOTO PROCESSING (macOS only)
+   - Select a folder with RAW photos
+   - Start AI rating process
+   - Verify XMP sidecar files are created
+
+3. CLOUD SYNC
+   - Check that ratings sync between devices
+   - Test push notifications
+
+4. GENERAL
+   - Test app stability and performance
+   - Report any crashes or UI issues
+
+Please send feedback to steve@lander.media"""
+
+def set_what_to_test(build_id):
+    """Set the 'What to Test' notes for a build"""
+    # Get existing localization
+    response = api_get(f'/v1/builds/{build_id}/betaBuildLocalizations')
+    if not response or 'data' not in response:
+        return False
+
+    locs = response.get('data', [])
+    if locs:
+        # Update existing
+        loc_id = locs[0]['id']
+        result, error = api_patch(f'/v1/betaBuildLocalizations/{loc_id}', {
+            'data': {
+                'type': 'betaBuildLocalizations',
+                'id': loc_id,
+                'attributes': {
+                    'whatsNew': WHAT_TO_TEST
+                }
+            }
+        })
+        return result is not None
+    else:
+        # Create new
+        result, error = api_post('/v1/betaBuildLocalizations', {
+            'data': {
+                'type': 'betaBuildLocalizations',
+                'attributes': {
+                    'locale': 'en-US',
+                    'whatsNew': WHAT_TO_TEST
+                },
+                'relationships': {
+                    'build': {
+                        'data': {
+                            'type': 'builds',
+                            'id': build_id
+                        }
+                    }
+                }
+            }
+        })
+        return result is not None
+
 def process_build(build, public_group_id):
     """Process a single build: set compliance, add to group, submit for review"""
     build_id = build['id']
@@ -140,6 +203,13 @@ def process_build(build, public_group_id):
     uses_encryption = build['attributes'].get('usesNonExemptEncryption')
 
     print(f"\n  Processing {platform} build {version}...")
+
+    # Step 0: Set "What to Test" notes
+    print("    0) Setting 'What to Test' notes...")
+    if set_what_to_test(build_id):
+        print("       ✓ What to Test notes set")
+    else:
+        print("       ⚠ Could not set What to Test notes")
 
     # Step 1: Set export compliance
     print("    a) Setting export compliance...")

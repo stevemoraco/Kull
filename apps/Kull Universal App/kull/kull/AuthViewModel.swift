@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AuthenticationServices
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -7,6 +8,21 @@ import AppKit
 import UIKit
 #endif
 import OSLog
+
+// MARK: - ASWebAuthenticationSession Presentation Context Provider
+#if os(iOS)
+final class WebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private let window: UIWindow
+
+    init(window: UIWindow) {
+        self.window = window
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return window
+    }
+}
+#endif
 
 @MainActor
 final class AuthViewModel: ObservableObject {
@@ -50,6 +66,10 @@ final class AuthViewModel: ObservableObject {
     private let syncCoordinator: SyncCoordinator
     private var pollTask: Task<Void, Never>?
     private let storedUserDefaultsKey = "kull_device_user"
+    private var webAuthSession: ASWebAuthenticationSession?
+    #if os(iOS)
+    private var webAuthContextProvider: WebAuthContextProvider?
+    #endif
 
     init(api: KullAPIClient = .shared, syncCoordinator: SyncCoordinator = .shared) {
         self.api = api
@@ -173,12 +193,35 @@ final class AuthViewModel: ObservableObject {
 
         guard let url else { return }
 
-        Logger.auth.info("Opening device approval page in browser")
-        #if os(macOS)
-        NSWorkspace.shared.open(url)
-        #else
-        UIApplication.shared.open(url)
+        Logger.auth.info("Opening device approval page with ASWebAuthenticationSession")
+
+        // Use ASWebAuthenticationSession for App Store compliance
+        // The callback URL scheme is "kull" - we don't actually need the callback
+        // since we poll for status, but ASWebAuthenticationSession requires one
+        webAuthSession = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: "kull"
+        ) { [weak self] callbackURL, error in
+            // We don't rely on the callback - polling handles the auth flow
+            // This just provides a better in-app browser experience
+            if let error = error as? ASWebAuthenticationSessionError,
+               error.code == .canceledLogin {
+                Logger.auth.info("User dismissed authentication browser")
+            }
+            self?.webAuthSession = nil
+        }
+
+        // Set presentation context for iOS
+        #if os(iOS)
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            webAuthContextProvider = WebAuthContextProvider(window: window)
+            webAuthSession?.presentationContextProvider = webAuthContextProvider
+        }
         #endif
+
+        webAuthSession?.prefersEphemeralWebBrowserSession = false
+        webAuthSession?.start()
     }
 
     func logout() {

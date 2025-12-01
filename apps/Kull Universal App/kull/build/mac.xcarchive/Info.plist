@@ -14,9 +14,9 @@
 		<key>CFBundleIdentifier</key>
 		<string>media.lander.kull</string>
 		<key>CFBundleShortVersionString</key>
-		<string>2025.11.27</string>
+		<string>2025.11.28</string>
 		<key>CFBundleVersion</key>
-		<string>2327</string>
+		<string>0114</string>
 		<key>SigningIdentity</key>
 		<string>Apple Development: Stephen Moraco (CNFRKNKY86)</string>
 		<key>Team</key>
@@ -25,7 +25,7 @@
 	<key>ArchiveVersion</key>
 	<integer>2</integer>
 	<key>CreationDate</key>
-	<date>2025-11-28T06:27:44Z</date>
+	<date>2025-11-28T08:15:05Z</date>
 	<key>Distributions</key>
 	<array>
 		<dict>
@@ -36,11 +36,11 @@
 			<key>destination</key>
 			<string>upload</string>
 			<key>identifier</key>
-			<string>05a274ea-24fc-48a0-94bb-3bbded959756</string>
+			<string>92bc7fb7-b8e3-46c3-a624-109f41cce284</string>
 			<key>preparationEvent</key>
 			<dict>
 				<key>date</key>
-				<string>2025-11-28T06:28:22Z</string>
+				<string>2025-11-28T08:15:33Z</string>
 				<key>errors</key>
 				<array/>
 				<key>infoMessages</key>
@@ -65,7 +65,7 @@
 			<key>uploadEvent</key>
 			<dict>
 				<key>date</key>
-				<string>2025-11-28T06:29:12Z</string>
+				<string>2025-11-28T08:16:08Z</string>
 				<key>errors</key>
 				<array/>
 				<key>infoMessages</key>
@@ -80,7 +80,7 @@
 				<array/>
 			</dict>
 			<key>uploadedBuildNumber</key>
-			<string>2327</string>
+			<string>0114</string>
 		</dict>
 	</array>
 	<key>Name</key>

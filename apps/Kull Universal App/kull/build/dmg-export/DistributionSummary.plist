@@ -11,7 +11,7 @@
 				<string>arm64</string>
 			</array>
 			<key>buildNumber</key>
-			<string>2327</string>
+			<string>0114</string>
 			<key>certificate</key>
 			<dict>
 				<key>SHA1</key>
@@ -29,18 +29,6 @@
 				<string>283HJ7VJR4</string>
 				<key>com.apple.security.app-sandbox</key>
 				<true/>
-				<key>com.apple.security.automation.apple-events</key>
-				<false/>
-				<key>com.apple.security.cs.allow-dyld-environment-variables</key>
-				<false/>
-				<key>com.apple.security.cs.allow-jit</key>
-				<false/>
-				<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-				<false/>
-				<key>com.apple.security.cs.disable-executable-page-protection</key>
-				<false/>
-				<key>com.apple.security.cs.disable-library-validation</key>
-				<false/>
 				<key>com.apple.security.files.user-selected.read-write</key>
 				<true/>
 				<key>com.apple.security.network.client</key>
@@ -65,7 +53,7 @@
 				<string></string>
 			</dict>
 			<key>versionNumber</key>
-			<string>2025.11.27</string>
+			<string>2025.11.28</string>
 		</dict>
 	</array>
 </dict>

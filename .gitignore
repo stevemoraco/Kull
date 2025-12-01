@@ -30,6 +30,10 @@ node_modules
 server/public
 *.tar.gz
 vite.config.ts.*
+.deployment_logs/
+.deployment_logs/**
+deployment_logs/
+deployment_logs/**
 .data-sync/
 .data-sync/**
 .data-sync/grok/
